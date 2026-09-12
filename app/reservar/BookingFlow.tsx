@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Sede, Servicio, FranjaDisponible } from "@/lib/types";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 
-type Paso = "sede" | "servicio" | "complementos" | "profesional" | "fecha" | "datos" | "confirmado";
+type Paso = "sede" | "servicio" | "complementos" | "fecha" | "datos" | "confirmado";
 
 // Los servicios "principales" (categoria = null) se muestran siempre
 // directamente en el paso de reserva. El resto vive dentro de un
@@ -205,7 +205,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
     const servicio = servicios.find((s) => s.id === id);
     // Si el servicio elegido ya es un complemento (se reserva solo), no
     // tiene sentido ofrecer añadirle otro complemento encima.
-    setPaso(servicio && esComplemento(servicio) ? "profesional" : "complementos");
+    setPaso(servicio && esComplemento(servicio) ? "fecha" : "complementos");
     if (sedeId) {
       const res = await fetch(`/api/profesionales?sedeId=${sedeId}&servicioId=${id}`);
       const json = await res.json();
@@ -219,22 +219,38 @@ export default function BookingFlow({ sedes, servicios }: Props) {
     );
   }
 
-  async function elegirFecha(valor: string) {
-    setFecha(valor);
+  // Recibe el profesional explícitamente (en vez de leerlo del estado) para
+  // evitar que, al cambiar de barbero y refrescar huecos en el mismo clic,
+  // se use por error el valor de profesionalId de antes de la actualización.
+  async function buscarSlots(fechaValor: string, profId: string | null) {
     setSlotElegido(null);
     setCargandoSlots(true);
     setSlots([]);
     const params = new URLSearchParams({
       sedeId: sedeId!,
       servicioId: servicioId!,
-      fecha: valor,
+      fecha: fechaValor,
     });
-    if (profesionalId) params.set("profesionalId", profesionalId);
+    if (profId) params.set("profesionalId", profId);
     if (duracionExtraMinutos > 0) params.set("duracionExtraMinutos", String(duracionExtraMinutos));
     const res = await fetch(`/api/disponibilidad?${params.toString()}`);
     const json = await res.json();
     setCargandoSlots(false);
     setSlots(json.slots ?? []);
+  }
+
+  function elegirFecha(valor: string) {
+    setFecha(valor);
+    buscarSlots(valor, profesionalId);
+  }
+
+  // Cambiar de barbero: "Cualquiera" (id null) agrega la disponibilidad de
+  // todo el equipo optimizando el primer hueco libre; un barbero concreto
+  // filtra a solo su propia agenda. Si ya había un día elegido, se
+  // recalculan los huecos al momento para ese mismo día.
+  function elegirProfesional(id: string | null) {
+    setProfesionalId(id);
+    if (fecha) buscarSlots(fecha, id);
   }
 
   // Solo una franja horaria por hora visible (si "cualquiera" hay varios
@@ -291,8 +307,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             ["sede", "Sede"],
             ["servicio", "Servicio"],
             ["complementos", "Extras"],
-            ["profesional", "Barbero"],
-            ["fecha", "Fecha"],
+            ["fecha", "Barbero y fecha"],
             ["datos", "Datos"],
           ] as [Paso, string][]
         ).map(([clave, etiqueta]) => (
@@ -413,67 +428,73 @@ export default function BookingFlow({ sedes, servicios }: Props) {
           )}
           <div className="flex items-center justify-between pt-1">
             <EnlaceVolver onClick={() => setPaso("servicio")}>← Cambiar de servicio</EnlaceVolver>
-            <BotonPrimario onClick={() => setPaso("profesional")}>
+            <BotonPrimario onClick={() => setPaso("fecha")}>
               {complementosElegidos.length > 0 ? "Continuar" : "Sin complementos"}
             </BotonPrimario>
           </div>
         </div>
       )}
 
-      {paso === "profesional" && (
-        <div className="space-y-3">
-          <PasoTitulo>¿Con quién prefieres ir?</PasoTitulo>
-          <TarjetaOpcion
-            onClick={() => {
-              setProfesionalId(null);
-              setPaso("fecha");
-            }}
-          >
-            <span className="font-body">Cualquier profesional disponible</span>
-          </TarjetaOpcion>
-          <div className="space-y-3">
-            {profesionales.map((p) => (
-              <TarjetaOpcion
-                key={p.id}
-                onClick={() => {
-                  setProfesionalId(p.id);
-                  setPaso("fecha");
-                }}
-              >
-                <span className="font-heading text-lg">{p.nombre}</span>
-              </TarjetaOpcion>
-            ))}
-          </div>
-          <EnlaceVolver
-            onClick={() =>
-              setPaso(
-                servicioSeleccionado && esComplemento(servicioSeleccionado) ? "servicio" : "complementos"
-              )
-            }
-          >
-            ← Volver
-          </EnlaceVolver>
-        </div>
-      )}
-
       {paso === "fecha" && (
         <div className="space-y-4">
-          <PasoTitulo>Elige día y hora</PasoTitulo>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {dias.map((d) => (
+          <PasoTitulo>Barbero, día y hora</PasoTitulo>
+
+          <div>
+            <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">
+              Barbero
+            </p>
+            <div className="flex flex-wrap gap-2">
               <button
-                key={d.valor}
-                onClick={() => elegirFecha(d.valor)}
+                onClick={() => elegirProfesional(null)}
                 className={
-                  "shrink-0 rounded-full border px-3 py-2 font-mono text-xs capitalize transition-colors " +
-                  (fecha === d.valor
+                  "rounded-full border px-3 py-2 font-mono text-xs transition-colors " +
+                  (profesionalId === null
                     ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
                     : "border-brand-line text-brand-white hover:border-brand-yellow/60")
                 }
               >
-                {d.etiqueta}
+                Cualquiera
               </button>
-            ))}
+              {profesionales.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => elegirProfesional(p.id)}
+                  className={
+                    "rounded-full border px-3 py-2 font-mono text-xs transition-colors " +
+                    (profesionalId === p.id
+                      ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                      : "border-brand-line text-brand-white hover:border-brand-yellow/60")
+                  }
+                >
+                  {p.nombre}
+                </button>
+              ))}
+            </div>
+            {profesionalId === null && (
+              <p className="mt-1 font-body text-xs text-brand-white-dim">
+                Se muestran los huecos de todo el equipo, para encontrarte hora lo antes posible.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">Día</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {dias.map((d) => (
+                <button
+                  key={d.valor}
+                  onClick={() => elegirFecha(d.valor)}
+                  className={
+                    "shrink-0 rounded-full border px-3 py-2 font-mono text-xs capitalize transition-colors " +
+                    (fecha === d.valor
+                      ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                      : "border-brand-line text-brand-white hover:border-brand-yellow/60")
+                  }
+                >
+                  {d.etiqueta}
+                </button>
+              ))}
+            </div>
           </div>
 
           {fecha && cargandoSlots && <p className="font-body text-sm text-brand-white-dim">Buscando huecos…</p>}
@@ -508,7 +529,15 @@ export default function BookingFlow({ sedes, servicios }: Props) {
           )}
 
           <div className="flex items-center justify-between pt-1">
-            <EnlaceVolver onClick={() => setPaso("profesional")}>← Cambiar profesional</EnlaceVolver>
+            <EnlaceVolver
+              onClick={() =>
+                setPaso(
+                  servicioSeleccionado && esComplemento(servicioSeleccionado) ? "servicio" : "complementos"
+                )
+              }
+            >
+              ← Volver
+            </EnlaceVolver>
             {slotElegido && <BotonPrimario onClick={() => setPaso("datos")}>Continuar</BotonPrimario>}
           </div>
         </div>
