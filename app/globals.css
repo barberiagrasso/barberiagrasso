@@ -3,13 +3,14 @@
 /* =====================================================================
    Barbería Grasso — sistema de marca
    =====================================================================
-   Negro como color predominante, blanco (cálido) como secundario y un
-   amarillo pastel para detalles/acentos. Tres familias tipográficas con
-   un rol fijo cada una, para que la jerarquía sea siempre reconocible:
-     - display   (Bebas Neue)          → titulares grandes, muy condensada
-     - heading   (Fraunces, serif)     → subtítulos, nombres de servicio
-     - body      (IBM Plex Sans)       → texto, botones, formularios
-     - mono      (IBM Plex Mono)       → precios, horas, duraciones
+   Una sola familia tipográfica (Lato, en todos sus grosores) para toda
+   la app. La jerarquía visual no viene de mezclar tipografías, sino del
+   peso de la letra — cada rol tiene su grosor fijo, para que siga
+   siendo reconocible igual que antes:
+     - display   (Lato Black 900)      → titulares grandes
+     - heading   (Lato Bold 700)       → subtítulos, nombres de servicio
+     - body      (Lato Regular 400)    → texto, botones, formularios
+     - mono      (Lato Bold 700)       → precios, horas, duraciones
    ===================================================================== */
 
 :root {
@@ -39,10 +40,10 @@
   --color-brand-yellow-dark: var(--brand-yellow-dark);
   --color-brand-yellow-ink: var(--brand-yellow-ink);
 
-  --font-display: "Bebas Neue", "Arial Narrow", sans-serif;
-  --font-heading: "Fraunces Variable", "Georgia", serif;
-  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", "Courier New", monospace;
+  --font-display: "Lato", "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Lato", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Lato", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Lato", "Helvetica Neue", Arial, sans-serif;
 }
 
 html {
@@ -53,11 +54,29 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body);
+  font-weight: 400;
 }
 
-/* Titulares: Bebas Neue es muy condensada y mayúscula por naturaleza;
-   se le da algo de tracking para que respire a tamaños grandes. */
+/* Titulares: el peso máximo (Black) hace de sustituto de la condensada
+   que había antes; el tracking le da aire a tamaños grandes. */
 .font-display {
+  font-weight: 900;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.font-heading {
+  font-weight: 700;
+}
+
+.font-body {
+  font-weight: 400;
+}
+
+/* Precios, horas y duraciones: negrita + cifras tabulares para que
+   siempre se alineen en columna, aunque ya no sea una monoespaciada de
+   verdad. */
+.font-mono {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }

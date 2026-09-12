@@ -152,22 +152,46 @@ function TarjetaOpcion({
   );
 }
 
-function FilaServicio({ servicio, extra }: { servicio: Servicio; extra?: boolean }) {
+// Tab de servicio/extra: fondo blanco, todo el texto en negro y borde
+// amarillo — el precio va centrado y es lo más grande de la tarjeta,
+// que es lo primero que se mira al elegir. `marcador` es el "✓" que se
+// añade quiere delante del nombre cuando el extra ya está elegido (solo
+// se usa en el paso de complementos, que es multi-selección).
+function TarjetaServicio({
+  servicio,
+  extra,
+  seleccionado,
+  onClick,
+}: {
+  servicio: Servicio;
+  extra?: boolean;
+  seleccionado?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-heading text-lg">{servicio.nombre}</span>
-        <span className={"font-mono text-base tabular-nums " + (extra ? "" : "text-brand-yellow")}>
-          {extra ? "+" : ""}
-          {formatearPrecio(servicio.precio_centimos)}
-        </span>
+    <button
+      onClick={onClick}
+      className={
+        "w-full rounded-xl border-2 bg-white px-4 py-3.5 text-center text-black transition-colors " +
+        (seleccionado ? "border-brand-yellow shadow-[0_0_0_3px_rgba(242,211,104,0.35)]" : "border-brand-yellow/80 hover:border-brand-yellow")
+      }
+    >
+      <div className="font-heading text-base text-black">
+        {seleccionado ? "✓ " : ""}
+        {servicio.nombre}
       </div>
-      <div className="mt-0.5 font-mono text-xs text-brand-white-dim opacity-80">
+      <div className="mt-1 font-mono text-2xl tabular-nums text-black">
+        {extra ? "+" : ""}
+        {formatearPrecio(servicio.precio_centimos)}
+      </div>
+      <div className="mt-0.5 font-mono text-[11px] text-black/55">
         {extra ? "+" : ""}
         {servicio.duracion_minutos} min
       </div>
-      {servicio.descripcion && <div className="mt-1 font-body text-sm opacity-70">{servicio.descripcion}</div>}
-    </>
+      {servicio.descripcion && (
+        <div className="mt-1 font-body text-xs text-black/55">{servicio.descripcion}</div>
+      )}
+    </button>
   );
 }
 
@@ -199,6 +223,56 @@ function EnlaceVolver({ onClick, children }: { onClick: () => void; children: Re
     >
       {children}
     </button>
+  );
+}
+
+// El recorrido completo, de principio a fin — el último nodo es la
+// propia cita confirmada, así queda claro que todos los pasos llevan
+// hacia ahí y no son una simple selección de filtros.
+const PASOS: { clave: Paso; etiqueta: string }[] = [
+  { clave: "sede", etiqueta: "Sede" },
+  { clave: "servicio", etiqueta: "Servicio" },
+  { clave: "complementos", etiqueta: "Extras" },
+  { clave: "fecha", etiqueta: "Barbero y fecha" },
+  { clave: "datos", etiqueta: "Datos" },
+  { clave: "confirmado", etiqueta: "Cita confirmada" },
+];
+
+function Stepper({ paso }: { paso: Paso }) {
+  const indiceActual = PASOS.findIndex((p) => p.clave === paso);
+  return (
+    <div className="mb-7">
+      <ol className="flex items-center">
+        {PASOS.map((p, i) => {
+          const completado = i < indiceActual;
+          const actual = i === indiceActual;
+          return (
+            <li key={p.clave} className="flex flex-1 items-center last:flex-none">
+              <span
+                aria-current={actual ? "step" : undefined}
+                className={
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-[11px] transition-colors " +
+                  (completado
+                    ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                    : actual
+                      ? "border-brand-yellow bg-transparent text-brand-yellow ring-2 ring-brand-yellow/30"
+                      : "border-brand-line text-brand-white-dim")
+                }
+              >
+                {completado ? "✓" : i + 1}
+              </span>
+              {i < PASOS.length - 1 && (
+                <span className={"mx-1 h-px flex-1 " + (completado ? "bg-brand-yellow" : "bg-brand-line")} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-2 text-center font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">
+        Paso {indiceActual + 1} de {PASOS.length} ·{" "}
+        <span className="text-brand-yellow">{PASOS[indiceActual].etiqueta}</span>
+      </p>
+    </div>
   );
 }
 
@@ -400,29 +474,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
 
   return (
     <div className="rounded-3xl border border-brand-line bg-brand-black-soft/60 p-5 shadow-2xl shadow-black/40 sm:p-8">
-      <ol className="mb-6 flex flex-wrap gap-2 font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">
-        {(
-          [
-            ["sede", "Sede"],
-            ["servicio", "Servicio"],
-            ["complementos", "Extras"],
-            ["fecha", "Barbero y fecha"],
-            ["datos", "Datos"],
-          ] as [Paso, string][]
-        ).map(([clave, etiqueta]) => (
-          <li
-            key={clave}
-            className={
-              "rounded-full border px-3 py-1 " +
-              (clave === paso
-                ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
-                : "border-brand-line text-brand-white-dim")
-            }
-          >
-            {etiqueta}
-          </li>
-        ))}
-      </ol>
+      <Stepper paso={paso} />
 
       {paso === "sede" && (
         <div className="space-y-3">
@@ -448,9 +500,11 @@ export default function BookingFlow({ sedes, servicios }: Props) {
 
           <div className="space-y-3">
             {principales.map((servicio) => (
-              <TarjetaOpcion key={servicio.id} onClick={() => elegirServicioYContinuar(servicio.id)}>
-                <FilaServicio servicio={servicio} />
-              </TarjetaOpcion>
+              <TarjetaServicio
+                key={servicio.id}
+                servicio={servicio}
+                onClick={() => elegirServicioYContinuar(servicio.id)}
+              />
             ))}
           </div>
 
@@ -479,9 +533,10 @@ export default function BookingFlow({ sedes, servicios }: Props) {
                                   Rastas
                                 </p>
                               )}
-                            <TarjetaOpcion onClick={() => elegirServicioYContinuar(servicio.id)}>
-                              <FilaServicio servicio={servicio} />
-                            </TarjetaOpcion>
+                            <TarjetaServicio
+                              servicio={servicio}
+                              onClick={() => elegirServicioYContinuar(servicio.id)}
+                            />
                           </div>
                         ))}
                       </div>
@@ -503,21 +558,15 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             Opcional — se suman a tu {servicioSeleccionado?.nombre.toLowerCase()} en la misma cita.
           </p>
           <div className="space-y-3">
-            {complementosDisponibles.map((c) => {
-              const elegido = complementoIds.includes(c.id);
-              return (
-                <TarjetaOpcion key={c.id} seleccionado={elegido} onClick={() => alternarComplemento(c.id)}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-heading text-lg">
-                      {elegido ? "✓ " : ""}
-                      {c.nombre}
-                    </span>
-                    <span className="font-mono text-base tabular-nums">+{formatearPrecio(c.precio_centimos)}</span>
-                  </div>
-                  <div className="mt-0.5 font-mono text-xs opacity-70">+{c.duracion_minutos} min</div>
-                </TarjetaOpcion>
-              );
-            })}
+            {complementosDisponibles.map((c) => (
+              <TarjetaServicio
+                key={c.id}
+                servicio={c}
+                extra
+                seleccionado={complementoIds.includes(c.id)}
+                onClick={() => alternarComplemento(c.id)}
+              />
+            ))}
           </div>
           {complementosElegidos.length > 0 && (
             <p className="font-mono text-sm text-brand-yellow">

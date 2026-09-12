@@ -70,9 +70,9 @@ update servicios set nombre = 'Depilación de nariz' where nombre = 'Complemento
 insert into servicios (nombre, descripcion, duracion_minutos, precio_centimos, categoria, orden, activo)
 values
   -- Los 4 principales
-  ('Corte', 'Con David (dueño): 18,00€', 30, 1600, null, 1, true),
+  ('Corte', '18,00€ con David Grasso', 30, 1600, null, 1, true),
   ('Barba', null, 30, 1200, null, 2, true),
-  ('Corte y barba', 'Con David (dueño): 25,00€', 30, 2300, null, 3, true),
+  ('Corte y barba', '25,00€ con David Grasso', 30, 2300, null, 3, true),
   ('Asesoría de prótesis capilar', 'Gratuita', 30, 0, null, 4, true),
 
   -- Grasso Kids (hasta 7 años)
