@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       aceptaComercial: Boolean(body.aceptaComercial),
       canal: "app",
       origen: "app",
+      complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
     });
 
     return NextResponse.json({ cita, profesionalNombre });

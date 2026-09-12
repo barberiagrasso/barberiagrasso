@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const servicioId = params.get("servicioId");
   const fecha = params.get("fecha");
   const profesionalId = params.get("profesionalId") || undefined;
+  const duracionExtraMinutos = Number(params.get("duracionExtraMinutos") || 0) || 0;
 
   if (!sedeId || !servicioId || !fecha) {
     return NextResponse.json(
@@ -18,7 +19,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const slots = await getAvailableSlots({ sedeId, servicioId, fecha, profesionalId });
+    const slots = await getAvailableSlots({
+      sedeId,
+      servicioId,
+      fecha,
+      profesionalId,
+      duracionExtraMinutos,
+    });
     return NextResponse.json({ slots });
   } catch (err) {
     console.error("Error calculando disponibilidad", err);

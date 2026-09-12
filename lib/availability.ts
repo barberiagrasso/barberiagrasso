@@ -15,6 +15,10 @@ interface Params {
   servicioId: string;
   fecha: string; // "YYYY-MM-DD" en la zona horaria del negocio
   profesionalId?: string | null;
+  // Minutos adicionales de complementos añadidos al servicio principal
+  // (ver lib/booking.ts) — se suman a la duración del servicio a la
+  // hora de calcular y bloquear el hueco.
+  duracionExtraMinutos?: number;
 }
 
 /**
@@ -28,6 +32,7 @@ export async function getAvailableSlots({
   servicioId,
   fecha,
   profesionalId,
+  duracionExtraMinutos,
 }: Params): Promise<FranjaDisponible[]> {
   const supabase = createAdminClient();
 
@@ -48,7 +53,8 @@ export async function getAvailableSlots({
 
   if (override && override.activo === false) return []; // servicio desactivado en esa sede
 
-  const duracionMinutos = override?.duracion_minutos ?? servicio.duracion_minutos;
+  const duracionMinutos =
+    (override?.duracion_minutos ?? servicio.duracion_minutos) + (duracionExtraMinutos ?? 0);
 
   // 2. Profesionales candidatos en esa sede que realizan ese servicio
   let profesionalesQuery = supabase

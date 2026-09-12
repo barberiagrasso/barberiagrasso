@@ -25,6 +25,10 @@ interface CrearReservaParams {
   aceptaComercial: boolean;
   canal: CanalConsentimiento;
   origen: "app" | "panel" | "whatsapp";
+  // Complementos añadidos al servicio principal en el paso extra de la
+  // reserva (p. ej. cejas, lavado). Amplían el hueco bloqueado en la
+  // agenda y quedan anotados en la cita para que el barbero cobre bien.
+  complementoIds?: string[];
 }
 
 export class ReservaError extends Error {}
@@ -38,11 +42,32 @@ export class ReservaError extends Error {}
 export async function crearReserva(params: CrearReservaParams) {
   const supabase = createAdminClient();
 
+  // Complementos añadidos en el paso extra (opcional): amplían la
+  // duración del hueco y se anotan en la cita.
+  const complementoIds = (params.complementoIds ?? []).filter(Boolean);
+  let duracionExtraMinutos = 0;
+  let notaComplementos: string | null = null;
+  if (complementoIds.length > 0) {
+    const { data: complementos } = await supabase
+      .from("servicios")
+      .select("nombre, duracion_minutos, precio_centimos")
+      .in("id", complementoIds);
+    if (complementos && complementos.length > 0) {
+      duracionExtraMinutos = complementos.reduce((acc, c) => acc + c.duracion_minutos, 0);
+      notaComplementos =
+        "Complementos: " +
+        complementos
+          .map((c) => `${c.nombre.replace(/^Complemento:\s*/, "")} (${(c.precio_centimos / 100).toFixed(2)}€)`)
+          .join(", ");
+    }
+  }
+
   const slots = await getAvailableSlots({
     sedeId: params.sedeId,
     servicioId: params.servicioId,
     fecha: params.fecha,
     profesionalId: params.profesionalId,
+    duracionExtraMinutos,
   });
 
   const slotElegido = slots.find((s) => s.hora_inicio === params.horaInicioISO);
@@ -63,7 +88,7 @@ export async function crearReserva(params: CrearReservaParams) {
     .eq("sede_id", params.sedeId)
     .eq("servicio_id", params.servicioId)
     .maybeSingle();
-  const duracionMinutos = override?.duracion_minutos ?? servicio?.duracion_minutos ?? 30;
+  const duracionMinutos = (override?.duracion_minutos ?? servicio?.duracion_minutos ?? 30) + duracionExtraMinutos;
 
   const inicio = new Date(params.horaInicioISO);
   const fin = addMinutes(inicio, duracionMinutos);
@@ -124,6 +149,7 @@ export async function crearReserva(params: CrearReservaParams) {
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
       origen: params.origen,
+      notas: notaComplementos,
     })
     .select("*")
     .single();

@@ -3,7 +3,19 @@
 import { useMemo, useState } from "react";
 import type { Sede, Servicio, FranjaDisponible } from "@/lib/types";
 
-type Paso = "sede" | "servicio" | "profesional" | "fecha" | "datos" | "confirmado";
+type Paso = "sede" | "servicio" | "complementos" | "profesional" | "fecha" | "datos" | "confirmado";
+
+// Los complementos (cejas, lavado, masaje...) se guardan como servicios
+// propios que empiezan por "Complemento: " — así se pueden reservar
+// sueltos (aparecen en el listado normal de servicios) o añadirse como
+// extra al servicio principal en el paso extra de abajo.
+const PREFIJO_COMPLEMENTO = "Complemento: ";
+function esComplemento(servicio: Servicio) {
+  return servicio.nombre.startsWith(PREFIJO_COMPLEMENTO);
+}
+function nombreCorto(servicio: Servicio) {
+  return servicio.nombre.replace(PREFIJO_COMPLEMENTO, "");
+}
 
 interface ProfesionalOpcion {
   id: string;
@@ -40,6 +52,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const [paso, setPaso] = useState<Paso>("sede");
   const [sedeId, setSedeId] = useState<string | null>(null);
   const [servicioId, setServicioId] = useState<string | null>(null);
+  const [complementoIds, setComplementoIds] = useState<string[]>([]);
   const [profesionalId, setProfesionalId] = useState<string | null>(null); // null = cualquiera
   const [profesionales, setProfesionales] = useState<ProfesionalOpcion[]>([]);
   const [fecha, setFecha] = useState<string | null>(null);
@@ -57,15 +70,34 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const dias = useMemo(() => proximosDias(14), []);
   const sedeSeleccionada = sedes.find((s) => s.id === sedeId);
   const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
+  const complementosDisponibles = useMemo(() => servicios.filter(esComplemento), [servicios]);
+  const complementosElegidos = useMemo(
+    () => complementosDisponibles.filter((c) => complementoIds.includes(c.id)),
+    [complementosDisponibles, complementoIds]
+  );
+  const duracionExtraMinutos = complementosElegidos.reduce((acc, c) => acc + c.duracion_minutos, 0);
+  const precioTotalCentimos =
+    (servicioSeleccionado?.precio_centimos ?? 0) +
+    complementosElegidos.reduce((acc, c) => acc + c.precio_centimos, 0);
 
   async function elegirServicioYContinuar(id: string) {
     setServicioId(id);
-    setPaso("profesional");
+    setComplementoIds([]);
+    const servicio = servicios.find((s) => s.id === id);
+    // Si el servicio elegido ya es un complemento (se reserva solo), no
+    // tiene sentido ofrecer añadirle otro complemento encima.
+    setPaso(servicio && esComplemento(servicio) ? "profesional" : "complementos");
     if (sedeId) {
       const res = await fetch(`/api/profesionales?sedeId=${sedeId}&servicioId=${id}`);
       const json = await res.json();
       setProfesionales(json.profesionales ?? []);
     }
+  }
+
+  function alternarComplemento(id: string) {
+    setComplementoIds((actuales) =>
+      actuales.includes(id) ? actuales.filter((c) => c !== id) : [...actuales, id]
+    );
   }
 
   async function elegirFecha(valor: string) {
@@ -79,6 +111,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
       fecha: valor,
     });
     if (profesionalId) params.set("profesionalId", profesionalId);
+    if (duracionExtraMinutos > 0) params.set("duracionExtraMinutos", String(duracionExtraMinutos));
     const res = await fetch(`/api/disponibilidad?${params.toString()}`);
     const json = await res.json();
     setCargandoSlots(false);
@@ -111,6 +144,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
           horaInicioISO: slotElegido.hora_inicio,
           cliente: { nombre, telefono, email: email || null },
           aceptaComercial,
+          complementoIds,
         }),
       });
       const json = await res.json();
@@ -133,14 +167,20 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   return (
     <div className="space-y-6">
       <ol className="flex flex-wrap gap-2 text-xs text-stone-500">
-        {["Sede", "Servicio", "Profesional", "Fecha y hora", "Tus datos"].map((etiqueta, i) => (
+        {(
+          [
+            ["sede", "Sede"],
+            ["servicio", "Servicio"],
+            ["complementos", "Complementos"],
+            ["profesional", "Profesional"],
+            ["fecha", "Fecha y hora"],
+            ["datos", "Tus datos"],
+          ] as [Paso, string][]
+        ).map(([clave, etiqueta]) => (
           <li
-            key={etiqueta}
+            key={clave}
             className={
-              "rounded-full px-3 py-1 " +
-              (["sede", "servicio", "profesional", "fecha", "datos"][i] === paso
-                ? "bg-amber-800 text-white"
-                : "bg-stone-100")
+              "rounded-full px-3 py-1 " + (clave === paso ? "bg-amber-800 text-white" : "bg-stone-100")
             }
           >
             {etiqueta}
@@ -183,11 +223,61 @@ export default function BookingFlow({ sedes, servicios }: Props) {
                 <span className="text-stone-700">{formatearPrecio(servicio.precio_centimos)}</span>
               </div>
               <div className="text-sm text-stone-500">{servicio.duracion_minutos} min</div>
+              {servicio.descripcion && (
+                <div className="mt-1 text-sm text-stone-500">{servicio.descripcion}</div>
+              )}
             </button>
           ))}
           <button className="text-sm text-stone-500 underline" onClick={() => setPaso("sede")}>
             ← Cambiar de sede
           </button>
+        </div>
+      )}
+
+      {paso === "complementos" && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-stone-800">¿Quieres añadir algún complemento?</h2>
+          <p className="text-sm text-stone-500">
+            Opcional — se suman a tu {servicioSeleccionado?.nombre.toLowerCase()} en la misma cita.
+          </p>
+          {complementosDisponibles.map((c) => {
+            const elegido = complementoIds.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                onClick={() => alternarComplemento(c.id)}
+                className={
+                  "w-full rounded-lg border p-4 text-left " +
+                  (elegido ? "border-amber-800 bg-amber-50" : "border-stone-200 hover:border-amber-700")
+                }
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-stone-900">
+                    {elegido ? "✓ " : ""}
+                    {nombreCorto(c)}
+                  </span>
+                  <span className="text-stone-700">+{formatearPrecio(c.precio_centimos)}</span>
+                </div>
+                <div className="text-sm text-stone-500">+{c.duracion_minutos} min</div>
+              </button>
+            );
+          })}
+          {complementosElegidos.length > 0 && (
+            <p className="text-sm text-stone-600">
+              Total con complementos: {formatearPrecio(precioTotalCentimos)} ({(servicioSeleccionado?.duracion_minutos ?? 0) + duracionExtraMinutos} min)
+            </p>
+          )}
+          <div className="flex items-center justify-between">
+            <button className="text-sm text-stone-500 underline" onClick={() => setPaso("servicio")}>
+              ← Cambiar de servicio
+            </button>
+            <button
+              onClick={() => setPaso("profesional")}
+              className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white"
+            >
+              {complementosElegidos.length > 0 ? "Continuar" : "Continuar sin complementos"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -215,8 +305,15 @@ export default function BookingFlow({ sedes, servicios }: Props) {
               {p.nombre}
             </button>
           ))}
-          <button className="text-sm text-stone-500 underline" onClick={() => setPaso("servicio")}>
-            ← Cambiar de servicio
+          <button
+            className="text-sm text-stone-500 underline"
+            onClick={() =>
+              setPaso(
+                servicioSeleccionado && esComplemento(servicioSeleccionado) ? "servicio" : "complementos"
+              )
+            }
+          >
+            ← Volver
           </button>
         </div>
       )}
@@ -291,6 +388,15 @@ export default function BookingFlow({ sedes, servicios }: Props) {
       {paso === "datos" && (
         <div className="space-y-4">
           <h2 className="font-semibold text-stone-800">Tus datos</h2>
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">
+            <div className="font-medium text-stone-800">{servicioSeleccionado?.nombre}</div>
+            {complementosElegidos.map((c) => (
+              <div key={c.id}>+ {nombreCorto(c)}</div>
+            ))}
+            <div className="mt-1 font-medium text-stone-800">
+              Total: {formatearPrecio(precioTotalCentimos)}
+            </div>
+          </div>
           <div className="space-y-3">
             <input
               className="w-full rounded-lg border border-stone-300 p-3"
@@ -354,8 +460,12 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             })}
           </p>
           <p className="text-stone-600">
-            {sedeSeleccionada?.nombre} · {servicioSeleccionado?.nombre} · {citaConfirmada.profesionalNombre}
+            {sedeSeleccionada?.nombre} · {servicioSeleccionado?.nombre}
+            {complementosElegidos.length > 0 &&
+              ` + ${complementosElegidos.map((c) => nombreCorto(c)).join(", ")}`}{" "}
+            · {citaConfirmada.profesionalNombre}
           </p>
+          <p className="text-stone-600">Total: {formatearPrecio(precioTotalCentimos)}</p>
           <p className="text-sm text-stone-500">Te avisaremos por WhatsApp antes de tu cita.</p>
         </div>
       )}

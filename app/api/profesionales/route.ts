@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const sedeId = params.get("sedeId");
-  const servicioId = params.get("servicioId");
+  const servicioId = params.get("servicioId"); // opcional: si no se pasa, no filtra por servicio
 
-  if (!sedeId || !servicioId) {
-    return NextResponse.json({ error: "Faltan sedeId y servicioId." }, { status: 400 });
+  if (!sedeId) {
+    return NextResponse.json({ error: "Falta sedeId." }, { status: 400 });
   }
 
   const supabase = createAdminClient();
@@ -23,15 +23,17 @@ export async function GET(request: NextRequest) {
     .eq("sede_id", sedeId)
     .eq("profesionales.activo", true);
 
-  const { data: profesionalServicios } = await supabase
-    .from("profesional_servicios")
-    .select("profesional_id")
-    .eq("servicio_id", servicioId);
-
-  const idsConServicio = new Set((profesionalServicios ?? []).map((p) => p.profesional_id));
+  let idsConServicio: Set<string> | null = null;
+  if (servicioId) {
+    const { data: profesionalServicios } = await supabase
+      .from("profesional_servicios")
+      .select("profesional_id")
+      .eq("servicio_id", servicioId);
+    idsConServicio = new Set((profesionalServicios ?? []).map((p) => p.profesional_id));
+  }
 
   const profesionales = (sedeProfesionales ?? [])
-    .filter((sp) => idsConServicio.has(sp.profesional_id))
+    .filter((sp) => !idsConServicio || idsConServicio.has(sp.profesional_id))
     .map((sp) => {
       const prof = Array.isArray(sp.profesionales) ? sp.profesionales[0] : sp.profesionales;
       return { id: sp.profesional_id, nombre: (prof as { nombre: string })?.nombre ?? "" };
