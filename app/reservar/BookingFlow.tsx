@@ -153,10 +153,12 @@ function TarjetaOpcion({
 }
 
 // Tab de servicio/extra: fondo blanco, todo el texto en negro y borde
-// amarillo — el precio va centrado y es lo más grande de la tarjeta,
-// que es lo primero que se mira al elegir. `marcador` es el "✓" que se
-// añade quiere delante del nombre cuando el extra ya está elegido (solo
-// se usa en el paso de complementos, que es multi-selección).
+// amarillo. Fila clásica de carta de precios — nombre a la izquierda,
+// precio en negrita a la derecha, ambos centrados en el eje vertical de
+// la tarjeta; la duración y la nota (p. ej. "con David Grasso") van
+// debajo del nombre, en un tamaño menor y más discretas. Cuando está
+// seleccionado (paso de extras, multi-selección) se marca con una
+// insignia en la esquina en vez de "ensuciar" el nombre.
 function TarjetaServicio({
   servicio,
   extra,
@@ -168,29 +170,33 @@ function TarjetaServicio({
   seleccionado?: boolean;
   onClick: () => void;
 }) {
+  const meta = [`${extra ? "+" : ""}${servicio.duracion_minutos} min`, servicio.descripcion]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <button
       onClick={onClick}
       className={
-        "w-full rounded-xl border-2 bg-white px-4 py-3.5 text-center text-black transition-colors " +
-        (seleccionado ? "border-brand-yellow shadow-[0_0_0_3px_rgba(242,211,104,0.35)]" : "border-brand-yellow/80 hover:border-brand-yellow")
+        "relative flex w-full items-center justify-between gap-4 rounded-xl border-2 bg-white px-4 py-3 text-left transition-colors " +
+        (seleccionado
+          ? "border-brand-yellow shadow-[0_2px_10px_rgba(0,0,0,0.14)]"
+          : "border-brand-yellow/50 hover:border-brand-yellow")
       }
     >
-      <div className="font-heading text-base text-black">
-        {seleccionado ? "✓ " : ""}
-        {servicio.nombre}
+      {seleccionado && (
+        <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand-yellow text-[11px] leading-none text-brand-yellow-ink shadow-sm">
+          ✓
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="truncate font-heading text-sm text-black">{servicio.nombre}</p>
+        {meta && <p className="mt-0.5 truncate font-body text-[11px] text-black/50">{meta}</p>}
       </div>
-      <div className="mt-1 font-mono text-2xl tabular-nums text-black">
+      <p className="shrink-0 font-mono text-base tabular-nums text-black">
         {extra ? "+" : ""}
         {formatearPrecio(servicio.precio_centimos)}
-      </div>
-      <div className="mt-0.5 font-mono text-[11px] text-black/55">
-        {extra ? "+" : ""}
-        {servicio.duracion_minutos} min
-      </div>
-      {servicio.descripcion && (
-        <div className="mt-1 font-body text-xs text-black/55">{servicio.descripcion}</div>
-      )}
+      </p>
     </button>
   );
 }
