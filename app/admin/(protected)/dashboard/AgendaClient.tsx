@@ -83,7 +83,7 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
               onClick={() => setSedeId(s.id)}
               className={
                 "rounded-lg border px-3 py-2 text-sm " +
-                (sedeId === s.id ? "border-amber-800 bg-amber-800 text-white" : "border-stone-200")
+                (sedeId === s.id ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
               }
             >
               {s.nombre}
@@ -269,7 +269,7 @@ function NuevaCitaForm({
             onClick={() => setHoraInicioISO(s.hora_inicio)}
             className={
               "rounded-lg border px-2 py-1 text-sm " +
-              (horaInicioISO === s.hora_inicio ? "border-amber-800 bg-amber-800 text-white" : "border-stone-200")
+              (horaInicioISO === s.hora_inicio ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
             }
           >
             {formatoHora(s.hora_inicio)}
@@ -298,7 +298,7 @@ function NuevaCitaForm({
       <button
         disabled={!horaInicioISO || !nombre || !telefono || enviando}
         onClick={crear}
-        className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
       >
         {enviando ? "Guardando…" : "Guardar cita"}
       </button>

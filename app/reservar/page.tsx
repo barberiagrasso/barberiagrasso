@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/public";
 import BookingFlow from "./BookingFlow";
+import { GrassoLogo } from "@/components/brand/GrassoLogo";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,17 @@ export default async function ReservarPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-8">
-      <h1 className="text-2xl font-bold text-stone-900">Reserva tu cita</h1>
-      <p className="mt-1 text-stone-600">Barbería Grasso · Los Molinos y Avenida de las Ciudades</p>
-      <div className="mt-6">
+    <main className="min-h-screen bg-brand-black px-4 py-10 sm:py-14">
+      <div className="mx-auto max-w-xl">
+        <div className="mb-10 flex flex-col items-center text-center">
+          <GrassoLogo className="h-auto w-56 text-brand-white sm:w-64" />
+          <p className="mt-4 font-heading text-lg italic text-brand-white-dim">
+            Reserva tu cita
+          </p>
+          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-brand-white-dim">
+            Los Molinos · Avenida de las Ciudades
+          </p>
+        </div>
         <BookingFlow sedes={sedes ?? []} servicios={servicios ?? []} />
       </div>
     </main>

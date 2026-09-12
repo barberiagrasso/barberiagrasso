@@ -87,7 +87,7 @@ export default function ConversacionesPage() {
             <button
               key={c.id}
               onClick={() => cargarConversacion(c.id)}
-              className={"block w-full p-3 text-left hover:bg-stone-50 " + (seleccionada === c.id ? "bg-amber-50" : "")}
+              className={"block w-full p-3 text-left hover:bg-stone-50 " + (seleccionada === c.id ? "bg-brand-yellow/15" : "")}
             >
               <div className="font-medium text-stone-900">{c.cliente?.nombre ?? c.telefono}</div>
               <div className="text-xs text-stone-500">{ETIQUETA_ESTADO[c.estado] ?? c.estado}</div>
@@ -104,7 +104,7 @@ export default function ConversacionesPage() {
                 <span className="text-sm text-stone-500">
                   {ETIQUETA_ESTADO[conversaciones.find((c) => c.id === seleccionada)?.estado ?? ""]}
                 </span>
-                <button onClick={devolverAIA} className="text-xs text-amber-800 underline">
+                <button onClick={devolverAIA} className="text-xs text-stone-700 underline hover:text-brand-yellow-dark">
                   Devolver a la IA
                 </button>
               </div>
@@ -116,7 +116,7 @@ export default function ConversacionesPage() {
                       "max-w-[75%] rounded-lg px-3 py-2 text-sm " +
                       (m.remitente === "cliente"
                         ? "bg-stone-100 text-stone-800"
-                        : "ml-auto bg-amber-800 text-white")
+                        : "ml-auto bg-brand-yellow text-brand-yellow-ink")
                     }
                   >
                     {m.contenido}
@@ -134,7 +134,7 @@ export default function ConversacionesPage() {
                 <button
                   disabled={enviando || !respuesta.trim()}
                   onClick={enviarRespuesta}
-                  className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
                 >
                   Enviar
                 </button>

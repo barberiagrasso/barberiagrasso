@@ -14,7 +14,7 @@ export default function SignOutButton() {
   }
 
   return (
-    <button onClick={cerrarSesion} className="underline hover:text-amber-800">
+    <button onClick={cerrarSesion} className="underline decoration-brand-line hover:text-brand-yellow">
       Cerrar sesión
     </button>
   );

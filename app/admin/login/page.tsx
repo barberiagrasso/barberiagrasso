@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { GrassoMark } from "@/components/brand/GrassoMark";
 
 export default function AdminLoginPage() {
   return (
@@ -40,38 +41,43 @@ function AdminLoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 text-2xl font-bold text-stone-900">Panel de control</h1>
-      <p className="mb-6 text-sm text-stone-500">Barbería Grasso</p>
-      <form onSubmit={iniciarSesion} className="space-y-4">
-        <input
-          type="email"
-          required
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg border border-stone-300 p-3"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-stone-300 p-3"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          disabled={cargando}
-          className="w-full rounded-lg bg-amber-800 p-3 font-medium text-white disabled:opacity-50"
-        >
-          {cargando ? "Entrando…" : "Entrar"}
-        </button>
-      </form>
-      <p className="mt-6 text-xs text-stone-400">
-        ¿No tienes acceso todavía? Créalo desde Supabase Authentication y añádete a la tabla
-        `admins` (ver README, sección &quot;Crea tu usuario administrador&quot;).
-      </p>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-brand-black px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <GrassoMark className="h-14 w-14 text-brand-yellow" />
+          <h1 className="mt-4 font-heading text-2xl italic text-brand-white">Panel de control</h1>
+          <p className="font-mono text-xs uppercase tracking-widest text-brand-white-dim">Barbería Grasso</p>
+        </div>
+        <form onSubmit={iniciarSesion} className="space-y-4 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
+          <input
+            type="email"
+            required
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+          />
+          <input
+            type="password"
+            required
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+          />
+          {error && <p className="font-body text-sm text-red-400">{error}</p>}
+          <button
+            disabled={cargando}
+            className="w-full rounded-full bg-brand-yellow p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:opacity-50"
+          >
+            {cargando ? "Entrando…" : "Entrar"}
+          </button>
+        </form>
+        <p className="mt-6 text-center font-body text-xs text-brand-white-dim">
+          ¿No tienes acceso todavía? Créalo desde Supabase Authentication y añádete a la tabla
+          `admins` (ver README, sección &quot;Crea tu usuario administrador&quot;).
+        </p>
+      </div>
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Sede, Servicio, FranjaDisponible } from "@/lib/types";
+import { GrassoMark } from "@/components/brand/GrassoMark";
 
 type Paso = "sede" | "servicio" | "complementos" | "profesional" | "fecha" | "datos" | "confirmado";
 
@@ -46,6 +47,70 @@ function proximosDias(cantidad: number) {
     dias.push({ valor, etiqueta });
   }
   return dias;
+}
+
+// ---------------------------------------------------------------------
+// Piezas de UI reutilizables, con la estética de marca ya aplicada
+// (negro / blanco cálido / amarillo pastel + jerarquía tipográfica).
+// ---------------------------------------------------------------------
+
+function PasoTitulo({ children }: { children: React.ReactNode }) {
+  return <h2 className="font-heading text-2xl italic text-brand-white">{children}</h2>;
+}
+
+function TarjetaOpcion({
+  seleccionado,
+  onClick,
+  children,
+}: {
+  seleccionado?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "w-full rounded-xl border p-4 text-left transition-colors " +
+        (seleccionado
+          ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+          : "border-brand-line bg-brand-black-soft text-brand-white hover:border-brand-yellow/60 hover:bg-white/[0.04]")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function BotonPrimario({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-full bg-brand-yellow px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+function EnlaceVolver({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 transition-colors hover:text-brand-yellow"
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function BookingFlow({ sedes, servicios }: Props) {
@@ -165,22 +230,25 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <ol className="flex flex-wrap gap-2 text-xs text-stone-500">
+    <div className="rounded-3xl border border-brand-line bg-brand-black-soft/60 p-5 shadow-2xl shadow-black/40 sm:p-8">
+      <ol className="mb-6 flex flex-wrap gap-2 font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">
         {(
           [
             ["sede", "Sede"],
             ["servicio", "Servicio"],
-            ["complementos", "Complementos"],
-            ["profesional", "Profesional"],
-            ["fecha", "Fecha y hora"],
-            ["datos", "Tus datos"],
+            ["complementos", "Extras"],
+            ["profesional", "Barbero"],
+            ["fecha", "Fecha"],
+            ["datos", "Datos"],
           ] as [Paso, string][]
         ).map(([clave, etiqueta]) => (
           <li
             key={clave}
             className={
-              "rounded-full px-3 py-1 " + (clave === paso ? "bg-amber-800 text-white" : "bg-stone-100")
+              "rounded-full border px-3 py-1 " +
+              (clave === paso
+                ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                : "border-brand-line text-brand-white-dim")
             }
           >
             {etiqueta}
@@ -190,123 +258,108 @@ export default function BookingFlow({ sedes, servicios }: Props) {
 
       {paso === "sede" && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-stone-800">Elige tu sede</h2>
+          <PasoTitulo>Elige tu sede</PasoTitulo>
           {sedes.map((sede) => (
-            <button
+            <TarjetaOpcion
               key={sede.id}
               onClick={() => {
                 setSedeId(sede.id);
                 setPaso("servicio");
               }}
-              className="w-full rounded-lg border border-stone-200 p-4 text-left hover:border-amber-700 hover:bg-amber-50"
             >
-              <div className="font-medium text-stone-900">{sede.nombre}</div>
-              {sede.direccion && <div className="text-sm text-stone-500">{sede.direccion}</div>}
-            </button>
+              <div className="font-heading text-lg">{sede.nombre}</div>
+              {sede.direccion && <div className="mt-0.5 font-body text-sm opacity-70">{sede.direccion}</div>}
+            </TarjetaOpcion>
           ))}
         </div>
       )}
 
       {paso === "servicio" && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-stone-800">
-            Servicios en {sedeSeleccionada?.nombre}
-          </h2>
-          {servicios.map((servicio) => (
-            <button
-              key={servicio.id}
-              onClick={() => elegirServicioYContinuar(servicio.id)}
-              className="w-full rounded-lg border border-stone-200 p-4 text-left hover:border-amber-700 hover:bg-amber-50"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-stone-900">{servicio.nombre}</span>
-                <span className="text-stone-700">{formatearPrecio(servicio.precio_centimos)}</span>
-              </div>
-              <div className="text-sm text-stone-500">{servicio.duracion_minutos} min</div>
-              {servicio.descripcion && (
-                <div className="mt-1 text-sm text-stone-500">{servicio.descripcion}</div>
-              )}
-            </button>
-          ))}
-          <button className="text-sm text-stone-500 underline" onClick={() => setPaso("sede")}>
-            ← Cambiar de sede
-          </button>
+          <PasoTitulo>Servicios en {sedeSeleccionada?.nombre}</PasoTitulo>
+          <div className="space-y-3">
+            {servicios.map((servicio) => (
+              <TarjetaOpcion key={servicio.id} onClick={() => elegirServicioYContinuar(servicio.id)}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-heading text-lg">{servicio.nombre}</span>
+                  <span className="font-mono text-base tabular-nums text-brand-yellow">
+                    {formatearPrecio(servicio.precio_centimos)}
+                  </span>
+                </div>
+                <div className="mt-0.5 font-mono text-xs text-brand-white-dim">{servicio.duracion_minutos} min</div>
+                {servicio.descripcion && (
+                  <div className="mt-1 font-body text-sm opacity-70">{servicio.descripcion}</div>
+                )}
+              </TarjetaOpcion>
+            ))}
+          </div>
+          <EnlaceVolver onClick={() => setPaso("sede")}>← Cambiar de sede</EnlaceVolver>
         </div>
       )}
 
       {paso === "complementos" && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-stone-800">¿Quieres añadir algún complemento?</h2>
-          <p className="text-sm text-stone-500">
+          <PasoTitulo>¿Algún complemento?</PasoTitulo>
+          <p className="font-body text-sm text-brand-white-dim">
             Opcional — se suman a tu {servicioSeleccionado?.nombre.toLowerCase()} en la misma cita.
           </p>
-          {complementosDisponibles.map((c) => {
-            const elegido = complementoIds.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                onClick={() => alternarComplemento(c.id)}
-                className={
-                  "w-full rounded-lg border p-4 text-left " +
-                  (elegido ? "border-amber-800 bg-amber-50" : "border-stone-200 hover:border-amber-700")
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-900">
-                    {elegido ? "✓ " : ""}
-                    {nombreCorto(c)}
-                  </span>
-                  <span className="text-stone-700">+{formatearPrecio(c.precio_centimos)}</span>
-                </div>
-                <div className="text-sm text-stone-500">+{c.duracion_minutos} min</div>
-              </button>
-            );
-          })}
+          <div className="space-y-3">
+            {complementosDisponibles.map((c) => {
+              const elegido = complementoIds.includes(c.id);
+              return (
+                <TarjetaOpcion key={c.id} seleccionado={elegido} onClick={() => alternarComplemento(c.id)}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-heading text-lg">
+                      {elegido ? "✓ " : ""}
+                      {nombreCorto(c)}
+                    </span>
+                    <span className="font-mono text-base tabular-nums">+{formatearPrecio(c.precio_centimos)}</span>
+                  </div>
+                  <div className="mt-0.5 font-mono text-xs opacity-70">+{c.duracion_minutos} min</div>
+                </TarjetaOpcion>
+              );
+            })}
+          </div>
           {complementosElegidos.length > 0 && (
-            <p className="text-sm text-stone-600">
-              Total con complementos: {formatearPrecio(precioTotalCentimos)} ({(servicioSeleccionado?.duracion_minutos ?? 0) + duracionExtraMinutos} min)
+            <p className="font-mono text-sm text-brand-yellow">
+              Total con complementos: {formatearPrecio(precioTotalCentimos)} (
+              {(servicioSeleccionado?.duracion_minutos ?? 0) + duracionExtraMinutos} min)
             </p>
           )}
-          <div className="flex items-center justify-between">
-            <button className="text-sm text-stone-500 underline" onClick={() => setPaso("servicio")}>
-              ← Cambiar de servicio
-            </button>
-            <button
-              onClick={() => setPaso("profesional")}
-              className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white"
-            >
-              {complementosElegidos.length > 0 ? "Continuar" : "Continuar sin complementos"}
-            </button>
+          <div className="flex items-center justify-between pt-1">
+            <EnlaceVolver onClick={() => setPaso("servicio")}>← Cambiar de servicio</EnlaceVolver>
+            <BotonPrimario onClick={() => setPaso("profesional")}>
+              {complementosElegidos.length > 0 ? "Continuar" : "Sin complementos"}
+            </BotonPrimario>
           </div>
         </div>
       )}
 
       {paso === "profesional" && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-stone-800">¿Con quién prefieres ir?</h2>
-          <button
+          <PasoTitulo>¿Con quién prefieres ir?</PasoTitulo>
+          <TarjetaOpcion
             onClick={() => {
               setProfesionalId(null);
               setPaso("fecha");
             }}
-            className="w-full rounded-lg border border-stone-200 p-4 text-left hover:border-amber-700 hover:bg-amber-50"
           >
-            Cualquier profesional disponible
-          </button>
-          {profesionales.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                setProfesionalId(p.id);
-                setPaso("fecha");
-              }}
-              className="w-full rounded-lg border border-stone-200 p-4 text-left hover:border-amber-700 hover:bg-amber-50"
-            >
-              {p.nombre}
-            </button>
-          ))}
-          <button
-            className="text-sm text-stone-500 underline"
+            <span className="font-body">Cualquier profesional disponible</span>
+          </TarjetaOpcion>
+          <div className="space-y-3">
+            {profesionales.map((p) => (
+              <TarjetaOpcion
+                key={p.id}
+                onClick={() => {
+                  setProfesionalId(p.id);
+                  setPaso("fecha");
+                }}
+              >
+                <span className="font-heading text-lg">{p.nombre}</span>
+              </TarjetaOpcion>
+            ))}
+          </div>
+          <EnlaceVolver
             onClick={() =>
               setPaso(
                 servicioSeleccionado && esComplemento(servicioSeleccionado) ? "servicio" : "complementos"
@@ -314,23 +367,23 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             }
           >
             ← Volver
-          </button>
+          </EnlaceVolver>
         </div>
       )}
 
       {paso === "fecha" && (
         <div className="space-y-4">
-          <h2 className="font-semibold text-stone-800">Elige día y hora</h2>
+          <PasoTitulo>Elige día y hora</PasoTitulo>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {dias.map((d) => (
               <button
                 key={d.valor}
                 onClick={() => elegirFecha(d.valor)}
                 className={
-                  "shrink-0 rounded-lg border px-3 py-2 text-sm capitalize " +
+                  "shrink-0 rounded-full border px-3 py-2 font-mono text-xs capitalize transition-colors " +
                   (fecha === d.valor
-                    ? "border-amber-800 bg-amber-800 text-white"
-                    : "border-stone-200 hover:border-amber-700")
+                    ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                    : "border-brand-line text-brand-white hover:border-brand-yellow/60")
                 }
               >
                 {d.etiqueta}
@@ -338,9 +391,9 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             ))}
           </div>
 
-          {fecha && cargandoSlots && <p className="text-sm text-stone-500">Buscando huecos…</p>}
+          {fecha && cargandoSlots && <p className="font-body text-sm text-brand-white-dim">Buscando huecos…</p>}
           {fecha && !cargandoSlots && horasUnicas.length === 0 && (
-            <p className="text-sm text-stone-500">No hay huecos ese día. Prueba con otra fecha.</p>
+            <p className="font-body text-sm text-brand-white-dim">No hay huecos ese día. Prueba con otra fecha.</p>
           )}
           {fecha && horasUnicas.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
@@ -356,10 +409,10 @@ export default function BookingFlow({ sedes, servicios }: Props) {
                     key={slot.hora_inicio + slot.profesional_id}
                     onClick={() => setSlotElegido(slot)}
                     className={
-                      "rounded-lg border px-2 py-2 text-sm " +
+                      "rounded-lg border px-2 py-2 font-mono text-sm transition-colors " +
                       (elegido
-                        ? "border-amber-800 bg-amber-800 text-white"
-                        : "border-stone-200 hover:border-amber-700")
+                        ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                        : "border-brand-line text-brand-white hover:border-brand-yellow/60")
                     }
                   >
                     {hora}
@@ -369,59 +422,48 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <button className="text-sm text-stone-500 underline" onClick={() => setPaso("profesional")}>
-              ← Cambiar profesional
-            </button>
-            {slotElegido && (
-              <button
-                onClick={() => setPaso("datos")}
-                className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white"
-              >
-                Continuar
-              </button>
-            )}
+          <div className="flex items-center justify-between pt-1">
+            <EnlaceVolver onClick={() => setPaso("profesional")}>← Cambiar profesional</EnlaceVolver>
+            {slotElegido && <BotonPrimario onClick={() => setPaso("datos")}>Continuar</BotonPrimario>}
           </div>
         </div>
       )}
 
       {paso === "datos" && (
         <div className="space-y-4">
-          <h2 className="font-semibold text-stone-800">Tus datos</h2>
-          <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">
-            <div className="font-medium text-stone-800">{servicioSeleccionado?.nombre}</div>
+          <PasoTitulo>Tus datos</PasoTitulo>
+          <div className="rounded-xl border border-brand-line bg-black/20 p-4 font-body text-sm text-brand-white-dim">
+            <div className="font-heading text-base text-brand-white">{servicioSeleccionado?.nombre}</div>
             {complementosElegidos.map((c) => (
               <div key={c.id}>+ {nombreCorto(c)}</div>
             ))}
-            <div className="mt-1 font-medium text-stone-800">
-              Total: {formatearPrecio(precioTotalCentimos)}
-            </div>
+            <div className="mt-1 font-mono text-brand-yellow">Total: {formatearPrecio(precioTotalCentimos)}</div>
           </div>
           <div className="space-y-3">
             <input
-              className="w-full rounded-lg border border-stone-300 p-3"
+              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
               placeholder="Nombre y apellidos"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
             />
             <input
-              className="w-full rounded-lg border border-stone-300 p-3"
+              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
               placeholder="Teléfono (WhatsApp)"
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
             />
             <input
-              className="w-full rounded-lg border border-stone-300 p-3"
+              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
               placeholder="Email (opcional)"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
-          <label className="flex items-start gap-2 text-sm text-stone-600">
+          <label className="flex items-start gap-2 font-body text-sm text-brand-white-dim">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 accent-brand-yellow"
               checked={aceptaComercial}
               onChange={(e) => setAceptaComercial(e.target.checked)}
             />
@@ -432,41 +474,36 @@ export default function BookingFlow({ sedes, servicios }: Props) {
             </span>
           </label>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="font-body text-sm text-red-400">{error}</p>}
 
-          <div className="flex items-center justify-between">
-            <button className="text-sm text-stone-500 underline" onClick={() => setPaso("fecha")}>
-              ← Cambiar hora
-            </button>
-            <button
-              disabled={!nombre || !telefono || enviando}
-              onClick={confirmarReserva}
-              className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
+          <div className="flex items-center justify-between pt-1">
+            <EnlaceVolver onClick={() => setPaso("fecha")}>← Cambiar hora</EnlaceVolver>
+            <BotonPrimario disabled={!nombre || !telefono || enviando} onClick={confirmarReserva}>
               {enviando ? "Reservando…" : "Confirmar cita"}
-            </button>
+            </BotonPrimario>
           </div>
         </div>
       )}
 
       {paso === "confirmado" && citaConfirmada && (
-        <div className="space-y-3 rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-          <p className="text-lg font-semibold text-green-800">¡Cita confirmada!</p>
-          <p className="text-stone-700">
+        <div className="space-y-3 rounded-2xl border border-brand-yellow/40 bg-brand-yellow/10 p-6 text-center">
+          <GrassoMark className="mx-auto h-10 w-10 text-brand-yellow" />
+          <p className="font-heading text-2xl italic text-brand-yellow">¡Cita confirmada!</p>
+          <p className="font-body text-brand-white">
             {new Date(citaConfirmada.inicio).toLocaleString("es-ES", {
               dateStyle: "full",
               timeStyle: "short",
               timeZone: "Europe/Madrid",
             })}
           </p>
-          <p className="text-stone-600">
+          <p className="font-body text-sm text-brand-white-dim">
             {sedeSeleccionada?.nombre} · {servicioSeleccionado?.nombre}
             {complementosElegidos.length > 0 &&
               ` + ${complementosElegidos.map((c) => nombreCorto(c)).join(", ")}`}{" "}
             · {citaConfirmada.profesionalNombre}
           </p>
-          <p className="text-stone-600">Total: {formatearPrecio(precioTotalCentimos)}</p>
-          <p className="text-sm text-stone-500">Te avisaremos por WhatsApp antes de tu cita.</p>
+          <p className="font-mono text-brand-white">Total: {formatearPrecio(precioTotalCentimos)}</p>
+          <p className="font-body text-xs text-brand-white-dim">Te avisaremos por WhatsApp antes de tu cita.</p>
         </div>
       )}
     </div>

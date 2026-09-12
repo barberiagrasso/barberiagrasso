@@ -96,7 +96,7 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
             onClick={() => setSedeId(s.id)}
             className={
               "rounded-lg border px-3 py-2 text-sm " +
-              (sedeId === s.id ? "border-amber-800 bg-amber-800 text-white" : "border-stone-200")
+              (sedeId === s.id ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
             }
           >
             {s.nombre}
@@ -152,7 +152,7 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
         <button
           disabled={enviando}
           onClick={crearBloqueo}
-          className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
         >
           {enviando ? "Guardando…" : "Crear bloqueo"}
         </button>
