@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GrassoMark } from "@/components/brand/GrassoMark";
+import { GrassoLogo } from "@/components/brand/GrassoLogo";
+import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 
 type Modo = "login" | "registro";
 
 export default function AccesoPage() {
+  return (
+    <Suspense fallback={null}>
+      <AccesoForm />
+    </Suspense>
+  );
+}
+
+function AccesoForm() {
   const router = useRouter();
   const [modo, setModo] = useState<Modo>("login");
   const [nombre, setNombre] = useState("");
@@ -43,10 +52,12 @@ export default function AccesoPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-brand-black px-4">
-      <div className="w-full max-w-sm">
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-brand-black px-4">
+      <HeroBackdrop />
+
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <GrassoMark className="h-14 w-14 text-brand-yellow" />
+          <GrassoLogo className="h-auto w-36 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)]" />
           <h1 className="mt-4 font-heading text-2xl italic text-brand-white">
             {modo === "login" ? "Bienvenido de nuevo" : "Crea tu cuenta"}
           </h1>
