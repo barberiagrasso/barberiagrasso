@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { Sede, Servicio, FranjaDisponible } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { Sede, Servicio, FranjaDisponible, ResumenDiaDisponibilidad } from "@/lib/types";
 import { GrassoMark } from "@/components/brand/GrassoMark";
+
+// Cuántos meses hacia delante del actual se puede navegar en el
+// calendario de reserva (0 = solo el mes en curso).
+const MESES_ADELANTE_MAX = 2;
+const NOMBRES_DIA_SEMANA = ["L", "M", "X", "J", "V", "S", "D"];
 
 type Paso = "sede" | "servicio" | "complementos" | "fecha" | "datos" | "confirmado";
 
@@ -65,21 +70,53 @@ function formatearPrecio(centimos: number) {
   return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }
 
-function proximosDias(cantidad: number) {
-  const dias: { valor: string; etiqueta: string }[] = [];
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function fechaISO(anio: number, mes: number, dia: number): string {
+  return `${anio}-${pad2(mes)}-${pad2(dia)}`;
+}
+
+function hoyLocalISO(): string {
   const hoy = new Date();
-  for (let i = 0; i < cantidad; i++) {
-    const d = new Date(hoy);
-    d.setDate(hoy.getDate() + i);
-    const valor = d.toISOString().slice(0, 10);
-    const etiqueta = d.toLocaleDateString("es-ES", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-    dias.push({ valor, etiqueta });
+  return fechaISO(hoy.getFullYear(), hoy.getMonth() + 1, hoy.getDate());
+}
+
+// Índice absoluto de mes (año*12 + mes 0-indexado) — hace trivial comparar
+// y limitar la navegación del calendario sin líos de fin de año.
+function indiceMes(anio: number, mes: number): number {
+  return anio * 12 + (mes - 1);
+}
+
+// Rejilla de celdas de un mes en semanas de lunes a domingo (convención
+// española), con `null` en los huecos antes del día 1 y después del
+// último día, para que la cuadrícula siempre tenga columnas completas.
+function celdasDelMes(anio: number, mes: number): (number | null)[] {
+  const primerDia = new Date(anio, mes - 1, 1);
+  const totalDias = new Date(anio, mes, 0).getDate();
+  const offset = (primerDia.getDay() + 6) % 7; // lunes=0 ... domingo=6
+  const celdas: (number | null)[] = Array(offset).fill(null);
+  for (let d = 1; d <= totalDias; d++) celdas.push(d);
+  while (celdas.length % 7 !== 0) celdas.push(null);
+  return celdas;
+}
+
+function nombreMes(anio: number, mes: number): string {
+  return new Date(anio, mes - 1, 1).toLocaleDateString("es-ES", { month: "long" });
+}
+
+function colorBarraNivel(nivel: ResumenDiaDisponibilidad["nivel"] | undefined): string {
+  switch (nivel) {
+    case "alta":
+      return "bg-emerald-500";
+    case "media":
+      return "bg-amber-400";
+    case "baja":
+      return "bg-red-500";
+    default:
+      return "bg-transparent";
   }
-  return dias;
 }
 
 // ---------------------------------------------------------------------
@@ -176,6 +213,13 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const [fecha, setFecha] = useState<string | null>(null);
   const [slots, setSlots] = useState<FranjaDisponible[]>([]);
   const [cargandoSlots, setCargandoSlots] = useState(false);
+  const hoy = useMemo(() => new Date(), []);
+  const [mesVisible, setMesVisible] = useState(() => ({
+    anio: hoy.getFullYear(),
+    mes: hoy.getMonth() + 1,
+  }));
+  const [resumenMes, setResumenMes] = useState<Record<string, ResumenDiaDisponibilidad>>({});
+  const [cargandoMes, setCargandoMes] = useState(false);
   const [slotElegido, setSlotElegido] = useState<FranjaDisponible | null>(null);
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -185,7 +229,6 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [citaConfirmada, setCitaConfirmada] = useState<{ inicio: string; profesionalNombre: string } | null>(null);
 
-  const dias = useMemo(() => proximosDias(14), []);
   const sedeSeleccionada = sedes.find((s) => s.id === sedeId);
   const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
   const { principales, grupos } = useMemo(() => agruparServicios(servicios), [servicios]);
@@ -251,6 +294,62 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   function elegirProfesional(id: string | null) {
     setProfesionalId(id);
     if (fecha) buscarSlots(fecha, id);
+  }
+
+  // Trae, de una sola vez, el resumen de disponibilidad de cada día del
+  // mes visible (para las barritas verde/amarilla/roja del calendario).
+  // Si el día ya elegido deja de tener huecos con el nuevo barbero o mes,
+  // se deselecciona en vez de dejar una hora "elegida" que ya no existe.
+  async function buscarResumenMes(anio: number, mes: number, profId: string | null) {
+    setCargandoMes(true);
+    const params = new URLSearchParams({
+      sedeId: sedeId!,
+      servicioId: servicioId!,
+      anio: String(anio),
+      mes: String(mes),
+    });
+    if (profId) params.set("profesionalId", profId);
+    if (duracionExtraMinutos > 0) params.set("duracionExtraMinutos", String(duracionExtraMinutos));
+    const res = await fetch(`/api/disponibilidad/mes?${params.toString()}`);
+    const json = await res.json();
+    setCargandoMes(false);
+    const mapa: Record<string, ResumenDiaDisponibilidad> = {};
+    for (const d of json.dias ?? []) mapa[d.fecha] = d;
+    setResumenMes(mapa);
+    if (fecha && !mapa[fecha]?.seleccionable) {
+      setFecha(null);
+      setSlots([]);
+      setSlotElegido(null);
+    }
+  }
+
+  useEffect(() => {
+    if (paso !== "fecha" || !sedeId || !servicioId) return;
+    // Si el día que ya estaba elegido ya no es válido en este mes/barbero
+    // (por ejemplo, al cambiar de barbero y quedarse sin huecos), se limpia
+    // dentro de buscarResumenMes.
+    void buscarResumenMes(mesVisible.anio, mesVisible.mes, profesionalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, mesVisible.anio, mesVisible.mes, profesionalId, sedeId, servicioId]);
+
+  const indiceMesVisible = indiceMes(mesVisible.anio, mesVisible.mes);
+  const indiceMesActual = indiceMes(hoy.getFullYear(), hoy.getMonth() + 1);
+  const puedeRetrocederMes = indiceMesVisible > indiceMesActual;
+  const puedeAvanzarMes = indiceMesVisible < indiceMesActual + MESES_ADELANTE_MAX;
+
+  function cambiarMes(delta: number) {
+    setMesVisible((actual) => {
+      let mes = actual.mes + delta;
+      let anio = actual.anio;
+      if (mes < 1) {
+        mes = 12;
+        anio -= 1;
+      } else if (mes > 12) {
+        mes = 1;
+        anio += 1;
+      }
+      return { anio, mes };
+    });
   }
 
   // Solo una franja horaria por hora visible (si "cualquiera" hay varios
@@ -478,22 +577,77 @@ export default function BookingFlow({ sedes, servicios }: Props) {
           </div>
 
           <div>
-            <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">Día</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {dias.map((d) => (
-                <button
-                  key={d.valor}
-                  onClick={() => elegirFecha(d.valor)}
-                  className={
-                    "shrink-0 rounded-full border px-3 py-2 font-mono text-xs capitalize transition-colors " +
-                    (fecha === d.valor
-                      ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
-                      : "border-brand-line text-brand-white hover:border-brand-yellow/60")
-                  }
-                >
-                  {d.etiqueta}
-                </button>
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                onClick={() => cambiarMes(-1)}
+                disabled={!puedeRetrocederMes}
+                aria-label="Mes anterior"
+                className="rounded-full border border-brand-line px-2.5 py-1 font-mono text-sm text-brand-white transition-colors hover:border-brand-yellow/60 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ‹
+              </button>
+              <p className="font-mono text-xs uppercase tracking-wider text-brand-white-dim">
+                {nombreMes(mesVisible.anio, mesVisible.mes)} {mesVisible.anio}
+                {cargandoMes && "…"}
+              </p>
+              <button
+                onClick={() => cambiarMes(1)}
+                disabled={!puedeAvanzarMes}
+                aria-label="Mes siguiente"
+                className="rounded-full border border-brand-line px-2.5 py-1 font-mono text-sm text-brand-white transition-colors hover:border-brand-yellow/60 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ›
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px] uppercase tracking-wider text-brand-white-dim">
+              {NOMBRES_DIA_SEMANA.map((d) => (
+                <div key={d}>{d}</div>
               ))}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {celdasDelMes(mesVisible.anio, mesVisible.mes).map((dia, i) => {
+                if (dia === null) return <div key={`vacio-${i}`} />;
+                const fechaCelda = fechaISO(mesVisible.anio, mesVisible.mes, dia);
+                const resumenDia = resumenMes[fechaCelda];
+                const esPasado = fechaCelda < hoyLocalISO();
+                const seleccionable = !esPasado && !!resumenDia?.seleccionable;
+                const elegido = fecha === fechaCelda;
+                return (
+                  <button
+                    key={fechaCelda}
+                    disabled={!seleccionable}
+                    onClick={() => elegirFecha(fechaCelda)}
+                    className={
+                      "flex flex-col items-center gap-1 rounded-lg border px-1 py-2 font-mono text-xs transition-colors " +
+                      (!seleccionable
+                        ? "border-transparent text-brand-white-dim/30"
+                        : elegido
+                          ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                          : "border-brand-line text-brand-white hover:border-brand-yellow/60")
+                    }
+                  >
+                    <span>{dia}</span>
+                    <span
+                      className={
+                        "block h-1 w-4 rounded-full " +
+                        (seleccionable ? colorBarraNivel(resumenDia?.nivel) : "bg-transparent")
+                      }
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-3 font-mono text-[10px] uppercase tracking-wider text-brand-white-dim">
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Alta
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> Media
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Baja
+              </span>
             </div>
           </div>
 

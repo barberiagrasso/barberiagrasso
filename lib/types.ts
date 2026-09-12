@@ -150,6 +150,17 @@ export interface FranjaDisponible {
   profesional_nombre: string;
 }
 
+export type NivelDisponibilidad = "alta" | "media" | "baja" | "ninguna";
+
+export interface ResumenDiaDisponibilidad {
+  fecha: string; // "YYYY-MM-DD" en la zona horaria del negocio
+  huecos: number; // nº de horas distintas con al menos un profesional libre
+  nivel: NivelDisponibilidad;
+  // false si el negocio está cerrado ese día (sin horario) o no queda
+  // ningún hueco libre — el calendario no debe dejar seleccionarlo.
+  seleccionable: boolean;
+}
+
 export interface Conversacion {
   id: string;
   cliente_id: string | null;
