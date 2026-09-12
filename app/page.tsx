@@ -61,12 +61,6 @@ export default async function Home() {
         >
           Mi perfil y mis citas
         </Link>
-        <Link
-          href="/admin/login"
-          className="mt-6 font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-        >
-          Acceso para el equipo
-        </Link>
       </div>
     </main>
   );

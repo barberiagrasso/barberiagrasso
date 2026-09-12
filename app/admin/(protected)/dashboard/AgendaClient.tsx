@@ -83,7 +83,9 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
               onClick={() => setSedeId(s.id)}
               className={
                 "rounded-lg border px-3 py-2 text-sm " +
-                (sedeId === s.id ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
+                (sedeId === s.id
+                  ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400")
               }
             >
               {s.nombre}
@@ -269,7 +271,9 @@ function NuevaCitaForm({
             onClick={() => setHoraInicioISO(s.hora_inicio)}
             className={
               "rounded-lg border px-2 py-1 text-sm " +
-              (horaInicioISO === s.hora_inicio ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
+              (horaInicioISO === s.hora_inicio
+                ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                : "border-stone-300 bg-white text-stone-700 hover:border-stone-400")
             }
           >
             {formatoHora(s.hora_inicio)}

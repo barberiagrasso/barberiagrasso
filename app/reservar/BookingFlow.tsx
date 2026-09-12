@@ -314,7 +314,7 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   const [nombre, setNombre] = useState(clienteInicial?.nombre ?? "");
   const [telefono, setTelefono] = useState(clienteInicial?.telefono ?? "");
   const [email, setEmail] = useState(clienteInicial?.email ?? "");
-  const [aceptaComercial, setAceptaComercial] = useState(false);
+  const [aceptaComercial, setAceptaComercial] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citaConfirmada, setCitaConfirmada] = useState<{ inicio: string; profesionalNombre: string } | null>(null);

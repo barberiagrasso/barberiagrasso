@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 
@@ -144,6 +145,15 @@ function AccesoForm() {
             ? "¿Primera vez por aquí? Crea tu cuenta arriba — tardas menos de un minuto."
             : "Tu cuenta se usa solo para gestionar tus citas en Barbería Grasso."}
         </p>
+
+        <div className="mt-8 text-center">
+          <Link
+            href="/admin/login"
+            className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          >
+            Acceso para el equipo
+          </Link>
+        </div>
       </div>
     </main>
   );

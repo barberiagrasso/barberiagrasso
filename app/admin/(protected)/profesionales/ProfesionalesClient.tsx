@@ -199,7 +199,9 @@ function DetalleProfesional({
                   onClick={() => setSedeHorarioId(id)}
                   className={
                     "rounded-lg border px-2 py-1 text-xs " +
-                    (sedeHorarioId === id ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
+                    (sedeHorarioId === id
+                      ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                      : "border-stone-300 bg-white text-stone-700 hover:border-stone-400")
                   }
                 >
                   {sede?.nombre}

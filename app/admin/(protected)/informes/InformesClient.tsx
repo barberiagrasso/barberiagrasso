@@ -69,7 +69,9 @@ export default function InformesClient({ sedes }: { sedes: Sede[] }) {
               onClick={() => setSedeId(s.id)}
               className={
                 "rounded-lg border px-3 py-2 text-sm " +
-                (sedeId === s.id ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink" : "border-stone-200")
+                (sedeId === s.id
+                  ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400")
               }
             >
               {s.nombre}

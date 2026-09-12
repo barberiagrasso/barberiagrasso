@@ -3,33 +3,11 @@ import { requireCliente } from "@/lib/clienteAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
+import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
 
 export const dynamic = "force-dynamic";
 
-function formatearPrecio(centimos: number) {
-  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-}
-
-const ETIQUETA_ESTADO: Record<string, string> = {
-  confirmada: "Confirmada",
-  completada: "Completada",
-  cancelada: "Cancelada",
-  no_presentada: "No presentada",
-};
-
-function colorEstado(estado: string): string {
-  switch (estado) {
-    case "completada":
-      return "text-emerald-400";
-    case "cancelada":
-    case "no_presentada":
-      return "text-red-400";
-    default:
-      return "text-brand-yellow";
-  }
-}
-
-interface CitaHistorial {
+interface CitaCruda {
   id: string;
   inicio: string;
   estado: string;
@@ -63,7 +41,22 @@ export default async function PerfilPage() {
     .eq("cliente_id", cliente.id)
     .order("inicio", { ascending: false });
 
-  const historial = (citas ?? []) as unknown as CitaHistorial[];
+  const historial: CitaNormalizada[] = ((citas ?? []) as unknown as CitaCruda[]).map((cita) => {
+    const servicio = uno(cita.servicio);
+    const extras = cita.extras ?? [];
+    const total = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+
+    return {
+      id: cita.id,
+      inicio: cita.inicio,
+      estado: cita.estado,
+      sedeNombre: uno(cita.sede)?.nombre ?? null,
+      servicioNombre: servicio?.nombre ?? "Servicio",
+      precioTotalCentimos: total,
+      profesionalNombre: uno(cita.profesional)?.nombre ?? "Cualquiera",
+      extrasNombres: extras.map((e) => uno(e.servicio)?.nombre).filter((n): n is string => Boolean(n)),
+    };
+  });
 
   return (
     <main className="min-h-screen bg-brand-black px-4 py-10 sm:py-14">
@@ -88,54 +81,7 @@ export default async function PerfilPage() {
 
         <h2 className="mb-3 font-heading text-lg text-brand-white">Historial de citas</h2>
 
-        {historial.length === 0 && (
-          <p className="rounded-xl border border-brand-line bg-brand-black-soft/60 p-4 font-body text-sm text-brand-white-dim">
-            Todavía no tienes citas con nosotros.
-          </p>
-        )}
-
-        <div className="space-y-3">
-          {historial.map((cita) => {
-            const sede = uno(cita.sede);
-            const servicio = uno(cita.servicio);
-            const profesional = uno(cita.profesional);
-            const extras = cita.extras ?? [];
-            const total = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
-
-            return (
-              <div key={cita.id} className="rounded-xl border border-brand-line bg-brand-black-soft/60 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-heading text-base text-brand-white">{servicio?.nombre ?? "Servicio"}</p>
-                    <p className="mt-0.5 font-body text-sm text-brand-white-dim">
-                      {new Date(cita.inicio).toLocaleString("es-ES", {
-                        dateStyle: "full",
-                        timeStyle: "short",
-                        timeZone: "Europe/Madrid",
-                      })}
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs uppercase tracking-wider text-brand-white-dim">
-                      {sede?.nombre} · {profesional?.nombre ?? "Cualquiera"}
-                    </p>
-                    {extras.length > 0 && (
-                      <p className="mt-1 font-body text-xs text-brand-white-dim">
-                        + {extras.map((e) => uno(e.servicio)?.nombre).filter(Boolean).join(", ")}
-                      </p>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className={"font-mono text-xs uppercase tracking-wider " + colorEstado(cita.estado)}>
-                      {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
-                    </p>
-                    <p className="mt-1 font-mono text-base tabular-nums text-brand-white">
-                      {formatearPrecio(total)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <HistorialCitas historialInicial={historial} />
       </div>
     </main>
   );
