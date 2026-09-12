@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
+import { requireCliente } from "@/lib/clienteAuth";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  // Lo primero al entrar: si no hay sesión de cliente, esto manda a
+  // /acceso. Una vez logueado, la sesión se queda puesta indefinidamente
+  // (no caduca sola) hasta que el propio cliente cierre sesión.
+  const { cliente } = await requireCliente();
+
   const supabase = createPublicClient();
   const { data: sedes } = await supabase
     .from("sedes")
@@ -19,7 +25,7 @@ export default async function Home() {
       <div className="relative z-10 flex flex-col items-center">
         <GrassoLogo className="h-auto w-64 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:w-80" />
         <p className="mt-5 font-heading text-xl italic text-brand-white-dim">
-          Barbería · desde siempre
+          Hola, {cliente.nombre.split(" ")[0]}
         </p>
 
         <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:gap-10">
@@ -50,8 +56,14 @@ export default async function Home() {
           Reservar cita
         </Link>
         <Link
+          href="/perfil"
+          className="mt-4 font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+        >
+          Mi perfil y mis citas
+        </Link>
+        <Link
           href="/admin/login"
-          className="mt-6 font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          className="mt-6 font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
         >
           Acceso para el equipo
         </Link>

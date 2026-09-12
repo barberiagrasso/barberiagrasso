@@ -61,9 +61,19 @@ interface ProfesionalOpcion {
   nombre: string;
 }
 
+interface ClienteInicial {
+  nombre: string;
+  telefono: string;
+  email: string | null;
+}
+
 interface Props {
   sedes: Sede[];
   servicios: Servicio[];
+  // Datos del cliente ya logueado, para no hacérselos volver a escribir.
+  // Se dejan en campos editables por si alguna vez reserva para otra
+  // persona (p. ej. un hijo).
+  clienteInicial?: ClienteInicial;
 }
 
 function formatearPrecio(centimos: number) {
@@ -282,7 +292,7 @@ function Stepper({ paso }: { paso: Paso }) {
   );
 }
 
-export default function BookingFlow({ sedes, servicios }: Props) {
+export default function BookingFlow({ sedes, servicios, clienteInicial }: Props) {
   const [paso, setPaso] = useState<Paso>("sede");
   const [sedeId, setSedeId] = useState<string | null>(null);
   const [servicioId, setServicioId] = useState<string | null>(null);
@@ -301,9 +311,9 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const [resumenMes, setResumenMes] = useState<Record<string, ResumenDiaDisponibilidad>>({});
   const [cargandoMes, setCargandoMes] = useState(false);
   const [slotElegido, setSlotElegido] = useState<FranjaDisponible | null>(null);
-  const [nombre, setNombre] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [email, setEmail] = useState("");
+  const [nombre, setNombre] = useState(clienteInicial?.nombre ?? "");
+  const [telefono, setTelefono] = useState(clienteInicial?.telefono ?? "");
+  const [email, setEmail] = useState(clienteInicial?.email ?? "");
   const [aceptaComercial, setAceptaComercial] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,10 +1,14 @@
 import { createPublicClient } from "@/lib/supabase/public";
+import { requireCliente } from "@/lib/clienteAuth";
 import BookingFlow from "./BookingFlow";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReservarPage() {
+  // Igual que la portada: sin sesión de cliente, no se llega aquí.
+  const { cliente } = await requireCliente();
+
   const supabase = createPublicClient();
 
   const [{ data: sedes }, { data: servicios }] = await Promise.all([
@@ -37,7 +41,11 @@ export default async function ReservarPage() {
             Los Molinos · Avenida de las Ciudades
           </p>
         </div>
-        <BookingFlow sedes={sedes ?? []} servicios={servicios ?? []} />
+        <BookingFlow
+          sedes={sedes ?? []}
+          servicios={servicios ?? []}
+          clienteInicial={{ nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email }}
+        />
       </div>
     </main>
   );

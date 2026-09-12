@@ -1,8 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Refresca la sesión de administrador en cada petición al panel, tal y
-// como recomienda Supabase para Next.js App Router.
+// Refresca la sesión (de administrador o de cliente) en cada petición a
+// las páginas que la necesitan, tal y como recomienda Supabase para
+// Next.js App Router — sin esto, la sesión podría caducar de golpe en
+// vez de renovarse sola en segundo plano.
 // (En Next.js 16 este archivo se llama proxy.ts en vez de middleware.ts)
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -32,5 +34,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/", "/reservar", "/perfil", "/acceso"],
 };

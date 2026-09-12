@@ -2,7 +2,14 @@ import "server-only";
 import { addMinutes } from "date-fns";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvailableSlots } from "@/lib/availability";
+import { buscarOCrearCliente, normalizarTelefono } from "@/lib/clientes";
 import type { CanalConsentimiento } from "@/lib/types";
+
+// Re-exportado por compatibilidad: varios módulos (webhook de WhatsApp,
+// aiAssistant) siguen importando normalizarTelefono desde aquí. La
+// implementación real vive en lib/clientes.ts junto al resto de lógica
+// de "quién es este cliente".
+export { normalizarTelefono };
 
 export const TEXTO_CONSENTIMIENTO_OPERATIVO =
   "Acepto que Barbería Grasso trate mis datos (nombre y teléfono) para gestionar esta cita.";
@@ -98,31 +105,18 @@ export async function crearReserva(params: CrearReservaParams) {
   const inicio = new Date(params.horaInicioISO);
   const fin = addMinutes(inicio, duracionMinutos);
 
-  // 1. Encontrar o crear el cliente por teléfono
-  const telefono = normalizarTelefono(params.cliente.telefono);
-  const { data: clienteExistente } = await supabase
-    .from("clientes")
-    .select("id")
-    .eq("telefono", telefono)
-    .maybeSingle();
+  // 1. Encontrar o crear el cliente por teléfono (mismo criterio que usa
+  // el registro de cuenta con contraseña y el alta manual desde el
+  // panel — ver lib/clientes.ts — para que siempre casen con el mismo
+  // historial, venga la reserva de donde venga).
+  const { clienteId, esNuevo } = await buscarOCrearCliente(supabase, {
+    nombre: params.cliente.nombre,
+    telefono: params.cliente.telefono,
+    email: params.cliente.email,
+    sedeId: params.sedeId,
+  });
 
-  let clienteId = clienteExistente?.id as string | undefined;
-  if (!clienteId) {
-    const { data: nuevoCliente, error: errorCliente } = await supabase
-      .from("clientes")
-      .insert({
-        nombre: params.cliente.nombre,
-        telefono,
-        email: params.cliente.email || null,
-        sede_habitual_id: params.sedeId,
-      })
-      .select("id")
-      .single();
-    if (errorCliente || !nuevoCliente) {
-      throw new ReservaError("No se pudo registrar el cliente.");
-    }
-    clienteId = nuevoCliente.id;
-
+  if (esNuevo) {
     // Consentimiento operativo: implícito al usar el servicio, se registra
     // igualmente para trazabilidad (ver sección 8 del documento de
     // especificación / RGPD).
@@ -261,20 +255,4 @@ export async function reprogramarCita({ citaId, nuevaHoraInicioISO, profesionalI
 
   if (error || !citaActualizada) throw new ReservaError("No se pudo reprogramar la cita.");
   return { cita: citaActualizada, profesionalNombre: slotElegido.profesional_nombre };
-}
-
-/**
- * Normaliza un teléfono a un formato consistente (aprox. E.164) para que
- * el mismo cliente se reconozca tanto si reserva desde la app (puede
- * escribir "612 345 678") como si escribe por WhatsApp (llega como
- * "34612345678", sin "+"). Ajusta el prefijo "34" si en el futuro abres
- * en otro país.
- */
-export function normalizarTelefono(telefono: string): string {
-  const soloDigitosYMas = telefono.replace(/[^\d+]/g, "");
-  if (soloDigitosYMas.startsWith("+")) return soloDigitosYMas;
-  if (soloDigitosYMas.length === 9 && /^[679]/.test(soloDigitosYMas)) {
-    return `+34${soloDigitosYMas}`;
-  }
-  return `+${soloDigitosYMas}`;
 }
