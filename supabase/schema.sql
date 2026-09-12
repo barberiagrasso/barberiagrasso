@@ -16,6 +16,9 @@ create table sedes (
   slug text unique not null,
   direccion text,
   telefono text,
+  -- Enlace directo a la ficha de Google Maps de la sede (se muestra en
+  -- la portada como "Cómo llegar").
+  maps_url text,
   activo boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -29,6 +32,13 @@ create table servicios (
   descripcion text,
   duracion_minutos int not null check (duracion_minutos > 0),
   precio_centimos int not null check (precio_centimos >= 0),
+  -- NULL = servicio "principal", visible directamente en el paso de
+  -- reserva. Con valor = nombre del desplegable donde vive (Grasso
+  -- Kids, Complementos, Tintes Grasso...).
+  categoria text,
+  -- Orden dentro de su grupo (los principales entre sí, o los de un
+  -- mismo desplegable entre sí).
+  orden int not null default 0,
   activo boolean not null default true,
   created_at timestamptz not null default now()
 );

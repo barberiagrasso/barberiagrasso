@@ -8,6 +8,8 @@ export interface Sede {
   direccion: string | null;
   telefono: string | null;
   activo: boolean;
+  // Enlace directo a la ficha de Google Maps de la sede (opcional).
+  maps_url?: string | null;
 }
 
 export interface Servicio {
@@ -17,6 +19,13 @@ export interface Servicio {
   duracion_minutos: number;
   precio_centimos: number;
   activo: boolean;
+  // null = uno de los 4 servicios "principales" que se muestran
+  // directamente en el paso de reserva; si tiene valor, el servicio vive
+  // dentro de ese desplegable (ver CATEGORIAS_ORDEN en BookingFlow.tsx).
+  categoria?: string | null;
+  // Orden dentro de su grupo (los 4 principales entre sí, o los
+  // servicios de un mismo desplegable entre sí).
+  orden?: number;
 }
 
 export interface Profesional {

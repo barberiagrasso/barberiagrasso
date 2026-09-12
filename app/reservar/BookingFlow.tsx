@@ -6,16 +6,49 @@ import { GrassoMark } from "@/components/brand/GrassoMark";
 
 type Paso = "sede" | "servicio" | "complementos" | "profesional" | "fecha" | "datos" | "confirmado";
 
-// Los complementos (cejas, lavado, masaje...) se guardan como servicios
-// propios que empiezan por "Complemento: " — así se pueden reservar
-// sueltos (aparecen en el listado normal de servicios) o añadirse como
-// extra al servicio principal en el paso extra de abajo.
-const PREFIJO_COMPLEMENTO = "Complemento: ";
+// Los servicios "principales" (categoria = null) se muestran siempre
+// directamente en el paso de reserva. El resto vive dentro de un
+// desplegable según su `categoria` — este orden es el que pidió Diego;
+// una categoría que no esté aquí se coloca al final, alfabéticamente.
+const CATEGORIAS_ORDEN = [
+  "Grasso Kids (hasta 7 años)",
+  "Complementos",
+  "Tintes Grasso",
+  "Tratamientos capilares",
+  "Packs Grasso",
+];
+const CATEGORIA_COMPLEMENTOS = "Complementos";
+
 function esComplemento(servicio: Servicio) {
-  return servicio.nombre.startsWith(PREFIJO_COMPLEMENTO);
+  return servicio.categoria === CATEGORIA_COMPLEMENTOS;
 }
-function nombreCorto(servicio: Servicio) {
-  return servicio.nombre.replace(PREFIJO_COMPLEMENTO, "");
+
+function agruparServicios(servicios: Servicio[]) {
+  const principales = servicios
+    .filter((s) => !s.categoria)
+    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
+  const porCategoria = new Map<string, Servicio[]>();
+  for (const s of servicios) {
+    if (!s.categoria) continue;
+    if (!porCategoria.has(s.categoria)) porCategoria.set(s.categoria, []);
+    porCategoria.get(s.categoria)!.push(s);
+  }
+  for (const items of porCategoria.values()) {
+    items.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+  }
+
+  const nombresCategorias = Array.from(porCategoria.keys()).sort((a, b) => {
+    const ia = CATEGORIAS_ORDEN.indexOf(a);
+    const ib = CATEGORIAS_ORDEN.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
+  const grupos = nombresCategorias.map((nombre) => ({ nombre, items: porCategoria.get(nombre)! }));
+  return { principales, grupos };
 }
 
 interface ProfesionalOpcion {
@@ -82,6 +115,25 @@ function TarjetaOpcion({
   );
 }
 
+function FilaServicio({ servicio, extra }: { servicio: Servicio; extra?: boolean }) {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-heading text-lg">{servicio.nombre}</span>
+        <span className={"font-mono text-base tabular-nums " + (extra ? "" : "text-brand-yellow")}>
+          {extra ? "+" : ""}
+          {formatearPrecio(servicio.precio_centimos)}
+        </span>
+      </div>
+      <div className="mt-0.5 font-mono text-xs text-brand-white-dim opacity-80">
+        {extra ? "+" : ""}
+        {servicio.duracion_minutos} min
+      </div>
+      {servicio.descripcion && <div className="mt-1 font-body text-sm opacity-70">{servicio.descripcion}</div>}
+    </>
+  );
+}
+
 function BotonPrimario({
   children,
   onClick,
@@ -117,6 +169,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const [paso, setPaso] = useState<Paso>("sede");
   const [sedeId, setSedeId] = useState<string | null>(null);
   const [servicioId, setServicioId] = useState<string | null>(null);
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
   const [complementoIds, setComplementoIds] = useState<string[]>([]);
   const [profesionalId, setProfesionalId] = useState<string | null>(null); // null = cualquiera
   const [profesionales, setProfesionales] = useState<ProfesionalOpcion[]>([]);
@@ -135,6 +188,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
   const dias = useMemo(() => proximosDias(14), []);
   const sedeSeleccionada = sedes.find((s) => s.id === sedeId);
   const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
+  const { principales, grupos } = useMemo(() => agruparServicios(servicios), [servicios]);
   const complementosDisponibles = useMemo(() => servicios.filter(esComplemento), [servicios]);
   const complementosElegidos = useMemo(
     () => complementosDisponibles.filter((c) => complementoIds.includes(c.id)),
@@ -277,22 +331,53 @@ export default function BookingFlow({ sedes, servicios }: Props) {
       {paso === "servicio" && (
         <div className="space-y-3">
           <PasoTitulo>Servicios en {sedeSeleccionada?.nombre}</PasoTitulo>
+
           <div className="space-y-3">
-            {servicios.map((servicio) => (
+            {principales.map((servicio) => (
               <TarjetaOpcion key={servicio.id} onClick={() => elegirServicioYContinuar(servicio.id)}>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-heading text-lg">{servicio.nombre}</span>
-                  <span className="font-mono text-base tabular-nums text-brand-yellow">
-                    {formatearPrecio(servicio.precio_centimos)}
-                  </span>
-                </div>
-                <div className="mt-0.5 font-mono text-xs text-brand-white-dim">{servicio.duracion_minutos} min</div>
-                {servicio.descripcion && (
-                  <div className="mt-1 font-body text-sm opacity-70">{servicio.descripcion}</div>
-                )}
+                <FilaServicio servicio={servicio} />
               </TarjetaOpcion>
             ))}
           </div>
+
+          {grupos.length > 0 && (
+            <div className="space-y-2 pt-1">
+              {grupos.map((grupo) => {
+                const abierto = grupoAbierto === grupo.nombre;
+                return (
+                  <div key={grupo.nombre} className="rounded-xl border border-brand-line">
+                    <button
+                      onClick={() => setGrupoAbierto(abierto ? null : grupo.nombre)}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                      <span className="font-mono text-xs uppercase tracking-wider text-brand-yellow">
+                        {grupo.nombre}
+                      </span>
+                      <span className="font-mono text-xs text-brand-white-dim">{abierto ? "−" : "+"}</span>
+                    </button>
+                    {abierto && (
+                      <div className="space-y-2 border-t border-brand-line p-3">
+                        {grupo.items.map((servicio) => (
+                          <div key={servicio.id}>
+                            {grupo.nombre === "Tratamientos capilares" &&
+                              servicio.nombre.toLowerCase().includes("rastas") && (
+                                <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-brand-white-dim">
+                                  Rastas
+                                </p>
+                              )}
+                            <TarjetaOpcion onClick={() => elegirServicioYContinuar(servicio.id)}>
+                              <FilaServicio servicio={servicio} />
+                            </TarjetaOpcion>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <EnlaceVolver onClick={() => setPaso("sede")}>← Cambiar de sede</EnlaceVolver>
         </div>
       )}
@@ -311,7 +396,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-heading text-lg">
                       {elegido ? "✓ " : ""}
-                      {nombreCorto(c)}
+                      {c.nombre}
                     </span>
                     <span className="font-mono text-base tabular-nums">+{formatearPrecio(c.precio_centimos)}</span>
                   </div>
@@ -435,7 +520,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
           <div className="rounded-xl border border-brand-line bg-black/20 p-4 font-body text-sm text-brand-white-dim">
             <div className="font-heading text-base text-brand-white">{servicioSeleccionado?.nombre}</div>
             {complementosElegidos.map((c) => (
-              <div key={c.id}>+ {nombreCorto(c)}</div>
+              <div key={c.id}>+ {c.nombre}</div>
             ))}
             <div className="mt-1 font-mono text-brand-yellow">Total: {formatearPrecio(precioTotalCentimos)}</div>
           </div>
@@ -499,7 +584,7 @@ export default function BookingFlow({ sedes, servicios }: Props) {
           <p className="font-body text-sm text-brand-white-dim">
             {sedeSeleccionada?.nombre} · {servicioSeleccionado?.nombre}
             {complementosElegidos.length > 0 &&
-              ` + ${complementosElegidos.map((c) => nombreCorto(c)).join(", ")}`}{" "}
+              ` + ${complementosElegidos.map((c) => c.nombre).join(", ")}`}{" "}
             · {citaConfirmada.profesionalNombre}
           </p>
           <p className="font-mono text-brand-white">Total: {formatearPrecio(precioTotalCentimos)}</p>
