@@ -16,8 +16,18 @@ export default async function ReservarPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-brand-black px-4 py-10 sm:py-14">
-      <div className="mx-auto max-w-xl">
+    <main className="relative min-h-screen overflow-hidden bg-brand-black px-4 py-10 sm:py-14">
+      {/* Fondo ambiental: una foto real de la barbería, muy oscurecida y
+          difuminada. Es solo textura — fija, sin animación ni interacción —
+          para no distraer ni un ápice del flujo de reserva. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-40"
+        style={{ backgroundImage: "url(/media/texturas/reservar-bg.jpg)" }}
+      />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-brand-black/70" />
+
+      <div className="relative mx-auto max-w-xl">
         <div className="mb-10 flex flex-col items-center text-center">
           <GrassoLogo className="h-auto w-56 text-brand-white sm:w-64" />
           <p className="mt-4 font-heading text-lg italic text-brand-white-dim">
