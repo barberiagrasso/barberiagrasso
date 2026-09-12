@@ -43,22 +43,27 @@ export async function crearReserva(params: CrearReservaParams) {
   const supabase = createAdminClient();
 
   // Complementos añadidos en el paso extra (opcional): amplían la
-  // duración del hueco y se anotan en la cita.
+  // duración del hueco. Se guardan como filas propias en cita_extras
+  // (para que los informes de facturación y servicios más pedidos los
+  // cuenten con precisión) y también como texto en "notas" para que se
+  // lean de un vistazo en la agenda.
   const complementoIds = (params.complementoIds ?? []).filter(Boolean);
   let duracionExtraMinutos = 0;
   let notaComplementos: string | null = null;
+  let complementosParaGuardar: { servicio_id: string; precio_centimos: number; duracion_minutos: number }[] = [];
   if (complementoIds.length > 0) {
     const { data: complementos } = await supabase
       .from("servicios")
-      .select("nombre, duracion_minutos, precio_centimos")
+      .select("id, nombre, duracion_minutos, precio_centimos")
       .in("id", complementoIds);
     if (complementos && complementos.length > 0) {
       duracionExtraMinutos = complementos.reduce((acc, c) => acc + c.duracion_minutos, 0);
-      notaComplementos =
-        "Complementos: " +
-        complementos
-          .map((c) => `${c.nombre.replace(/^Complemento:\s*/, "")} (${(c.precio_centimos / 100).toFixed(2)}€)`)
-          .join(", ");
+      notaComplementos = "Complementos: " + complementos.map((c) => `${c.nombre} (${(c.precio_centimos / 100).toFixed(2)}€)`).join(", ");
+      complementosParaGuardar = complementos.map((c) => ({
+        servicio_id: c.id,
+        precio_centimos: c.precio_centimos,
+        duracion_minutos: c.duracion_minutos,
+      }));
     }
   }
 
@@ -158,7 +163,104 @@ export async function crearReserva(params: CrearReservaParams) {
     throw new ReservaError("No se pudo crear la cita. Inténtalo de nuevo.");
   }
 
+  if (complementosParaGuardar.length > 0) {
+    await supabase.from("cita_extras").insert(
+      complementosParaGuardar.map((c) => ({ cita_id: cita.id, ...c }))
+    );
+  }
+
   return { cita, clienteId, profesionalNombre: slotElegido.profesional_nombre };
+}
+
+/**
+ * Minutos de antelación mínimos para que el propio cliente pueda cancelar
+ * o reprogramar su cita por WhatsApp sin intervención humana (política de
+ * Diego: por debajo de este margen, la IA no lo hace sola y pide que
+ * llamen a la barbería). El panel de administración no tiene este límite:
+ * un gestor humano puede cancelar/mover cualquier cita en cualquier
+ * momento desde /admin/dashboard.
+ */
+export const MINUTOS_MINIMOS_CANCELACION_AUTOMATICA = 60;
+
+export function puedeGestionarseAutomaticamente(inicioISO: string): boolean {
+  const minutosHastaLaCita = (new Date(inicioISO).getTime() - Date.now()) / 60000;
+  return minutosHastaLaCita >= MINUTOS_MINIMOS_CANCELACION_AUTOMATICA;
+}
+
+/**
+ * Cancela una cita ya existente. Usado tanto por el asistente de WhatsApp
+ * (con el límite de la 1 hora ya comprobado antes de llamar a esto) como,
+ * en el futuro, por otros puntos de entrada.
+ */
+export async function cancelarCita(citaId: string) {
+  const supabase = createAdminClient();
+  const { data: cita, error } = await supabase
+    .from("citas")
+    .update({ estado: "cancelada" })
+    .eq("id", citaId)
+    .select("*")
+    .single();
+  if (error || !cita) throw new ReservaError("No se pudo cancelar la cita.");
+  return cita;
+}
+
+interface ReprogramarCitaParams {
+  citaId: string;
+  nuevaHoraInicioISO: string;
+  // Si no se indica, se mantiene el mismo profesional/sede/servicio y solo
+  // cambia el horario; getAvailableSlots decide igualmente qué profesional
+  // atiende si el original no está libre a esa hora.
+  profesionalId?: string | null;
+}
+
+/**
+ * Mueve una cita existente a un nuevo horario, comprobando disponibilidad
+ * real igual que al crearla (evita dobles reservas).
+ */
+export async function reprogramarCita({ citaId, nuevaHoraInicioISO, profesionalId }: ReprogramarCitaParams) {
+  const supabase = createAdminClient();
+  const { data: citaActual } = await supabase.from("citas").select("*").eq("id", citaId).single();
+  if (!citaActual) throw new ReservaError("No se encontró la cita.");
+
+  const duracionMinutos = Math.round(
+    (new Date(citaActual.fin).getTime() - new Date(citaActual.inicio).getTime()) / 60000
+  );
+
+  const fecha = new Date(nuevaHoraInicioISO).toISOString().slice(0, 10);
+  const slots = await getAvailableSlots({
+    sedeId: citaActual.sede_id,
+    servicioId: citaActual.servicio_id,
+    fecha,
+    profesionalId: profesionalId ?? citaActual.profesional_id,
+    duracionExtraMinutos: 0,
+  });
+
+  // La duración total (servicio + complementos) ya está fijada en la cita
+  // original; buscamos un hueco de esa misma duración exacta a partir de
+  // los slots que ofrece el motor de disponibilidad (que asume la
+  // duración base del servicio) comprobando que, extendido, no choca.
+  const slotElegido = slots.find((s) => s.hora_inicio === nuevaHoraInicioISO);
+  if (!slotElegido) {
+    throw new ReservaError("Ese horario ya no está disponible. Elige otra hora.");
+  }
+
+  const nuevoInicio = new Date(nuevaHoraInicioISO);
+  const nuevoFin = addMinutes(nuevoInicio, duracionMinutos);
+
+  const { data: citaActualizada, error } = await supabase
+    .from("citas")
+    .update({
+      inicio: nuevoInicio.toISOString(),
+      fin: nuevoFin.toISOString(),
+      profesional_id: slotElegido.profesional_id,
+      recordatorio_enviado_at: null, // si ya se había mandado, que se vuelva a mandar para la nueva hora
+    })
+    .eq("id", citaId)
+    .select("*")
+    .single();
+
+  if (error || !citaActualizada) throw new ReservaError("No se pudo reprogramar la cita.");
+  return { cita: citaActualizada, profesionalNombre: slotElegido.profesional_nombre };
 }
 
 /**

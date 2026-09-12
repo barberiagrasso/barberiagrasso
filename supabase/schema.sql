@@ -136,6 +136,10 @@ create table citas (
     check (estado in ('confirmada', 'cancelada', 'completada', 'no_presentada')),
   origen text not null default 'app' check (origen in ('app', 'panel', 'whatsapp')),
   notas text,
+  -- Se rellena la primera vez que se manda el recordatorio automático de
+  -- esta cita, para no mandarlo dos veces (lo consulta el endpoint de
+  -- /api/cron/recordatorios).
+  recordatorio_enviado_at timestamptz,
   created_at timestamptz not null default now(),
   check (fin > inicio)
 );
@@ -143,6 +147,22 @@ create table citas (
 create index citas_sede_inicio_idx on citas (sede_id, inicio);
 create index citas_profesional_inicio_idx on citas (profesional_id, inicio);
 create index citas_cliente_idx on citas (cliente_id);
+
+-- Complementos añadidos a una cita (cejas, lavado...), como filas
+-- independientes en vez de texto libre: así los informes de facturación
+-- y de servicios más pedidos pueden contarlos con precisión. Se guarda
+-- una "foto" del precio y duración en el momento de la reserva, para que
+-- si luego cambias el precio del complemento en el catálogo, las citas
+-- ya pasadas no cambien de valor con efecto retroactivo.
+create table cita_extras (
+  id uuid primary key default gen_random_uuid(),
+  cita_id uuid not null references citas(id) on delete cascade,
+  servicio_id uuid not null references servicios(id),
+  precio_centimos int not null,
+  duracion_minutos int not null
+);
+
+create index cita_extras_cita_idx on cita_extras (cita_id);
 
 -- ---------------------------------------------------------------------
 -- WHATSAPP: CONVERSACIONES Y MENSAJES
@@ -171,12 +191,31 @@ create index mensajes_conversacion_idx on mensajes (conversacion_id, created_at)
 -- ---------------------------------------------------------------------
 -- CAMPAÑAS COMERCIALES
 -- ---------------------------------------------------------------------
+-- Plantillas de WhatsApp aprobadas por Meta (business-initiated messages:
+-- fuera de la ventana de 24h desde el último mensaje del cliente, WhatsApp
+-- exige usar una plantilla ya revisada y aprobada, no texto libre). Aquí
+-- solo se registra el nombre exacto de la plantilla tal y como la creaste
+-- en Meta Business Manager, para poder usarla desde el panel sin tocar
+-- código cada vez.
+create table plantillas_whatsapp (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null check (tipo in ('recordatorio', 'campana')),
+  nombre text not null, -- nombre interno para reconocerla en el panel
+  nombre_meta text not null, -- nombre exacto de la plantilla en Meta
+  idioma text not null default 'es',
+  variables text[] not null default '{}', -- nombres de las variables {{1}}, {{2}}... en orden
+  activa boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 create table campanas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
   canal text not null check (canal in ('whatsapp', 'email', 'push')),
   mensaje text not null,
   segmento jsonb,
+  plantilla_id uuid references plantillas_whatsapp(id),
+  estado text not null default 'borrador' check (estado in ('borrador', 'enviando', 'enviada', 'fallida')),
   enviada_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -185,6 +224,8 @@ create table campana_destinatarios (
   campana_id uuid not null references campanas(id) on delete cascade,
   cliente_id uuid not null references clientes(id) on delete cascade,
   estado text not null default 'pendiente' check (estado in ('pendiente', 'enviado', 'fallido')),
+  enviado_at timestamptz,
+  error text,
   primary key (campana_id, cliente_id)
 );
 
@@ -224,6 +265,8 @@ alter table conversaciones enable row level security;
 alter table mensajes enable row level security;
 alter table campanas enable row level security;
 alter table campana_destinatarios enable row level security;
+alter table plantillas_whatsapp enable row level security;
+alter table cita_extras enable row level security;
 alter table admins enable row level security;
 
 -- Función auxiliar: ¿el usuario autenticado actual es admin?
@@ -271,5 +314,9 @@ create policy "conversaciones_admin_all" on conversaciones for all using (is_adm
 create policy "mensajes_admin_all" on mensajes for all using (is_admin()) with check (is_admin());
 create policy "campanas_admin_all" on campanas for all using (is_admin()) with check (is_admin());
 create policy "campana_destinatarios_admin_all" on campana_destinatarios for all using (is_admin()) with check (is_admin());
+create policy "plantillas_whatsapp_admin_all" on plantillas_whatsapp for all using (is_admin()) with check (is_admin());
+-- cita_extras hereda la misma sensibilidad que citas: solo backend (service
+-- role) y administradores.
+create policy "cita_extras_admin_all" on cita_extras for all using (is_admin()) with check (is_admin());
 
 create policy "admins_self_read" on admins for select using (auth.uid() = id);

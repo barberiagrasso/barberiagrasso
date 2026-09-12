@@ -2,7 +2,15 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvailableSlots } from "@/lib/availability";
-import { crearReserva, ReservaError } from "@/lib/booking";
+import {
+  crearReserva,
+  cancelarCita,
+  reprogramarCita,
+  puedeGestionarseAutomaticamente,
+  MINUTOS_MINIMOS_CANCELACION_AUTOMATICA,
+  normalizarTelefono,
+  ReservaError,
+} from "@/lib/booking";
 
 // Revisa de vez en cuando en la documentación de Anthropic
 // (platform.claude.com/docs) si hay un modelo más reciente recomendado.
@@ -40,7 +48,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "crear_cita",
     description:
-      "Crea la cita en firme. Solo llama a esta función cuando el cliente ha confirmado explícitamente sede, servicio, fecha y hora exactos, y te ha dado su nombre.",
+      "Crea la cita en firme. Solo llama a esta función cuando el cliente ha confirmado explícitamente sede, servicio, fecha y hora exactos, y te ha dado su nombre. Antes de llamarla para uno de los 4 servicios principales (Corte, Barba, Corte y barba, Asesoría de prótesis capilar), ofrece al cliente añadir un complemento (ver regla en el prompt).",
     input_schema: {
       type: "object",
       properties: {
@@ -54,8 +62,48 @@ const TOOLS: Anthropic.Tool[] = [
           description:
             "true solo si el cliente ha dicho explícitamente que sí quiere recibir ofertas/novedades. Si no lo ha dicho o no lo has preguntado, usa false.",
         },
+        complementos: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Nombres de complementos que el cliente ha pedido añadir (opcional), tal cual aparecen en el catálogo: Cejas, Lavado, Masaje anti-estrés, Depilación de nariz.",
+        },
       },
       required: ["sede", "servicio", "fecha", "hora", "nombre_cliente"],
+    },
+  },
+  {
+    name: "consultar_mis_citas",
+    description:
+      "Consulta las próximas citas confirmadas de este mismo cliente (por su número de WhatsApp). Úsalo siempre antes de cancelar_cita o reprogramar_cita si el cliente no ha dicho fecha y hora exactas de la cita que quiere tocar, para saber cuál es o preguntarle cuál si tiene varias.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "cancelar_cita",
+    description:
+      `Cancela una cita ya existente de este cliente. Solo puedes hacerlo tú directamente si faltan ${MINUTOS_MINIMOS_CANCELACION_AUTOMATICA} minutos o más para la cita; si falta menos, la herramienta te lo dirá y debes decirle al cliente que llame a la barbería.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        fecha: { type: "string", description: "Fecha de la cita a cancelar, YYYY-MM-DD." },
+        hora: { type: "string", description: "Hora de la cita a cancelar, HH:mm." },
+      },
+      required: ["fecha", "hora"],
+    },
+  },
+  {
+    name: "reprogramar_cita",
+    description:
+      `Mueve una cita ya existente de este cliente a otro día/hora. Consulta antes disponibilidad con consultar_disponibilidad para la nueva fecha. Solo puedes hacerlo tú directamente si faltan ${MINUTOS_MINIMOS_CANCELACION_AUTOMATICA} minutos o más para la cita ORIGINAL; si falta menos, la herramienta te lo dirá y debes decirle al cliente que llame a la barbería.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        fecha_actual: { type: "string", description: "Fecha actual de la cita, YYYY-MM-DD." },
+        hora_actual: { type: "string", description: "Hora actual de la cita, HH:mm." },
+        fecha_nueva: { type: "string", description: "Nueva fecha deseada, YYYY-MM-DD." },
+        hora_nueva: { type: "string", description: "Nueva hora deseada, HH:mm." },
+      },
+      required: ["fecha_actual", "hora_actual", "fecha_nueva", "hora_nueva"],
     },
   },
   {
@@ -108,7 +156,9 @@ ${serviciosTexto || "(sin servicios configurados todavía)"}
 REGLAS IMPORTANTES:
 - Nunca inventes horarios disponibles: usa siempre la herramienta consultar_disponibilidad antes de proponer una hora.
 - Para reservar, necesitas: sede, servicio, fecha, hora exacta confirmada por el cliente, y su nombre. Solo entonces llama a crear_cita.
-- Si el cliente quiere cambiar o cancelar una cita ya existente, o pide algo que no puedes resolver tú (una queja, un descuento, una duda muy específica), usa escalar_a_persona y dile al cliente que alguien del equipo le va a escribir.
+- Complementos: si el cliente va a reservar uno de los 4 servicios principales (Corte, Barba, Corte y barba, Asesoría de prótesis capilar), antes de confirmar la cita pregúntale si quiere añadir algún complemento (Cejas, Lavado, Masaje anti-estrés, Depilación de nariz), como haría alguien del equipo al cogerle hora. Si dice que no o no contesta a eso, sigue sin complementos sin insistir. Si el cliente reserva directamente un complemento suelto o cualquier otro servicio que no sea uno de los 4 principales, no hace falta que ofrezcas nada más.
+- Cancelar o reprogramar una cita: usa consultar_mis_citas si el cliente no te ha dado ya la fecha y hora exactas de la cita que quiere tocar. Luego usa cancelar_cita o reprogramar_cita. Estas herramientas comprueban solas si queda margen suficiente; si no, te lo dirán y entonces debes decirle al cliente que llame directamente a la barbería para gestionarlo, sin escalar la conversación.
+- Si el cliente pide algo que no puedes resolver tú (una queja, un descuento, una duda muy específica, o cualquier otra gestión que no sea crear/cancelar/reprogramar una cita), usa escalar_a_persona y dile al cliente que alguien del equipo le va a escribir.
 - Nunca compartas datos de otros clientes.
 - Sé proactivo: si el cliente solo saluda o pregunta algo general, ayúdale a decidir sede, servicio y fecha antes de mostrar horas.`;
 }
@@ -166,6 +216,12 @@ async function ejecutarHerramienta(
       new Date(`${fecha}T${hora}:00+02:00`).toISOString()
     ).toISOString();
 
+    const nombresComplementos = Array.isArray(input.complementos) ? (input.complementos as unknown[]) : [];
+    const complementoIds = nombresComplementos
+      .map((c) => resolverServicioId(String(c), servicios ?? []))
+      .filter((s): s is { id: string; nombre: string } => Boolean(s))
+      .map((s) => s.id);
+
     try {
       const { cita } = await crearReserva({
         sedeId: sede.id,
@@ -176,6 +232,7 @@ async function ejecutarHerramienta(
         aceptaComercial: Boolean(input.acepta_comunicaciones_comerciales),
         canal: "whatsapp",
         origen: "whatsapp",
+        complementoIds,
       });
       return {
         resultado: `Cita creada correctamente para el ${fecha} a las ${hora} en ${sede.nombre}. ID: ${cita.id}`,
@@ -189,11 +246,113 @@ async function ejecutarHerramienta(
     }
   }
 
+  if (nombre === "consultar_mis_citas") {
+    const citas = await buscarCitasFuturasDelCliente(telefono);
+    if (citas.length === 0) {
+      return { resultado: "Este cliente no tiene ninguna cita próxima confirmada.", escalar: false };
+    }
+    const lista = citas
+      .map((c) => `- ${formatoFechaHora(c.inicio)}: ${c.servicioNombre} en ${c.sedeNombre}`)
+      .join("\n");
+    return { resultado: `Próximas citas del cliente:\n${lista}`, escalar: false };
+  }
+
+  if (nombre === "cancelar_cita") {
+    const cita = await encontrarCitaPorFechaHora(telefono, String(input.fecha), String(input.hora));
+    if (!cita) {
+      return { resultado: "No encuentro ninguna cita confirmada de este cliente en esa fecha y hora.", escalar: false };
+    }
+    if (!puedeGestionarseAutomaticamente(cita.inicio)) {
+      return {
+        resultado: `Falta menos de ${MINUTOS_MINIMOS_CANCELACION_AUTOMATICA} minutos para esa cita: no la canceles tú, dile al cliente que llame directamente a la barbería.`,
+        escalar: false,
+      };
+    }
+    try {
+      await cancelarCita(cita.id);
+      return { resultado: "Cita cancelada correctamente.", escalar: false };
+    } catch {
+      return { resultado: "Ha ocurrido un error técnico al cancelar la cita.", escalar: true };
+    }
+  }
+
+  if (nombre === "reprogramar_cita") {
+    const cita = await encontrarCitaPorFechaHora(telefono, String(input.fecha_actual), String(input.hora_actual));
+    if (!cita) {
+      return { resultado: "No encuentro ninguna cita confirmada de este cliente en esa fecha y hora.", escalar: false };
+    }
+    if (!puedeGestionarseAutomaticamente(cita.inicio)) {
+      return {
+        resultado: `Falta menos de ${MINUTOS_MINIMOS_CANCELACION_AUTOMATICA} minutos para esa cita: no la reprogromes tú, dile al cliente que llame directamente a la barbería.`,
+        escalar: false,
+      };
+    }
+    const fechaNueva = String(input.fecha_nueva);
+    const horaNueva = String(input.hora_nueva);
+    const nuevaHoraInicioISO = new Date(new Date(`${fechaNueva}T${horaNueva}:00+02:00`).toISOString()).toISOString();
+    try {
+      await reprogramarCita({ citaId: cita.id, nuevaHoraInicioISO });
+      return { resultado: `Cita movida correctamente al ${fechaNueva} a las ${horaNueva}.`, escalar: false };
+    } catch (err) {
+      if (err instanceof ReservaError) {
+        return { resultado: `No se pudo reprogramar: ${err.message}`, escalar: false };
+      }
+      return { resultado: "Ha ocurrido un error técnico al reprogramar la cita.", escalar: true };
+    }
+  }
+
   if (nombre === "escalar_a_persona") {
     return { resultado: "Conversación marcada para que la atienda una persona.", escalar: true };
   }
 
   return { resultado: "Herramienta desconocida.", escalar: false };
+}
+
+async function buscarCitasFuturasDelCliente(telefono: string) {
+  const supabase = createAdminClient();
+  const telefonoNormalizado = normalizarTelefono(telefono);
+  const { data: cliente } = await supabase
+    .from("clientes")
+    .select("id")
+    .eq("telefono", telefonoNormalizado)
+    .maybeSingle();
+  if (!cliente) return [];
+
+  const { data: citas } = await supabase
+    .from("citas")
+    .select("id, inicio, servicio:servicios(nombre), sede:sedes(nombre)")
+    .eq("cliente_id", cliente.id)
+    .eq("estado", "confirmada")
+    .gt("inicio", new Date().toISOString())
+    .order("inicio");
+
+  return (citas ?? []).map((c) => {
+    const servicio = Array.isArray(c.servicio) ? c.servicio[0] : c.servicio;
+    const sede = Array.isArray(c.sede) ? c.sede[0] : c.sede;
+    return {
+      id: c.id as string,
+      inicio: c.inicio as string,
+      servicioNombre: (servicio as { nombre: string } | null)?.nombre ?? "Servicio",
+      sedeNombre: (sede as { nombre: string } | null)?.nombre ?? "Sede",
+    };
+  });
+}
+
+async function encontrarCitaPorFechaHora(telefono: string, fecha: string, hora: string) {
+  const citas = await buscarCitasFuturasDelCliente(telefono);
+  const objetivoISO = new Date(new Date(`${fecha}T${hora}:00+02:00`).toISOString()).toISOString();
+  return citas.find((c) => c.inicio === objetivoISO) ?? null;
+}
+
+function formatoFechaHora(iso: string) {
+  return new Date(iso).toLocaleString("es-ES", {
+    timeZone: "Europe/Madrid",
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export async function ejecutarAsistente({

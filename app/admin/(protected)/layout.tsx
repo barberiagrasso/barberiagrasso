@@ -9,8 +9,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   return (
     <div className="min-h-screen bg-stone-50">
       <header className="border-b border-black/10 bg-brand-black">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-2">
               <GrassoMark className="h-6 w-6 text-brand-yellow" />
               <span className="font-heading text-lg italic text-brand-white">Barbería Grasso</span>
@@ -23,7 +23,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
 }

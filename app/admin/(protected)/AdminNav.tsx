@@ -5,8 +5,13 @@ import { usePathname } from "next/navigation";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Agenda" },
+  { href: "/admin/servicios", label: "Servicios" },
+  { href: "/admin/profesionales", label: "Equipo" },
   { href: "/admin/bloqueos", label: "Vacaciones" },
   { href: "/admin/clientes", label: "Clientes" },
+  { href: "/admin/campanas", label: "Campañas" },
+  { href: "/admin/plantillas", label: "Plantillas" },
+  { href: "/admin/informes", label: "Informes" },
   { href: "/admin/conversaciones", label: "WhatsApp" },
 ];
 
@@ -14,7 +19,7 @@ export default function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-5 font-body text-sm">
+    <nav className="flex flex-wrap gap-x-5 gap-y-1 font-body text-sm">
       {NAV.map((item) => {
         const activo = pathname?.startsWith(item.href);
         return (

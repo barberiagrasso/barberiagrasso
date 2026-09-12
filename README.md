@@ -14,41 +14,96 @@ simplemente describe qué quieres conseguir.
 ## Qué incluye ya este proyecto (funcionando de verdad)
 
 - **Base de datos completa** (`supabase/schema.sql`) para las dos sedes: servicios, horarios,
-  profesionales, clientes, citas, consentimientos, conversaciones de WhatsApp y campañas.
-- **Página de reserva** (`/reservar`): el cliente elige sede, servicio, profesional (opcional),
+  profesionales, clientes, citas (con sus complementos como filas propias en `cita_extras`),
+  consentimientos, conversaciones de WhatsApp, campañas y plantillas de WhatsApp.
+- **Página de reserva** (`/reservar`): el cliente elige sede, uno de los 4 servicios
+  principales o uno de los desplegables, complementos opcionales, profesional (opcional),
   fecha y hora real disponible, y confirma con sus datos. Funciona perfectamente desde el
   móvil (es una web responsive) aunque todavía no está empaquetada como app de App
   Store/Google Play — ver "Qué falta" más abajo.
-- **Panel de control** (`/admin`): agenda por sede con creación, cancelación y cambios de
-  estado de citas manuales; listado de clientes (CRM) con su estado de consentimiento
-  comercial; supervisión de las conversaciones de WhatsApp con posibilidad de responder tú
-  manualmente en cualquier momento.
+- **Panel de control** (`/admin`), con gestión visual completa (sin tocar Supabase):
+  - **Agenda**: creación, cancelación y cambios de estado de citas por sede.
+  - **Servicios**: catálogo, precios, duración y en qué desplegable aparece cada uno.
+  - **Equipo**: alta de barberos, a qué sedes y servicios están asignados, y su horario
+    semanal.
+  - **Vacaciones**: bloqueos puntuales por barbero o por sede.
+  - **Clientes (CRM)**: listado con su estado de consentimiento comercial.
+  - **Campañas**: segmentar clientes (por sede, etiqueta, o quién no viene desde hace
+    tiempo) y mandarles un mensaje de WhatsApp — solo a quien haya dado su consentimiento.
+  - **Plantillas**: registro de las plantillas de WhatsApp que Meta te apruebe, para
+    recordatorios y campañas.
+  - **Informes**: ingresos por sede y por barbero, servicios y complementos más pedidos, y
+    ocupación aproximada por franja horaria.
+  - **WhatsApp**: supervisión de conversaciones, con posibilidad de responder tú
+    manualmente en cualquier momento.
 - **Asistente de WhatsApp con IA** (usando la API de Claude): responde dudas de servicios,
-  precios y horarios, consulta disponibilidad real y crea la cita directamente en la
-  conversación, o escala a una persona cuando no puede resolver algo.
+  precios y horarios, consulta disponibilidad real, ofrece complementos y crea la cita
+  directamente en la conversación; también puede **cancelar o reprogramar** una cita ya
+  existente si faltan 60 minutos o más (si falta menos, le dice al cliente que llame a la
+  barbería), o escala a una persona cuando no puede resolver algo.
+- **Recordatorios automáticos**: un disparador programado (ver más abajo) revisa cada hora
+  las citas que empiezan pronto y manda un recordatorio por WhatsApp, sin mandarlo dos veces.
 - **Motor de disponibilidad** que evita dobles reservas entre la app, el panel y WhatsApp,
   porque los tres comparten la misma base de datos (tal y como recomendaba la sección 5 del
   documento de especificación).
 - **Cumplimiento del consentimiento comercial**: casilla explícita y no premarcada, registro
-  de fecha/canal/texto aceptado, y el CRM solo permite ver quién ha dado ese consentimiento
-  (ver `supabase/schema.sql`, tablas `consentimientos`).
+  de fecha/canal/texto aceptado, el CRM solo permite ver quién ha dado ese consentimiento, y
+  las campañas nunca incluyen a quien no lo haya dado (ver `supabase/schema.sql`, tablas
+  `consentimientos`).
+
+### Recordatorios y campañas: hace falta WhatsApp Business + una plantilla aprobada
+
+Los recordatorios y las campañas son mensajes que **inicia el negocio**, no una respuesta a
+algo que ha escrito el cliente en las últimas 24 horas. WhatsApp exige que ese tipo de mensaje
+use una **plantilla revisada y aprobada por Meta** (texto libre no vale). Para que funcionen
+de verdad, hacen falta tres cosas, en este orden:
+
+1. Completa el **Paso 4** de este README (conectar WhatsApp Business Platform), si no lo has
+   hecho ya.
+2. En Meta Business Manager → WhatsApp Manager → Plantillas de mensajes, crea al menos una
+   plantilla de tipo "Marketing" o "Utility" con las variables que quieras (por ejemplo:
+   `Hola {{1}}, te recordamos tu cita de {{2}} hoy a las {{3}}.`) y espera a que Meta la
+   apruebe (de minutos a un par de días).
+3. Ve a `/admin/plantillas` en tu panel y regístrala: nombre exacto tal cual la creaste en
+   Meta, y el nombre de cada variable en el mismo orden (para recordatorios puedes usar
+   `nombre`, `servicio`, `hora`, `sede`, `fecha`; para campañas, `nombre` y `mensaje`).
+
+Mientras no completes esto, las campañas se pueden seguir creando como borrador y los
+recordatorios simplemente no se mandan (no da ningún error).
+
+### Recordatorios: por qué hace falta GitHub Actions
+
+Vercel, en su plan gratuito (Hobby), solo permite que los cron jobs propios de un proyecto se
+ejecuten **una vez al día** — y los recordatorios necesitan revisarse con más frecuencia para
+poder mandarse unas horas antes de cada cita. Por eso se usa GitHub Actions (gratis) como
+disparador externo: el archivo `.github/workflows/recordatorios.yml` llama, una vez por hora,
+al endpoint `/api/cron/recordatorios` de tu propia app.
+
+Para activarlo:
+
+1. En Vercel, añade estas dos variables de entorno nuevas (junto a las demás): `CRON_SECRET`
+   (una frase secreta larga que te inventes) y opcionalmente `RECORDATORIO_HORAS_ANTES` (por
+   defecto 3).
+2. En GitHub, ve a tu repositorio → **Settings → Secrets and variables → Actions → New
+   repository secret**, y crea dos secretos: `CRON_SECRET` (el mismo valor exacto que
+   pusiste en Vercel) y `APP_URL` (la URL pública de tu app, sin barra al final).
+3. Sube este cambio con `git push`: en cuanto GitHub detecte el archivo
+   `.github/workflows/recordatorios.yml`, empezará a ejecutarlo solo, cada hora. Puedes
+   probarlo a mano desde GitHub → pestaña **Actions** → "Recordatorios de citas" → **Run
+   workflow**.
+
+(Si en el futuro prefieres más precisión y no te importa pagar, la alternativa es subir tu
+proyecto a Vercel Pro, que sí permite cron jobs cada minuto — pídeselo a Claude si cambias de
+opinión más adelante.)
 
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
-- **Enviar campañas comerciales**: hoy el CRM te deja ver quién acepta comunicaciones, pero
-  todavía no hay un botón para redactar y enviar una campaña a un segmento de clientes
-  (Fase 3 del documento de especificación).
-- **Cancelar o mover una cita ya existente desde WhatsApp**: la IA hoy solo puede *crear*
-  una cita nueva. Cambiarla o cancelarla, de momento, lo haces tú desde el panel.
-- **Recordatorios automáticos antes de la cita** (por WhatsApp o push): no hay ninguna tarea
-  programada todavía que los envíe.
-- **Gestión visual de servicios, profesionales y horarios**: de momento se edita directamente
-  en Supabase (Table Editor), no desde el panel. Es sencillo, se explica más abajo.
 - **Empaquetar como app nativa** en App Store / Google Play: la reserva ya funciona como una
   web para móvil; convertirla en una app instalable con Capacitor (o similar) es un paso
   posterior, una vez valides que el sistema funciona bien en el día a día.
-- **Fidelización, pagos/señales anticipadas, informes avanzados**: quedaban fuera del
-  alcance inicial también en el documento de especificación (Fase 4).
+- **Pagos y señales anticipadas** (por ejemplo con Stripe) para reducir las citas fantasma.
+- **Fidelización por puntos o visitas** (ej. cada 10 cortes, uno gratis).
+- Cualquier otra idea nueva que se te ocurra — este proyecto sigue evolucionando contigo.
 
 ---
 
@@ -84,13 +139,13 @@ simplemente describe qué quieres conseguir.
 
 4. Con esto, ese usuario ya puede entrar en `/admin/login` con permisos completos.
 
-### Editar servicios, sedes, profesionales y horarios reales
+### Editar servicios, profesionales y horarios reales
 
-Ve a **Table Editor** en Supabase y edita directamente las filas de las tablas `sedes`,
-`servicios`, `profesionales`, `profesional_sedes`, `profesional_servicios` y `horarios`
-(las que creó `seed.sql` de ejemplo, si lo ejecutaste). Es una tabla como una hoja de
-cálculo: añade, edita o borra filas ahí. Cuando quieras que esto tenga una pantalla propia
-en el panel en vez de editarse en Supabase, pídeselo a Claude.
+Esto ya no hace falta hacerlo en Supabase: desde el panel, en `/admin/servicios` y
+`/admin/profesionales`, puedes crear y editar servicios, precios, barberos, a qué sedes y
+servicios están asignados, y su horario semanal. Las direcciones de las sedes se editan
+directamente en Table Editor → tabla `sedes` (columnas `direccion` y `maps_url`), ya que no
+cambian casi nunca.
 
 ---
 
@@ -165,14 +220,23 @@ versión.
 
 ## Paso 6 — Probar todo de principio a fin
 
-- [ ] Reserva una cita de prueba desde `/reservar` con tu propio teléfono.
+- [ ] Reserva una cita de prueba desde `/reservar` con tu propio teléfono, añadiendo algún
+      complemento en el paso extra.
 - [ ] Comprueba que aparece en `/admin/dashboard` en la sede y hora correctas.
 - [ ] Cancélala y créala de nuevo desde el propio panel (simulando una llamada de
       teléfono).
 - [ ] Escribe por WhatsApp al número conectado preguntando precios y horarios, y luego pide
-      cita: comprueba que el asistente consulta disponibilidad real y la crea.
+      cita: comprueba que el asistente consulta disponibilidad real, te ofrece un
+      complemento y la crea.
+- [ ] Pide por WhatsApp cambiar o cancelar esa misma cita (con más de 1 hora de antelación):
+      comprueba que el asistente lo hace directamente.
 - [ ] Desde `/admin/conversaciones`, responde tú manualmente a una conversación y comprueba
       que el mensaje llega por WhatsApp.
+- [ ] Crea un servicio y un barbero nuevo desde `/admin/servicios` y `/admin/profesionales`,
+      y comprueba que aparecen en la reserva.
+- [ ] En cuanto tengas una plantilla aprobada por Meta y registrada en `/admin/plantillas`:
+      crea una campaña de prueba a un segmento pequeño y compruébala en `/admin/campanas`;
+      y confirma que el workflow de GitHub Actions se ejecuta (pestaña Actions del repo).
 
 ---
 
@@ -190,13 +254,18 @@ Este proyecto va a evolucionar contigo. Cuando quieras un cambio o una función 
 ## Estructura del proyecto (para orientarte)
 
 ```
-supabase/schema.sql        Toda la base de datos y las reglas de seguridad
-supabase/seed.sql          Datos de ejemplo opcionales
+supabase/schema.sql                    Toda la base de datos y las reglas de seguridad
+supabase/seed.sql                      Datos de ejemplo opcionales
+supabase/actualizar-datos-reales.sql   Catálogo real de servicios/barberos/horarios (re-ejecutable)
+supabase/actualizar-funcionalidad-avanzada.sql  Tablas de campañas/plantillas/recordatorios (re-ejecutable)
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
-lib/booking.ts             Crear una reserva (usado por la app, el panel y WhatsApp)
+lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
 lib/aiAssistant.ts         El asistente de WhatsApp con IA (prompt + herramientas)
-lib/whatsapp.ts            Envío de mensajes de WhatsApp
+lib/whatsapp.ts            Envío de mensajes de WhatsApp (texto libre y plantillas)
+lib/segmentacion.ts        Cálculo de a qué clientes llega una campaña
+.github/workflows/recordatorios.yml     Disparador externo (GitHub Actions) de los recordatorios
 app/reservar/              Página pública de reserva
-app/admin/                 Panel de control (login + agenda + clientes + WhatsApp)
+app/admin/                 Panel de control (agenda, servicios, equipo, CRM, campañas, informes...)
 app/api/                   Toda la lógica del servidor (reservas, disponibilidad, webhook…)
+app/api/cron/recordatorios Endpoint que manda los recordatorios (llamado por GitHub Actions)
 ```

@@ -34,6 +34,15 @@ export interface Profesional {
   activo: boolean;
 }
 
+export interface Horario {
+  id: string;
+  profesional_id: string;
+  sede_id: string;
+  dia_semana: number; // 0 = domingo ... 6 = sábado
+  hora_inicio: string; // "HH:mm:ss"
+  hora_fin: string; // "HH:mm:ss"
+}
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -72,7 +81,18 @@ export interface Cita {
   estado: EstadoCita;
   origen: OrigenCita;
   notas: string | null;
+  // Se rellena cuando /api/cron/recordatorios ya mandó el recordatorio
+  // automático de esta cita (evita mandarlo dos veces).
+  recordatorio_enviado_at?: string | null;
   created_at: string;
+}
+
+export interface CitaExtra {
+  id: string;
+  cita_id: string;
+  servicio_id: string;
+  precio_centimos: number;
+  duracion_minutos: number;
 }
 
 export interface CitaConDetalle extends Cita {
@@ -80,6 +100,48 @@ export interface CitaConDetalle extends Cita {
   sede?: Sede;
   profesional?: Profesional | null;
   servicio?: Servicio;
+  extras?: (CitaExtra & { servicio?: Servicio })[];
+}
+
+export type TipoPlantilla = "recordatorio" | "campana";
+
+export interface PlantillaWhatsapp {
+  id: string;
+  tipo: TipoPlantilla;
+  nombre: string;
+  nombre_meta: string;
+  idioma: string;
+  variables: string[];
+  activa: boolean;
+}
+
+export type EstadoCampana = "borrador" | "enviando" | "enviada" | "fallida";
+
+export interface SegmentoCampana {
+  sedeHabitualId?: string | null;
+  etiqueta?: string | null;
+  soloConsentimientoComercial?: boolean;
+  sinVisitasDesde?: string | null; // YYYY-MM-DD: sin citas completadas desde esta fecha
+}
+
+export interface Campana {
+  id: string;
+  nombre: string;
+  canal: "whatsapp" | "email" | "push";
+  mensaje: string;
+  segmento: SegmentoCampana | null;
+  plantilla_id: string | null;
+  estado: EstadoCampana;
+  enviada_at: string | null;
+  created_at: string;
+}
+
+export interface CampanaDestinatario {
+  campana_id: string;
+  cliente_id: string;
+  estado: "pendiente" | "enviado" | "fallido";
+  enviado_at: string | null;
+  error: string | null;
 }
 
 export interface FranjaDisponible {

@@ -1,0 +1,37 @@
+# Dispara el envío de recordatorios de citas una vez por hora.
+#
+# Por qué esto y no un Cron Job de Vercel: en el plan gratuito (Hobby) de
+# Vercel, los cron jobs propios del proyecto solo pueden ejecutarse una
+# vez al día, y los recordatorios necesitan revisarse con más frecuencia
+# para poder mandarse "unas horas antes" de cada cita. GitHub Actions sí
+# permite programaciones más frecuentes gratis, así que hace de disparador
+# externo llamando al endpoint /api/cron/recordatorios de la propia app.
+#
+# Antes de que esto funcione, ve a GitHub → este repositorio → Settings →
+# Secrets and variables → Actions → New repository secret, y crea dos:
+#   - CRON_SECRET     → el mismo valor que pusiste en Vercel como
+#                        variable de entorno CRON_SECRET (invéntate una
+#                        frase larga y aleatoria, y ponla en los dos
+#                        sitios exactamente igual)
+#   - APP_URL         → la URL pública de tu app en Vercel, por ejemplo
+#                        https://barberia-grasso.vercel.app (sin barra al
+#                        final)
+
+name: Recordatorios de citas
+
+on:
+  schedule:
+    # GitHub no garantiza el minuto exacto bajo carga, pero para un
+    # recordatorio "unas horas antes" no hace falta esa precisión.
+    - cron: "5 * * * *"
+  workflow_dispatch: {} # permite lanzarlo a mano desde la pestaña Actions, para probar
+
+jobs:
+  llamar-recordatorios:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a /api/cron/recordatorios
+        run: |
+          curl --fail --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/recordatorios" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

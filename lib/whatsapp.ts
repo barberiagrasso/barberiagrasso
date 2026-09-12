@@ -43,5 +43,64 @@ export async function sendWhatsAppMessage(to: string, body: string) {
   if (!res.ok) {
     const detalle = await res.text();
     console.error("Error enviando mensaje de WhatsApp", res.status, detalle);
+    throw new Error(`WhatsApp respondió ${res.status}: ${detalle}`);
+  }
+}
+
+/**
+ * Envía un mensaje usando una plantilla ya aprobada por Meta. Es
+ * obligatorio para cualquier mensaje que el negocio inicia sin que el
+ * cliente haya escrito antes en las últimas 24h (recordatorios,
+ * campañas comerciales): WhatsApp rechaza el texto libre en ese caso.
+ * `nombreMeta` es el nombre exacto de la plantilla tal y como se creó y
+ * aprobó en Meta Business Manager (Diego lo registra en /admin/plantillas
+ * una vez se la aprueban). `variables` son los valores, en orden, de los
+ * huecos {{1}}, {{2}}... que tenga la plantilla.
+ */
+export async function sendWhatsAppTemplate(
+  to: string,
+  nombreMeta: string,
+  idioma: string,
+  variables: string[]
+) {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const token = process.env.WHATSAPP_TOKEN;
+  if (!phoneNumberId || !token) {
+    throw new Error("WHATSAPP_PHONE_NUMBER_ID o WHATSAPP_TOKEN no configurados.");
+  }
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: nombreMeta,
+          language: { code: idioma },
+          components:
+            variables.length > 0
+              ? [
+                  {
+                    type: "body",
+                    parameters: variables.map((texto) => ({ type: "text", text: texto })),
+                  },
+                ]
+              : undefined,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const detalle = await res.text();
+    console.error("Error enviando plantilla de WhatsApp", res.status, detalle);
+    throw new Error(`WhatsApp respondió ${res.status}: ${detalle}`);
   }
 }
