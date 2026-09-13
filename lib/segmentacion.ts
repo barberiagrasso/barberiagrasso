@@ -1,4 +1,5 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SegmentoCampana } from "@/lib/types";
 
@@ -6,6 +7,30 @@ export interface ClienteSegmento {
   id: string;
   nombre: string;
   telefono: string;
+}
+
+/**
+ * Filtra una lista de clientes dejando solo quienes tienen el
+ * consentimiento comercial activo. Usado por resolverSegmento y también
+ * directamente por lib/retencion.ts (cumpleaños): nunca se debe poder
+ * mandar una comunicación comercial —automática o manual— a quien no ha
+ * dado ese consentimiento, así que esta comprobación vive en un solo
+ * sitio en vez de repetirse en cada punto de envío.
+ */
+export async function filtrarConConsentimientoComercial<T extends { id: string }>(
+  supabase: SupabaseClient,
+  candidatos: T[]
+): Promise<T[]> {
+  const ids = candidatos.map((c) => c.id);
+  if (ids.length === 0) return [];
+  const { data: consentimientos } = await supabase
+    .from("consentimientos")
+    .select("cliente_id")
+    .eq("tipo", "comercial")
+    .eq("estado", "activo")
+    .in("cliente_id", ids);
+  const idsConConsentimiento = new Set((consentimientos ?? []).map((c) => c.cliente_id));
+  return candidatos.filter((c) => idsConConsentimiento.has(c.id));
 }
 
 /**
@@ -22,17 +47,7 @@ export async function resolverSegmento(segmento: SegmentoCampana): Promise<Clien
   if (segmento.etiqueta) query = query.contains("etiquetas", [segmento.etiqueta]);
 
   const { data: clientes } = await query;
-  let candidatos = clientes ?? [];
-
-  const ids = candidatos.map((c) => c.id);
-  const { data: consentimientos } = await supabase
-    .from("consentimientos")
-    .select("cliente_id")
-    .eq("tipo", "comercial")
-    .eq("estado", "activo")
-    .in("cliente_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-  const idsConConsentimiento = new Set((consentimientos ?? []).map((c) => c.cliente_id));
-  candidatos = candidatos.filter((c) => idsConConsentimiento.has(c.id));
+  let candidatos = await filtrarConConsentimientoComercial(supabase, clientes ?? []);
 
   if (segmento.sinVisitasDesde) {
     const idsCandidatos = candidatos.map((c) => c.id);

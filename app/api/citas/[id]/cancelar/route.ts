@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireClienteApi, NoAutorizadoError } from "@/lib/clienteApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sincronizarCitaHubSpot } from "@/lib/hubspot";
+import { cancelarCita, ReservaError } from "@/lib/booking";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +38,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Esta cita ya ha pasado y no se puede cancelar." }, { status: 409 });
   }
 
-  const { error } = await admin.from("citas").update({ estado: "cancelada" }).eq("id", id);
-  if (error) return NextResponse.json({ error: "No se pudo cancelar la cita. Inténtalo de nuevo." }, { status: 500 });
-
-  await sincronizarCitaHubSpot(admin, id);
+  // cancelarCita (lib/booking.ts) hace también la sincronización con
+  // HubSpot y avisa a la lista de espera si alguien pidió ese mismo día.
+  try {
+    await cancelarCita(id);
+  } catch (err) {
+    if (err instanceof ReservaError) {
+      return NextResponse.json({ error: "No se pudo cancelar la cita. Inténtalo de nuevo." }, { status: 500 });
+    }
+    throw err;
+  }
 
   return NextResponse.json({ ok: true });
 }

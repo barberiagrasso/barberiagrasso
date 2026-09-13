@@ -22,7 +22,7 @@ export async function requireCliente() {
 
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("id, nombre, telefono, email, sede_habitual_id")
+    .select("id, nombre, telefono, email, sede_habitual_id, fecha_nacimiento")
     .eq("user_id", user.id)
     .maybeSingle();
 

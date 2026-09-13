@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Sede {
   id: string;
@@ -36,6 +36,40 @@ function formatoHora(iso: string) {
   });
 }
 
+// --- Helpers para la vista semanal: trabajamos siempre con la fecha en
+// formato "YYYY-MM-DD" a mediodía UTC, para no arrastrar líos de huso
+// horario al sumar/restar días o calcular el lunes de la semana.
+function sumarDias(fechaISO: string, dias: number): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const fecha = new Date(Date.UTC(y, m - 1, d));
+  fecha.setUTCDate(fecha.getUTCDate() + dias);
+  return fecha.toISOString().slice(0, 10);
+}
+
+function lunesDeLaSemana(fechaISO: string): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const fecha = new Date(Date.UTC(y, m - 1, d));
+  const diaSemana = fecha.getUTCDay(); // 0 = domingo, 1 = lunes...
+  const offset = diaSemana === 0 ? -6 : 1 - diaSemana;
+  fecha.setUTCDate(fecha.getUTCDate() + offset);
+  return fecha.toISOString().slice(0, 10);
+}
+
+function nombreDiaCorto(fechaISO: string): string {
+  return new Date(`${fechaISO}T12:00:00`).toLocaleDateString("es-ES", {
+    weekday: "short",
+    timeZone: "Europe/Madrid",
+  });
+}
+
+function formatoFechaCorta(fechaISO: string): string {
+  return new Date(`${fechaISO}T12:00:00`).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Madrid",
+  });
+}
+
 const ETIQUETA_ESTADO: Record<string, string> = {
   confirmada: "Confirmada",
   cancelada: "Cancelada",
@@ -46,14 +80,26 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; servicios: Servicio[] }) {
   const [sedeId, setSedeId] = useState(sedes[0]?.id ?? "");
   const [fecha, setFecha] = useState(hoyISO());
+  const [vista, setVista] = useState<"dia" | "semana">("dia");
   const [citas, setCitas] = useState<Cita[]>([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarNueva, setMostrarNueva] = useState(false);
 
+  // En modo semana, "fecha" sigue siendo el día ancla (el que se ve en el
+  // selector antes de cambiar de vista); los 7 días mostrados son los de
+  // la semana (lunes a domingo) a la que pertenece.
+  const diasSemana = useMemo(() => {
+    if (vista !== "semana") return [];
+    const lunes = lunesDeLaSemana(fecha);
+    return Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
+  }, [vista, fecha]);
+
   async function cargarCitas() {
     if (!sedeId) return;
     setCargando(true);
-    const res = await fetch(`/api/admin/citas?sedeId=${sedeId}&fecha=${fecha}`);
+    const fechaInicio = vista === "semana" ? diasSemana[0] ?? fecha : fecha;
+    const fechaFinRango = vista === "semana" ? diasSemana[6] ?? fecha : fecha;
+    const res = await fetch(`/api/admin/citas?sedeId=${sedeId}&fecha=${fechaInicio}&fechaFin=${fechaFinRango}`);
     const json = await res.json();
     setCitas(json.citas ?? []);
     setCargando(false);
@@ -62,7 +108,11 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
   useEffect(() => {
     void cargarCitas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sedeId, fecha]);
+  }, [sedeId, fecha, vista]);
+
+  function moverFecha(dias: number) {
+    setFecha((f) => sumarDias(f, dias));
+  }
 
   async function cambiarEstado(id: string, estado: string) {
     await fetch(`/api/admin/citas/${id}`, {
@@ -92,12 +142,56 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
             </button>
           ))}
         </div>
-        <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          className="rounded-lg border border-stone-300 p-2 text-sm"
-        />
+        <div className="flex gap-1 rounded-lg border border-stone-300 p-1">
+          <button
+            onClick={() => setVista("dia")}
+            className={
+              "rounded-md px-2 py-1 text-sm " +
+              (vista === "dia" ? "bg-stone-900 text-white" : "text-stone-600 hover:text-stone-900")
+            }
+          >
+            Día
+          </button>
+          <button
+            onClick={() => setVista("semana")}
+            className={
+              "rounded-md px-2 py-1 text-sm " +
+              (vista === "semana" ? "bg-stone-900 text-white" : "text-stone-600 hover:text-stone-900")
+            }
+          >
+            Semana
+          </button>
+        </div>
+
+        {vista === "dia" ? (
+          <input
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            className="rounded-lg border border-stone-300 p-2 text-sm"
+          />
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-stone-700">
+            <button
+              onClick={() => moverFecha(-7)}
+              className="rounded-lg border border-stone-300 px-2 py-1 hover:border-stone-400"
+              aria-label="Semana anterior"
+            >
+              ‹
+            </button>
+            <span className="whitespace-nowrap">
+              {diasSemana.length > 0 && `${formatoFechaCorta(diasSemana[0])} – ${formatoFechaCorta(diasSemana[6])}`}
+            </span>
+            <button
+              onClick={() => moverFecha(7)}
+              className="rounded-lg border border-stone-300 px-2 py-1 hover:border-stone-400"
+              aria-label="Semana siguiente"
+            >
+              ›
+            </button>
+          </div>
+        )}
+
         <button
           onClick={() => setMostrarNueva((v) => !v)}
           className="ml-auto rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white"
@@ -118,61 +212,164 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
         />
       )}
 
-      {cargando && <p className="text-sm text-stone-500">Cargando…</p>}
-      {!cargando && citas.length === 0 && (
-        <p className="text-sm text-stone-500">No hay citas ese día en esta sede.</p>
-      )}
+      {vista === "dia" ? (
+        <>
+          {cargando && <p className="text-sm text-stone-500">Cargando…</p>}
+          {!cargando && citas.length === 0 && (
+            <p className="text-sm text-stone-500">No hay citas ese día en esta sede.</p>
+          )}
 
-      <div className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
-        {citas.map((cita) => (
-          <div key={cita.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
-            <div>
-              <div className="font-medium text-stone-900">
-                {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
+          <div className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+            {citas.map((cita) => (
+              <div key={cita.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
+                <div>
+                  <div className="font-medium text-stone-900">
+                    {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
+                  </div>
+                  <div className="text-sm text-stone-500">
+                    {cita.servicio?.nombre} · {cita.profesional?.nombre} · {cita.cliente?.telefono}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={
+                      "rounded-full px-2 py-1 text-xs " +
+                      (cita.estado === "cancelada"
+                        ? "bg-red-100 text-red-700"
+                        : cita.estado === "completada"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-stone-100 text-stone-700")
+                    }
+                  >
+                    {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
+                  </span>
+                  {cita.estado === "confirmada" && (
+                    <>
+                      <button
+                        onClick={() => cambiarEstado(cita.id, "completada")}
+                        className="text-xs text-green-700 underline"
+                      >
+                        Completada
+                      </button>
+                      <button
+                        onClick={() => cambiarEstado(cita.id, "no_presentada")}
+                        className="text-xs text-amber-700 underline"
+                      >
+                        No presentada
+                      </button>
+                      <button
+                        onClick={() => cambiarEstado(cita.id, "cancelada")}
+                        className="text-xs text-red-700 underline"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="text-sm text-stone-500">
-                {cita.servicio?.nombre} · {cita.profesional?.nombre} · {cita.cliente?.telefono}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={
-                  "rounded-full px-2 py-1 text-xs " +
-                  (cita.estado === "cancelada"
-                    ? "bg-red-100 text-red-700"
-                    : cita.estado === "completada"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-stone-100 text-stone-700")
-                }
-              >
-                {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
-              </span>
-              {cita.estado === "confirmada" && (
-                <>
-                  <button
-                    onClick={() => cambiarEstado(cita.id, "completada")}
-                    className="text-xs text-green-700 underline"
-                  >
-                    Completada
-                  </button>
-                  <button
-                    onClick={() => cambiarEstado(cita.id, "no_presentada")}
-                    className="text-xs text-amber-700 underline"
-                  >
-                    No presentada
-                  </button>
-                  <button
-                    onClick={() => cambiarEstado(cita.id, "cancelada")}
-                    className="text-xs text-red-700 underline"
-                  >
-                    Cancelar
-                  </button>
-                </>
-              )}
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      ) : (
+        <VistaSemanal dias={diasSemana} citas={citas} cargando={cargando} onCambiarEstado={cambiarEstado} />
+      )}
+    </div>
+  );
+}
+
+function VistaSemanal({
+  dias,
+  citas,
+  cargando,
+  onCambiarEstado,
+}: {
+  dias: string[];
+  citas: Cita[];
+  cargando: boolean;
+  onCambiarEstado: (id: string, estado: string) => void;
+}) {
+  const citasPorDia = useMemo(() => {
+    const mapa = new Map<string, Cita[]>();
+    for (const d of dias) mapa.set(d, []);
+    for (const cita of citas) {
+      const diaISO = cita.inicio.slice(0, 10);
+      mapa.get(diaISO)?.push(cita);
+    }
+    return mapa;
+  }, [dias, citas]);
+
+  const hoy = hoyISO();
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-7">
+      {dias.map((dia) => (
+        <div
+          key={dia}
+          className={
+            "rounded-lg border bg-white p-2 " + (dia === hoy ? "border-brand-yellow" : "border-stone-200")
+          }
+        >
+          <div className="mb-2 text-center">
+            <div className="text-xs uppercase text-stone-500">{nombreDiaCorto(dia)}</div>
+            <div className="text-sm font-medium text-stone-900">{formatoFechaCorta(dia)}</div>
+          </div>
+          <div className="space-y-2">
+            {cargando && <p className="text-xs text-stone-400">Cargando…</p>}
+            {!cargando && (citasPorDia.get(dia) ?? []).length === 0 && (
+              <p className="text-xs text-stone-400">Sin citas</p>
+            )}
+            {(citasPorDia.get(dia) ?? []).map((cita) => (
+              <div key={cita.id} className="rounded-lg border border-stone-200 p-2 text-xs">
+                <div className="font-medium text-stone-900">
+                  {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
+                </div>
+                <div className="text-stone-500">
+                  {cita.servicio?.nombre} · {cita.profesional?.nombre ?? "Cualquiera"}
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-1">
+                  <span
+                    className={
+                      "rounded-full px-1.5 py-0.5 " +
+                      (cita.estado === "cancelada"
+                        ? "bg-red-100 text-red-700"
+                        : cita.estado === "completada"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-stone-100 text-stone-700")
+                    }
+                  >
+                    {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
+                  </span>
+                  {cita.estado === "confirmada" && (
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => onCambiarEstado(cita.id, "completada")}
+                        className="text-green-700 underline"
+                        title="Marcar como completada"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => onCambiarEstado(cita.id, "no_presentada")}
+                        className="text-amber-700 underline"
+                        title="Marcar como no presentada"
+                      >
+                        !
+                      </button>
+                      <button
+                        onClick={() => onCambiarEstado(cita.id, "cancelada")}
+                        className="text-red-700 underline"
+                        title="Cancelar"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,0 +1,25 @@
+# Dispara el envío de las campañas automáticas de retención (clientes
+# inactivos y cumpleaños) una vez al día.
+#
+# Reutiliza los mismos dos secretos que ya usa el workflow de
+# recordatorios.yml (CRON_SECRET y APP_URL) — no hace falta configurar
+# nada nuevo en GitHub si ese ya te funciona.
+
+name: Campañas de retención
+
+on:
+  schedule:
+    # 08:00 UTC ≈ 9-10 de la mañana en España (según horario de verano),
+    # una hora razonable para mandar mensajes comerciales.
+    - cron: "0 8 * * *"
+  workflow_dispatch: {} # permite lanzarlo a mano desde la pestaña Actions, para probar
+
+jobs:
+  llamar-retencion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a /api/cron/retencion
+        run: |
+          curl --fail --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/retencion" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

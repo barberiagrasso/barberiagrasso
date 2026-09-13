@@ -16,13 +16,17 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const sedeId = params.get("sedeId");
   const fecha = params.get("fecha"); // "YYYY-MM-DD"
+  // fechaFin es opcional: permite pedir un rango de días (p.ej. la vista
+  // semanal de la Agenda) en una sola llamada. Si no se manda, se comporta
+  // igual que siempre: solo el día de "fecha".
+  const fechaFin = params.get("fechaFin") || fecha;
   if (!sedeId || !fecha) {
     return NextResponse.json({ error: "Faltan sedeId y fecha." }, { status: 400 });
   }
 
   const supabase = createAdminClient();
   const inicioDia = `${fecha}T00:00:00`;
-  const finDia = `${fecha}T23:59:59`;
+  const finDia = `${fechaFin}T23:59:59`;
 
   const { data: citas, error } = await supabase
     .from("citas")

@@ -318,6 +318,10 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citaConfirmada, setCitaConfirmada] = useState<{ inicio: string; profesionalNombre: string } | null>(null);
+  const [mostrarFormListaEspera, setMostrarFormListaEspera] = useState(false);
+  const [enviandoListaEspera, setEnviandoListaEspera] = useState(false);
+  const [errorListaEspera, setErrorListaEspera] = useState<string | null>(null);
+  const [listaEsperaApuntada, setListaEsperaApuntada] = useState(false);
 
   const sedeSeleccionada = sedes.find((s) => s.id === sedeId);
   const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
@@ -375,6 +379,41 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   function elegirFecha(valor: string) {
     setFecha(valor);
     buscarSlots(valor, profesionalId);
+    // Cada día es una lista de espera distinta: al cambiar de fecha se
+    // limpia cualquier formulario/confirmación que quedara del día anterior.
+    setMostrarFormListaEspera(false);
+    setListaEsperaApuntada(false);
+    setErrorListaEspera(null);
+  }
+
+  async function apuntarseAListaEspera() {
+    if (!sedeId || !servicioId || !fecha || !nombre || !telefono) return;
+    setEnviandoListaEspera(true);
+    setErrorListaEspera(null);
+    try {
+      const res = await fetch("/api/lista-espera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sedeId,
+          servicioId,
+          profesionalId,
+          fecha,
+          cliente: { nombre, telefono, email: email || null },
+          aceptaComercial,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setErrorListaEspera(json.error || "No se pudo apuntar a la lista de espera.");
+        return;
+      }
+      setListaEsperaApuntada(true);
+    } catch {
+      setErrorListaEspera("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setEnviandoListaEspera(false);
+    }
   }
 
   // Cambiar de barbero: "Cualquiera" (id null) agrega la disponibilidad de
@@ -718,7 +757,47 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
 
           {fecha && cargandoSlots && <p className="font-body text-sm text-brand-white-dim">Buscando huecos…</p>}
           {fecha && !cargandoSlots && horasUnicas.length === 0 && (
-            <p className="font-body text-sm text-brand-white-dim">No hay huecos ese día. Prueba con otra fecha.</p>
+            <div className="space-y-3 rounded-xl border border-brand-line bg-black/20 p-4">
+              <p className="font-body text-sm text-brand-white-dim">No hay huecos ese día. Prueba con otra fecha.</p>
+
+              {listaEsperaApuntada ? (
+                <p className="font-body text-sm text-brand-yellow">
+                  ¡Listo! Te avisaremos por WhatsApp si se libera un hueco ese día.
+                </p>
+              ) : mostrarFormListaEspera ? (
+                <div className="space-y-2">
+                  <p className="font-body text-xs text-brand-white-dim">
+                    Te avisamos por WhatsApp en cuanto se libere un hueco ese día.
+                  </p>
+                  <input
+                    className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                    placeholder="Nombre y apellidos"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                  />
+                  <input
+                    className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                    placeholder="Teléfono (WhatsApp)"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                  />
+                  {errorListaEspera && <p className="font-body text-xs text-red-400">{errorListaEspera}</p>}
+                  <BotonPrimario
+                    disabled={!nombre || !telefono || enviandoListaEspera}
+                    onClick={apuntarseAListaEspera}
+                  >
+                    {enviandoListaEspera ? "Apuntando…" : "Avisadme"}
+                  </BotonPrimario>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setMostrarFormListaEspera(true)}
+                  className="font-body text-sm text-brand-yellow underline decoration-brand-yellow/40 underline-offset-4"
+                >
+                  Avisarme por WhatsApp si se libera un hueco
+                </button>
+              )}
+            </div>
           )}
           {fecha && horasUnicas.length > 0 && (
             <div className="grid grid-cols-3 gap-2">

@@ -94,12 +94,31 @@ export async function POST(request: NextRequest) {
 
     const historial = (historialCrudo ?? []).slice(0, -1); // sin el mensaje que acabamos de insertar
 
-    const { respuesta, escalar } = await ejecutarAsistente({
-      conversacionId: conversacion.id,
-      telefono,
-      historial,
-      mensajeNuevo: nombreContacto ? `[${nombreContacto}] ${texto}` : texto,
-    });
+    // Si el propio asistente falla (la API de Claude, una herramienta que
+    // lanza, etc.) NO se debe dejar al cliente sin respuesta ni perder el
+    // fallo en los logs de Vercel donde nadie lo va a ver: se avisa al
+    // cliente de que hay un problema, se escala para que un gestor lo
+    // retome, y se anota en fallos_asistente para que salga en el aviso
+    // del panel (ver app/admin/(protected)/layout.tsx).
+    let respuesta: string;
+    let escalar: boolean;
+    try {
+      ({ respuesta, escalar } = await ejecutarAsistente({
+        conversacionId: conversacion.id,
+        telefono,
+        historial,
+        mensajeNuevo: nombreContacto ? `[${nombreContacto}] ${texto}` : texto,
+      }));
+    } catch (errAsistente) {
+      console.error("Error del asistente de IA procesando un mensaje de WhatsApp", errAsistente);
+      await supabase.from("fallos_asistente").insert({
+        conversacion_id: conversacion.id,
+        telefono,
+        error: errAsistente instanceof Error ? errAsistente.message : "Error desconocido",
+      });
+      respuesta = "Uy, estamos teniendo un problema técnico justo ahora. Ya ha quedado anotado y un miembro del equipo te escribirá en breve. ¡Perdona las molestias!";
+      escalar = true;
+    }
 
     await supabase.from("mensajes").insert({
       conversacion_id: conversacion.id,

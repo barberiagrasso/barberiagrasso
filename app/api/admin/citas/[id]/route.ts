@@ -3,6 +3,7 @@ import { addMinutes } from "date-fns";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sincronizarCitaHubSpot } from "@/lib/hubspot";
+import { cancelarCita, ReservaError } from "@/lib/booking";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = await request.json().catch(() => null);
   const supabase = createAdminClient();
 
-  // Cambiar solo el estado (cancelar, marcar completada / no presentada)
+  // Cambiar solo el estado (cancelar, marcar completada / no presentada).
+  // La cancelación pasa por lib/booking.ts porque, además de marcar la
+  // cita, es la que avisa a la lista de espera si alguien estaba
+  // esperando un hueco ese mismo día — igual que cuando cancela la IA
+  // por WhatsApp.
+  if (body?.estado === "cancelada") {
+    try {
+      await cancelarCita(id);
+    } catch (err) {
+      if (err instanceof ReservaError) return NextResponse.json({ error: err.message }, { status: 409 });
+      throw err;
+    }
+    return NextResponse.json({ ok: true });
+  }
   if (body?.estado) {
     const { error } = await supabase.from("citas").update({ estado: body.estado }).eq("id", id);
     if (error) return NextResponse.json({ error: "No se pudo actualizar la cita." }, { status: 500 });

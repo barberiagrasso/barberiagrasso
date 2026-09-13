@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 interface Plantilla {
   id: string;
-  tipo: "recordatorio" | "campana";
+  tipo: "recordatorio" | "campana" | "retencion_inactivo" | "retencion_cumple";
   nombre: string;
   nombre_meta: string;
   idioma: string;
@@ -87,7 +87,7 @@ export default function PlantillasClient() {
 }
 
 function NuevaPlantillaForm({ onCreada }: { onCreada: () => void }) {
-  const [tipo, setTipo] = useState<"recordatorio" | "campana">("recordatorio");
+  const [tipo, setTipo] = useState<Plantilla["tipo"]>("recordatorio");
   const [nombre, setNombre] = useState("");
   const [nombreMeta, setNombreMeta] = useState("");
   const [idioma, setIdioma] = useState("es");
@@ -124,9 +124,11 @@ function NuevaPlantillaForm({ onCreada }: { onCreada: () => void }) {
 
   return (
     <div className="space-y-2 rounded-lg border border-stone-200 bg-white p-4">
-      <select value={tipo} onChange={(e) => setTipo(e.target.value as "recordatorio" | "campana")} className="w-full rounded border border-stone-300 p-2 text-sm">
+      <select value={tipo} onChange={(e) => setTipo(e.target.value as Plantilla["tipo"])} className="w-full rounded border border-stone-300 p-2 text-sm">
         <option value="recordatorio">Recordatorio de cita</option>
-        <option value="campana">Campaña comercial</option>
+        <option value="campana">Campaña comercial (manual)</option>
+        <option value="retencion_inactivo">Retención: cliente inactivo (automática)</option>
+        <option value="retencion_cumple">Retención: cumpleaños (automática)</option>
       </select>
       <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre para reconocerla en el panel" className="w-full rounded border border-stone-300 p-2 text-sm" />
       <input

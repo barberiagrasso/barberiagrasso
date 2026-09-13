@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
 import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
+import { CumpleanosForm } from "./CumpleanosForm";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,8 @@ export default async function PerfilPage() {
           </Link>
           <CerrarSesionButton className="font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow" />
         </div>
+
+        <CumpleanosForm fechaInicial={cliente.fecha_nacimiento ?? null} />
 
         <h2 className="mb-3 font-heading text-lg text-brand-white">Historial de citas</h2>
 
