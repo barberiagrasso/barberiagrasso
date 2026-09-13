@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireClienteApi, NoAutorizadoError } from "@/lib/clienteApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sincronizarCitaHubSpot } from "@/lib/hubspot";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { error } = await admin.from("citas").update({ estado: "cancelada" }).eq("id", id);
   if (error) return NextResponse.json({ error: "No se pudo cancelar la cita. Inténtalo de nuevo." }, { status: 500 });
+
+  await sincronizarCitaHubSpot(admin, id);
 
   return NextResponse.json({ ok: true });
 }

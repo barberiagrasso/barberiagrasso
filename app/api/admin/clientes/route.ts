@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buscarOCrearCliente } from "@/lib/clientes";
+import { sincronizarClienteHubSpot } from "@/lib/hubspot";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+    await sincronizarClienteHubSpot(supabase, clienteId);
     return NextResponse.json({ id: clienteId });
   } catch {
     return NextResponse.json({ error: "No se pudo registrar el cliente." }, { status: 500 });

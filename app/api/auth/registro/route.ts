@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buscarOCrearCliente, emailSinteticoParaTelefono, normalizarTelefono } from "@/lib/clientes";
+import { sincronizarClienteHubSpot } from "@/lib/hubspot";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,10 @@ export async function POST(request: NextRequest) {
     await admin.auth.admin.deleteUser(nuevoUsuario.user.id);
     return NextResponse.json({ error: "No se pudo completar el registro." }, { status: 500 });
   }
+
+  // Copia esta nueva cuenta a HubSpot como Contacto (nunca bloquea el
+  // registro si HubSpot falla).
+  await sincronizarClienteHubSpot(admin, clienteId);
 
   // Inicia la sesión de verdad (deja la cookie puesta) con el cliente
   // normal, no con el de servicio.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addMinutes } from "date-fns";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sincronizarCitaHubSpot } from "@/lib/hubspot";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (body?.estado) {
     const { error } = await supabase.from("citas").update({ estado: body.estado }).eq("id", id);
     if (error) return NextResponse.json({ error: "No se pudo actualizar la cita." }, { status: 500 });
+    await sincronizarCitaHubSpot(supabase, id);
     return NextResponse.json({ ok: true });
   }
 
@@ -64,6 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       })
       .eq("id", id);
     if (error) return NextResponse.json({ error: "No se pudo mover la cita." }, { status: 500 });
+    await sincronizarCitaHubSpot(supabase, id);
     return NextResponse.json({ ok: true });
   }
 

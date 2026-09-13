@@ -3,6 +3,7 @@ import { addMinutes } from "date-fns";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvailableSlots } from "@/lib/availability";
 import { buscarOCrearCliente, normalizarTelefono } from "@/lib/clientes";
+import { sincronizarClienteHubSpot, sincronizarCitaHubSpot } from "@/lib/hubspot";
 import type { CanalConsentimiento } from "@/lib/types";
 
 // Re-exportado por compatibilidad: varios módulos (webhook de WhatsApp,
@@ -163,6 +164,12 @@ export async function crearReserva(params: CrearReservaParams) {
     );
   }
 
+  // Copia la ficha del cliente y la cita nueva a HubSpot (CRM externo de
+  // Diego). Estas funciones nunca lanzan: si HubSpot falla o no está
+  // configurado, la reserva ya está hecha en Supabase igualmente.
+  await sincronizarClienteHubSpot(supabase, clienteId);
+  await sincronizarCitaHubSpot(supabase, cita.id);
+
   return { cita, clienteId, profesionalNombre: slotElegido.profesional_nombre };
 }
 
@@ -195,6 +202,7 @@ export async function cancelarCita(citaId: string) {
     .select("*")
     .single();
   if (error || !cita) throw new ReservaError("No se pudo cancelar la cita.");
+  await sincronizarCitaHubSpot(supabase, cita.id);
   return cita;
 }
 
@@ -254,5 +262,6 @@ export async function reprogramarCita({ citaId, nuevaHoraInicioISO, profesionalI
     .single();
 
   if (error || !citaActualizada) throw new ReservaError("No se pudo reprogramar la cita.");
+  await sincronizarCitaHubSpot(supabase, citaActualizada.id);
   return { cita: citaActualizada, profesionalNombre: slotElegido.profesional_nombre };
 }
