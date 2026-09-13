@@ -2,6 +2,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { requireCliente } from "@/lib/clienteAuth";
 import BookingFlow from "./BookingFlow";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
+import InstalarApp from "@/components/pwa/InstalarApp";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function ReservarPage() {
             Los Molinos · Avenida de las Ciudades
           </p>
         </div>
+        <InstalarApp />
         <BookingFlow
           sedes={sedes ?? []}
           servicios={servicios ?? []}

@@ -13,10 +13,19 @@ import "@fontsource/lato/700-italic.css";
 import "@fontsource/lato/900.css";
 import "@fontsource/lato/900-italic.css";
 import "./globals.css";
+import RegistrarServiceWorker from "@/components/pwa/RegistrarServiceWorker";
 
 export const metadata: Metadata = {
   title: "Barbería Grasso",
   description: "Reserva tu cita en Barbería Grasso — Los Molinos y Avenida de las Ciudades",
+  // Junto con app/manifest.ts y public/sw.js, esto es lo que permite
+  // "instalar" la web como app (icono en pantalla de inicio, se abre sin
+  // barra de direcciones) — ver components/pwa/InstalarApp.tsx.
+  appleWebApp: {
+    capable: true,
+    title: "Grasso",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
@@ -26,7 +35,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className="h-full antialiased">
-      <body className="min-h-full flex flex-col font-body">{children}</body>
+      <body className="min-h-full flex flex-col font-body">
+        {children}
+        <RegistrarServiceWorker />
+      </body>
     </html>
   );
 }

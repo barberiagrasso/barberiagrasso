@@ -19,8 +19,12 @@ simplemente describe qué quieres conseguir.
 - **Página de reserva** (`/reservar`): el cliente elige sede, uno de los 4 servicios
   principales o uno de los desplegables, complementos opcionales, profesional (opcional),
   fecha y hora real disponible, y confirma con sus datos. Funciona perfectamente desde el
-  móvil (es una web responsive) aunque todavía no está empaquetada como app de App
-  Store/Google Play — ver "Qué falta" más abajo.
+  móvil (es una web responsive), y además **se puede instalar** como si fuera una app: en
+  Android/Chrome aparece un aviso con un botón "Instalar" (usa el prompt nativo del propio
+  navegador); en iPhone/Safari, que no tiene ese prompt, se le explican los dos toques
+  (Compartir → Añadir a pantalla de inicio). Una vez instalada, se abre a pantalla completa,
+  con su propio icono, sin la barra de direcciones. Todavía no está en App Store/Google Play
+  — eso es un paso aparte y más costoso, ver "Qué falta" más abajo.
 - **Panel de control** (`/admin`), con gestión visual completa (sin tocar Supabase):
   - **Agenda**: creación, cancelación y cambios de estado de citas por sede.
   - **Servicios**: catálogo, precios, duración y en qué desplegable aparece cada uno.
@@ -121,9 +125,12 @@ que aprender.
 
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
-- **Empaquetar como app nativa** en App Store / Google Play: la reserva ya funciona como una
-  web para móvil; convertirla en una app instalable con Capacitor (o similar) es un paso
-  posterior, una vez valides que el sistema funciona bien en el día a día.
+- **Publicarla en App Store / Google Play**: la reserva ya se puede "instalar" desde el
+  navegador (ver arriba), que cubre la sensación de app para la mayoría de clientes sin coste
+  ni cuenta de desarrollador. Estar además en las tiendas de apps es un paso aparte y más
+  costoso (cuota de Apple, revisión de ambas tiendas, mantener el envoltorio con Capacitor o
+  similar) — solo tiene sentido si más adelante quieres esa presencia por marketing o
+  prestigio, no por funcionalidad.
 - **Pagos y señales anticipadas** (por ejemplo con Stripe) para reducir las citas fantasma.
 - **Fidelización por puntos o visitas** (ej. cada 10 cortes, uno gratis).
 - Cualquier otra idea nueva que se te ocurra — este proyecto sigue evolucionando contigo.
@@ -289,6 +296,9 @@ lib/whatsapp.ts            Envío de mensajes de WhatsApp (texto libre y plantil
 lib/segmentacion.ts        Cálculo de a qué clientes llega una campaña
 lib/errorLog.ts            Registrar un error de producción para verlo en /admin/errores
 instrumentation.ts         Red de seguridad: captura cualquier error que se escape sin registrar
+app/manifest.ts            Manifest de la PWA (nombre, iconos, colores — instalar como app)
+public/sw.js               Service worker mínimo (solo para ser "instalable", nunca cachea datos)
+components/pwa/            Registro del service worker y aviso de "Instalar app" en /reservar
 .github/workflows/recordatorios.yml     Disparador externo (GitHub Actions) de los recordatorios
 .github/workflows/backup.yml            Disparador externo (GitHub Actions) de la copia de seguridad
 app/reservar/              Página pública de reserva
