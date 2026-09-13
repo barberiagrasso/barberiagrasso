@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { resolverVariablesPlantilla } from "@/lib/plantillaVariables";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
 
   let enviados = 0;
   let fallidos = 0;
+  const citasFallidas: { id: string; error: string }[] = [];
 
   for (const cita of citas ?? []) {
     const cliente = Array.isArray(cita.cliente) ? cita.cliente[0] : cita.cliente;
@@ -83,7 +85,19 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error("Error mandando recordatorio de cita", cita.id, err);
       fallidos++;
+      citasFallidas.push({ id: cita.id, error: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  // Un único registro agregado (no uno por cada recordatorio fallido):
+  // si WhatsApp está caído un rato, esto evita llenar /admin/errores con
+  // decenas de filas idénticas en la misma pasada horaria.
+  if (fallidos > 0) {
+    await registrarError({
+      origen: "cron_recordatorios",
+      mensaje: `${fallidos} de ${citas?.length ?? 0} recordatorios no se pudieron mandar`,
+      detalle: citasFallidas,
+    });
   }
 
   return NextResponse.json({ ok: true, procesadas: citas?.length ?? 0, enviados, fallidos });

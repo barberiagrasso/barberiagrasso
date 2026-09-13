@@ -27,13 +27,19 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   // recientes del asistente de IA) que se ve desde cualquier pantalla.
   const supabase = createAdminClient();
   const desde = fechaHaceNDiasISO(DIAS_FALLOS_ASISTENTE);
-  const [{ data: sedes }, { data: servicios }, { count: escaladasPendientes }, { count: fallosRecientes }] =
-    await Promise.all([
-      supabase.from("sedes").select("id, nombre").order("nombre"),
-      supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos").order("nombre"),
-      supabase.from("conversaciones").select("id", { count: "exact", head: true }).eq("estado", "escalada"),
-      supabase.from("fallos_asistente").select("id", { count: "exact", head: true }).gte("created_at", desde),
-    ]);
+  const [
+    { data: sedes },
+    { data: servicios },
+    { count: escaladasPendientes },
+    { count: fallosRecientes },
+    { count: erroresSinResolver },
+  ] = await Promise.all([
+    supabase.from("sedes").select("id, nombre").order("nombre"),
+    supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos").order("nombre"),
+    supabase.from("conversaciones").select("id", { count: "exact", head: true }).eq("estado", "escalada"),
+    supabase.from("fallos_asistente").select("id", { count: "exact", head: true }).gte("created_at", desde),
+    supabase.from("errores_sistema").select("id", { count: "exact", head: true }).eq("resuelto", false),
+  ]);
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -52,7 +58,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           </div>
         </div>
       </header>
-      {((escaladasPendientes ?? 0) > 0 || (fallosRecientes ?? 0) > 0) && (
+      {((escaladasPendientes ?? 0) > 0 || (fallosRecientes ?? 0) > 0 || (erroresSinResolver ?? 0) > 0) && (
         <div className="border-b border-amber-300 bg-amber-50 px-4 py-2">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-1 text-sm text-amber-900">
             {(escaladasPendientes ?? 0) > 0 && (
@@ -71,6 +77,14 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               >
                 {fallosRecientes} fallo{fallosRecientes === 1 ? "" : "s"} del asistente de IA en los últimos{" "}
                 {DIAS_FALLOS_ASISTENTE} días
+              </Link>
+            )}
+            {(erroresSinResolver ?? 0) > 0 && (
+              <Link
+                href="/admin/errores"
+                className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"
+              >
+                {erroresSinResolver} error{erroresSinResolver === 1 ? "" : "es"} del sistema sin revisar
               </Link>
             )}
           </div>

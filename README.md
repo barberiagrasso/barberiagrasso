@@ -96,6 +96,29 @@ Para activarlo:
 proyecto a Vercel Pro, que sí permite cron jobs cada minuto — pídeselo a Claude si cambias de
 opinión más adelante.)
 
+### Producción: errores y copias de seguridad
+
+No hace falta que configures nada nuevo para esto — se apoya en lo que ya tienes montado del
+paso de recordatorios (Supabase + GitHub Actions), sin cuentas ni servicios externos nuevos
+que aprender.
+
+- **Errores del sistema** (`/admin/errores`): cualquier fallo real al crear o cancelar una
+  reserva, procesar un mensaje de WhatsApp, o al ejecutar los recordatorios/campañas
+  automáticas, queda anotado ahí — con un aviso en la banda ámbar de arriba de cualquier
+  pantalla del panel, igual que ya pasa con los fallos del asistente de IA. Puedes marcarlos
+  como resueltos para ir vaciando la lista. Antes, si algo fallaba, solo quedaba en los logs
+  de Vercel (que no sueles mirar); ahora lo ves tú mismo, en español, sin salir del panel.
+- **Copia de seguridad diaria**: el archivo `.github/workflows/backup.yml` llama una vez al
+  día a `/api/cron/backup`, que exporta todos los datos del negocio (clientes, citas,
+  servicios, conversaciones...) a un archivo. GitHub lo guarda como "artifact" durante 30
+  días — en tu repositorio, pestaña **Actions** → la ejecución del día que quieras →
+  **Artifacts**, al final de la página. Reutiliza los mismos secretos `CRON_SECRET` y
+  `APP_URL` que ya tienes puestos para los recordatorios: en cuanto hagas `git push`, empieza
+  a funcionar sola. El esquema de la base de datos (las tablas y sus reglas) ya estaba a
+  salvo desde el principio, versionado en `supabase/*.sql` dentro de este mismo repositorio;
+  esto respalda los datos día a día. Si alguna vez necesitas restaurar algo desde una de
+  estas copias, descarga el archivo del día que te interese y pídeselo a Claude.
+
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
 - **Empaquetar como app nativa** en App Store / Google Play: la reserva ya funciona como una
@@ -258,14 +281,18 @@ supabase/schema.sql                    Toda la base de datos y las reglas de seg
 supabase/seed.sql                      Datos de ejemplo opcionales
 supabase/actualizar-datos-reales.sql   Catálogo real de servicios/barberos/horarios (re-ejecutable)
 supabase/actualizar-funcionalidad-avanzada.sql  Tablas de campañas/plantillas/recordatorios (re-ejecutable)
+supabase/actualizar-monitorizacion-produccion.sql  Tabla de errores del sistema (re-ejecutable)
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
 lib/aiAssistant.ts         El asistente de WhatsApp con IA (prompt + herramientas)
 lib/whatsapp.ts            Envío de mensajes de WhatsApp (texto libre y plantillas)
 lib/segmentacion.ts        Cálculo de a qué clientes llega una campaña
+lib/errorLog.ts            Registrar un error de producción para verlo en /admin/errores
+instrumentation.ts         Red de seguridad: captura cualquier error que se escape sin registrar
 .github/workflows/recordatorios.yml     Disparador externo (GitHub Actions) de los recordatorios
+.github/workflows/backup.yml            Disparador externo (GitHub Actions) de la copia de seguridad
 app/reservar/              Página pública de reserva
-app/admin/                 Panel de control (agenda, servicios, equipo, CRM, campañas, informes...)
+app/admin/                 Panel de control (agenda, servicios, equipo, CRM, campañas, informes, errores...)
 app/api/                   Toda la lógica del servidor (reservas, disponibilidad, webhook…)
 app/api/cron/recordatorios Endpoint que manda los recordatorios (llamado por GitHub Actions)
 ```

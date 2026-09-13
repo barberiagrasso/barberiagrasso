@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ejecutarRetencionDiaria } from "@/lib/retencion";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, motivo: "WhatsApp Business todavía no está conectado.", inactivosAvisados: 0, cumpleanosAvisados: 0 });
   }
 
-  const resultado = await ejecutarRetencionDiaria();
-  return NextResponse.json({ ok: true, ...resultado });
+  try {
+    const resultado = await ejecutarRetencionDiaria();
+    return NextResponse.json({ ok: true, ...resultado });
+  } catch (err) {
+    console.error("Error ejecutando la retención diaria", err);
+    await registrarError({ origen: "cron_retencion", mensaje: "Fallo en las campañas automáticas de retención", detalle: err });
+    return NextResponse.json({ ok: false, error: "Fallo en las campañas de retención." }, { status: 500 });
+  }
 }

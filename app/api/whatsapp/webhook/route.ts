@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizarTelefono } from "@/lib/booking";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { ejecutarAsistente } from "@/lib/aiAssistant";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 
@@ -135,8 +136,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Error procesando webhook de WhatsApp", err);
-    // Devolvemos 200 igualmente: si respondemos con error, Meta reintenta
-    // el mismo mensaje varias veces y puede duplicar respuestas.
+    // No se relanza (a diferencia de otras rutas) para poder devolver 200
+    // igualmente: si respondemos con error, Meta reintenta el mismo
+    // mensaje varias veces y puede duplicar respuestas. Por eso este caso
+    // sí necesita su propio registrarError explícito: instrumentation.ts
+    // nunca lo vería.
+    await registrarError({ origen: "webhook_whatsapp", mensaje: "Fallo procesando un mensaje entrante de WhatsApp", detalle: err });
     return NextResponse.json({ ok: false });
   }
 }

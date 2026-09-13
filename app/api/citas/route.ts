@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearReserva, ReservaError } from "@/lib/booking";
 import { normalizarTelefono } from "@/lib/clientes";
 import { comprobarLimite, ipDePeticion, RESPUESTA_DEMASIADOS_INTENTOS } from "@/lib/rateLimit";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     console.error("Error creando reserva", err);
+    await registrarError({ origen: "reserva", mensaje: "Fallo creando una reserva", detalle: err });
     return NextResponse.json({ error: "No se pudo crear la reserva." }, { status: 500 });
   }
 }

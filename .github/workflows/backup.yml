@@ -1,0 +1,42 @@
+# Copia de seguridad diaria de los datos del negocio (clientes, citas,
+# servicios, conversaciones...), porque Supabase en su plan gratuito no
+# hace copias automáticas por su cuenta.
+#
+# No hace falta configurar nada nuevo si ya te funcionan los workflows de
+# recordatorios y retención: reutiliza los mismos dos secretos
+# (CRON_SECRET y APP_URL). El esquema de la base de datos (las tablas y
+# sus reglas) ya está a salvo dentro de este mismo repositorio, en
+# supabase/*.sql — esto respalda los DATOS.
+#
+# Las copias se guardan como "artifact" del propio GitHub (Actions →
+# esta ejecución → Artifacts, al final de la página), durante 30 días.
+# Si alguna vez necesitas restaurar algo, descarga el .json.gz del día
+# que quieras y pídeselo a Claude.
+
+name: Copia de seguridad
+
+on:
+  schedule:
+    # 03:00 UTC ≈ 4-5 de la madrugada en España, para no coincidir con
+    # horas de uso ni con el resto de tareas programadas.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {} # permite lanzarla a mano desde la pestaña Actions, para probar
+
+jobs:
+  copia-de-seguridad:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar los datos y comprimirlos
+        run: |
+          curl --fail --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/backup" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -o "backup.json"
+          gzip backup.json
+
+      - name: Subir la copia como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_id }}
+          path: backup.json.gz
+          retention-days: 30

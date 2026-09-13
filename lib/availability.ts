@@ -281,8 +281,11 @@ async function cargarDatosBase(
 
 /** Genera las franjas libres de un día concreto a partir de datos ya
  * cargados (nada de red aquí), para poder reutilizarlo tanto en el
- * cálculo de un solo día como en el resumen de un mes entero. */
-function generarSlotsParaDia({
+ * cálculo de un solo día como en el resumen de un mes entero. Exportada
+ * (además de por getAvailableSlots/getMonthAvailabilitySummary) para
+ * poder probar a fondo la lógica de huecos/solapes/antelación en
+ * availability.test.ts sin necesitar una base de datos real. */
+export function generarSlotsParaDia({
   fecha,
   candidatos,
   horariosDelDia,

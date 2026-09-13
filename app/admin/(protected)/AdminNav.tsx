@@ -12,6 +12,7 @@ const NAV = [
   { href: "/admin/plantillas", label: "Plantillas" },
   { href: "/admin/informes", label: "Informes" },
   { href: "/admin/conversaciones", label: "WhatsApp" },
+  { href: "/admin/errores", label: "Errores" },
 ];
 
 export default function AdminNav() {

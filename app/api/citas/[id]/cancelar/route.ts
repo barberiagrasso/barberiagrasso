@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireClienteApi, NoAutorizadoError } from "@/lib/clienteApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cancelarCita, ReservaError } from "@/lib/booking";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await cancelarCita(id);
   } catch (err) {
     if (err instanceof ReservaError) {
+      await registrarError({ origen: "cancelacion", mensaje: `Fallo cancelando la cita ${id}`, detalle: err });
       return NextResponse.json({ error: "No se pudo cancelar la cita. Inténtalo de nuevo." }, { status: 500 });
     }
+    // Un error inesperado (no ReservaError) se relanza a propósito: lo
+    // recoge la red de seguridad global de instrumentation.ts, para no
+    // registrarlo dos veces.
     throw err;
   }
 
