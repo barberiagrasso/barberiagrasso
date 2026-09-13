@@ -11,8 +11,8 @@ export default async function InformesPage() {
     <div>
       <h1 className="mb-1 text-xl font-bold text-stone-900">Informes</h1>
       <p className="mb-4 text-sm text-stone-500">
-        Facturación por sede y por barbero, servicios más pedidos, y qué franjas horarias se
-        quedan más vacías — para decidir turnos, ofertas o refuerzos con datos reales.
+        Elige sede, rango de fechas y pestaña para cruzar ingresos, ocupación, no presentados y
+        clientes de todas las formas que necesites, con gráficas y exportación a CSV.
       </p>
       <InformesClient sedes={sedes ?? []} />
     </div>
