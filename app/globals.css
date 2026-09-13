@@ -80,3 +80,24 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* El sitio público usa fondo oscuro y por eso el texto por defecto
+   (--foreground) es el crema de marca. El panel de equipo, en cambio, es de
+   fondo claro (blanco / stone-50) y sus inputs, selects y textareas no fijan
+   su propio color de texto — con lo que heredaban ese crema y quedaban casi
+   ilegibles sobre fondo claro (valores de fecha, opciones de <select>,
+   placeholders...). Los formularios del sitio público sí fijan su color
+   explícitamente (text-brand-white), así que esta regla no les afecta: una
+   clase de Tailwind siempre gana en especificidad a un selector de
+   etiqueta como este. */
+input,
+select,
+textarea {
+  color: var(--brand-black);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #78716c; /* stone-500 */
+  opacity: 1;
+}
