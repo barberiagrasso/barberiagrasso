@@ -1,10 +1,20 @@
 import { requireAdmin } from "@/lib/adminAuth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import AdminNav from "./AdminNav";
 import SignOutButton from "./SignOutButton";
+import NuevaCitaRapida from "./NuevaCitaRapida";
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const { admin } = await requireAdmin();
+
+  // Datos para el botón flotante de "nueva cita rápida", disponible en
+  // todas las páginas del panel (no solo en la Agenda).
+  const supabase = createAdminClient();
+  const [{ data: sedes }, { data: servicios }] = await Promise.all([
+    supabase.from("sedes").select("id, nombre").order("nombre"),
+    supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos").order("nombre"),
+  ]);
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -24,6 +34,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <NuevaCitaRapida sedes={sedes ?? []} servicios={servicios ?? []} />
     </div>
   );
 }
