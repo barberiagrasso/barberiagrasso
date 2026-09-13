@@ -291,7 +291,7 @@ async function buscarContactoPorClienteId(clienteId: string): Promise<string | n
   return resultado?.results?.[0]?.id ?? null;
 }
 
-interface HistoricoFila {
+export interface HistoricoFila {
   estado: string;
   inicio: string;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
@@ -304,7 +304,7 @@ const UMBRAL_INACTIVO_DIAS = 90;
 const UMBRAL_VIP_VISITAS = 6;
 const UMBRAL_VIP_GASTO_EUR = 300;
 
-function calcularSegmento(visitasCompletadas: number, gastoTotalEur: number, ultimaVisitaISO: string | null) {
+export function calcularSegmento(visitasCompletadas: number, gastoTotalEur: number, ultimaVisitaISO: string | null) {
   if (visitasCompletadas === 0) return "nuevo";
   const diasDesdeUltimaVisita = ultimaVisitaISO ? (Date.now() - new Date(ultimaVisitaISO).getTime()) / 86400000 : Infinity;
   if (diasDesdeUltimaVisita > UMBRAL_INACTIVO_DIAS) return "inactivo";
@@ -312,7 +312,7 @@ function calcularSegmento(visitasCompletadas: number, gastoTotalEur: number, ult
   return "activo";
 }
 
-function calcularEstadisticasCliente(historico: HistoricoFila[]) {
+export function calcularEstadisticasCliente(historico: HistoricoFila[]) {
   const completadas = historico.filter((c) => c.estado === "completada");
 
   const gastoTotalCentimos = completadas.reduce((acc, c) => {
@@ -452,7 +452,7 @@ export async function sincronizarClienteHubSpot(
 // Negocios (citas)
 // ---------------------------------------------------------------------
 
-function estadoADealstage(estado: string): string {
+export function estadoADealstage(estado: string): string {
   switch (estado) {
     case "completada":
       return STAGE_ID_COMPLETADA;

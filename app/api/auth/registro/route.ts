@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buscarOCrearCliente, emailSinteticoParaTelefono, normalizarTelefono } from "@/lib/clientes";
 import { sincronizarClienteHubSpot } from "@/lib/hubspot";
+import { comprobarLimite, ipDePeticion, RESPUESTA_DEMASIADOS_INTENTOS } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,12 @@ export async function POST(request: NextRequest) {
   }
   if (password.length < 6) {
     return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+  }
+
+  // Frena altas masivas de cuentas falsas desde el mismo sitio.
+  const limite = await comprobarLimite(`registro:ip:${ipDePeticion(request)}`, { maxIntentos: 6, ventanaMinutos: 60 });
+  if (!limite.permitido) {
+    return NextResponse.json(RESPUESTA_DEMASIADOS_INTENTOS, { status: 429 });
   }
 
   const telefono = normalizarTelefono(telefonoBruto);

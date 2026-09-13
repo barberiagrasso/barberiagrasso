@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearReserva, ReservaError } from "@/lib/booking";
+import { normalizarTelefono } from "@/lib/clientes";
+import { comprobarLimite, ipDePeticion, RESPUESTA_DEMASIADOS_INTENTOS } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,17 @@ export async function POST(request: NextRequest) {
     !body?.cliente?.telefono
   ) {
     return NextResponse.json({ error: "Faltan datos obligatorios para reservar." }, { status: 400 });
+  }
+
+  // Frena el spam de reservas (por teléfono y por IP) sin afectar a un
+  // cliente normal, que nunca hace tantas reservas seguidas.
+  const telefono = normalizarTelefono(body.cliente.telefono);
+  const [porTelefono, porIp] = await Promise.all([
+    comprobarLimite(`reserva:tel:${telefono}`, { maxIntentos: 8, ventanaMinutos: 60 }),
+    comprobarLimite(`reserva:ip:${ipDePeticion(request)}`, { maxIntentos: 20, ventanaMinutos: 60 }),
+  ]);
+  if (!porTelefono.permitido || !porIp.permitido) {
+    return NextResponse.json(RESPUESTA_DEMASIADOS_INTENTOS, { status: 429 });
   }
 
   try {
