@@ -18,6 +18,8 @@ const ETIQUETA_ORIGEN: Record<string, string> = {
   cron_recordatorios: "Recordatorios",
   cron_retencion: "Retención",
   cron_backup: "Copia de seguridad",
+  fidelizacion: "Fidelización",
+  aviso_disponibilidad: "Aviso de disponibilidad",
   servidor: "Servidor",
 };
 

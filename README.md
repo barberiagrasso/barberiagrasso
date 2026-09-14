@@ -26,7 +26,10 @@ simplemente describe qué quieres conseguir.
   con su propio icono, sin la barra de direcciones. Todavía no está en App Store/Google Play
   — eso es un paso aparte y más costoso, ver "Qué falta" más abajo.
 - **Panel de control** (`/admin`), con gestión visual completa (sin tocar Supabase):
-  - **Agenda**: creación, cancelación y cambios de estado de citas por sede.
+  - **Agenda**: creación, cancelación y cambios de estado de citas por sede. Cada cita tiene
+    un botón **"Avisar disponible"**: si un barbero termina antes de lo previsto, avisa por
+    WhatsApp (con confirmación previa) a su siguiente cliente de ese mismo día por si quiere
+    venir antes — el hueco reservado sigue intacto si no contesta o prefiere mantenerlo.
   - **Servicios**: catálogo, precios, duración y en qué desplegable aparece cada uno.
   - **Equipo**: alta de barberos, a qué sedes y servicios están asignados, y su horario
     semanal.

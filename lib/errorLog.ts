@@ -12,6 +12,7 @@ export type OrigenError =
   | "cron_retencion"
   | "cron_backup"
   | "fidelizacion"
+  | "aviso_disponibilidad"
   | "servidor";
 
 /**

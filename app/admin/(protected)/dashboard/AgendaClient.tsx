@@ -123,6 +123,25 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
     cargarCitas();
   }
 
+  const [avisando, setAvisando] = useState<string | null>(null);
+
+  // Avisa por WhatsApp al siguiente cliente de este mismo profesional de
+  // que ya está disponible por si quiere venir antes — pensado para
+  // cuando una cita termina antes de lo previsto. Pide confirmación
+  // porque manda un mensaje de verdad, que no se puede deshacer.
+  async function avisarDisponible(id: string) {
+    if (!confirm("¿Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible?")) return;
+    setAvisando(id);
+    const res = await fetch(`/api/admin/citas/${id}/avisar-disponible`, { method: "POST" });
+    const json = await res.json();
+    setAvisando(null);
+    if (!res.ok) {
+      alert(json.error || "No se pudo enviar el aviso.");
+      return;
+    }
+    alert(`Aviso enviado a ${json.clienteNombre}.`);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -243,6 +262,16 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
                   >
                     {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
                   </span>
+                  {(cita.estado === "confirmada" || cita.estado === "completada") && (
+                    <button
+                      onClick={() => avisarDisponible(cita.id)}
+                      disabled={avisando === cita.id}
+                      className="text-xs text-blue-700 underline disabled:opacity-50"
+                      title="Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible"
+                    >
+                      {avisando === cita.id ? "Avisando…" : "Avisar disponible"}
+                    </button>
+                  )}
                   {cita.estado === "confirmada" && (
                     <>
                       <button
@@ -271,7 +300,14 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
           </div>
         </>
       ) : (
-        <VistaSemanal dias={diasSemana} citas={citas} cargando={cargando} onCambiarEstado={cambiarEstado} />
+        <VistaSemanal
+          dias={diasSemana}
+          citas={citas}
+          cargando={cargando}
+          onCambiarEstado={cambiarEstado}
+          onAvisarDisponible={avisarDisponible}
+          avisando={avisando}
+        />
       )}
     </div>
   );
@@ -282,11 +318,15 @@ function VistaSemanal({
   citas,
   cargando,
   onCambiarEstado,
+  onAvisarDisponible,
+  avisando,
 }: {
   dias: string[];
   citas: Cita[];
   cargando: boolean;
   onCambiarEstado: (id: string, estado: string) => void;
+  onAvisarDisponible: (id: string) => void;
+  avisando: string | null;
 }) {
   const citasPorDia = useMemo(() => {
     const mapa = new Map<string, Cita[]>();
@@ -339,31 +379,43 @@ function VistaSemanal({
                   >
                     {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
                   </span>
-                  {cita.estado === "confirmada" && (
-                    <div className="flex gap-1.5">
+                  <div className="flex gap-1.5">
+                    {(cita.estado === "confirmada" || cita.estado === "completada") && (
                       <button
-                        onClick={() => onCambiarEstado(cita.id, "completada")}
-                        className="text-green-700 underline"
-                        title="Marcar como completada"
+                        onClick={() => onAvisarDisponible(cita.id)}
+                        disabled={avisando === cita.id}
+                        className="text-blue-700 underline disabled:opacity-50"
+                        title="Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible"
                       >
-                        ✓
+                        📲
                       </button>
-                      <button
-                        onClick={() => onCambiarEstado(cita.id, "no_presentada")}
-                        className="text-amber-700 underline"
-                        title="Marcar como no presentada"
-                      >
-                        !
-                      </button>
-                      <button
-                        onClick={() => onCambiarEstado(cita.id, "cancelada")}
-                        className="text-red-700 underline"
-                        title="Cancelar"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    {cita.estado === "confirmada" && (
+                      <>
+                        <button
+                          onClick={() => onCambiarEstado(cita.id, "completada")}
+                          className="text-green-700 underline"
+                          title="Marcar como completada"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => onCambiarEstado(cita.id, "no_presentada")}
+                          className="text-amber-700 underline"
+                          title="Marcar como no presentada"
+                        >
+                          !
+                        </button>
+                        <button
+                          onClick={() => onCambiarEstado(cita.id, "cancelada")}
+                          className="text-red-700 underline"
+                          title="Cancelar"
+                        >
+                          ✕
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
