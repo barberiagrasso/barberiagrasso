@@ -26,6 +26,10 @@ function uno<T>(valor: T | T[] | null): T | null {
   return valor;
 }
 
+function formatearPrecio(centimos: number) {
+  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+}
+
 export default async function PerfilPage() {
   const { cliente } = await requireCliente();
 
@@ -79,6 +83,19 @@ export default async function PerfilPage() {
           </Link>
           <CerrarSesionButton className="font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow" />
         </div>
+
+        <Link
+          href="/perfil/tarjeta"
+          className="mb-6 flex items-center justify-between rounded-xl border border-brand-yellow/30 bg-brand-black-soft p-4 hover:border-brand-yellow/60"
+        >
+          <div>
+            <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tu saldo de fidelización</p>
+            <p className="mt-0.5 font-mono text-2xl text-brand-yellow">
+              {formatearPrecio(cliente.saldo_fidelizacion_centimos ?? 0)}
+            </p>
+          </div>
+          <span className="font-body text-sm text-brand-white-dim">Ver tarjeta →</span>
+        </Link>
 
         <CumpleanosForm fechaInicial={cliente.fecha_nacimiento ?? null} />
 

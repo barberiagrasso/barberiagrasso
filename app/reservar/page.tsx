@@ -46,7 +46,12 @@ export default async function ReservarPage() {
         <BookingFlow
           sedes={sedes ?? []}
           servicios={servicios ?? []}
-          clienteInicial={{ nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email }}
+          clienteInicial={{
+            nombre: cliente.nombre,
+            telefono: cliente.telefono,
+            email: cliente.email,
+            saldoFidelizacionCentimos: cliente.saldo_fidelizacion_centimos ?? 0,
+          }}
         />
       </div>
     </main>

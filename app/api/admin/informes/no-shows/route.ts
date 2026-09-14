@@ -11,6 +11,7 @@ interface CitaFila {
   origen: string;
   profesional_id: string | null;
   inicio: string;
+  saldo_canjeado_centimos: number;
   profesional: { nombre: string } | { nombre: string }[] | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
 }
@@ -50,7 +51,9 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("citas")
-    .select("id, estado, origen, profesional_id, inicio, profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos)")
+    .select(
+      "id, estado, origen, profesional_id, inicio, saldo_canjeado_centimos, profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos)"
+    )
     .gte("inicio", rango.desdeUTC.toISOString())
     .lte("inicio", rango.hastaUTC.toISOString());
   if (sedeId && sedeId !== "todas") query = query.eq("sede_id", sedeId);
@@ -74,6 +77,10 @@ export async function GET(request: NextRequest) {
     extrasPorCita.set(e.cita_id, (extrasPorCita.get(e.cita_id) ?? 0) + e.precio_centimos);
   }
   const ingresosPerdidosCentimos = [...noPresentadas, ...canceladas].reduce((acc, c) => {
+    // Si se iba a pagar con saldo de fidelización, no había dinero real
+    // en juego (y si el saldo se llegó a canjear, ya se ha devuelto al
+    // cliente al cancelar/marcar no presentada — ver lib/fidelizacion.ts).
+    if (c.saldo_canjeado_centimos > 0) return acc;
     const servicio = uno(c.servicio);
     return acc + (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
   }, 0);

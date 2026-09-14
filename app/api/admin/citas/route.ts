@@ -76,6 +76,8 @@ export async function POST(request: NextRequest) {
       aceptaComercial: Boolean(body.aceptaComercial),
       canal: "panel",
       origen: "panel",
+      complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
+      pagarConSaldo: Boolean(body.pagarConSaldo),
     });
     return NextResponse.json({ cita, profesionalNombre });
   } catch (err) {

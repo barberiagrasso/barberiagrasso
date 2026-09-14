@@ -3,6 +3,7 @@ import { crearReserva, ReservaError } from "@/lib/booking";
 import { normalizarTelefono } from "@/lib/clientes";
 import { comprobarLimite, ipDePeticion, RESPUESTA_DEMASIADOS_INTENTOS } from "@/lib/rateLimit";
 import { registrarError } from "@/lib/errorLog";
+import { requireClienteApi, NoAutorizadoError } from "@/lib/clienteApiAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(RESPUESTA_DEMASIADOS_INTENTOS, { status: 429 });
   }
 
+  // Pagar con saldo mueve dinero de verdad de la cuenta de un cliente:
+  // exige sesión iniciada y, aunque el formulario ya viene relleno con
+  // los datos del cliente logueado, se ignora el teléfono que llegue en
+  // el cuerpo de la petición y se usa el de la sesión — así nadie puede
+  // gastar el saldo de otra persona escribiendo su teléfono a mano.
+  const pagarConSaldo = Boolean(body.pagarConSaldo);
+  let datosCliente = body.cliente;
+  if (pagarConSaldo) {
+    try {
+      const { cliente } = await requireClienteApi();
+      datosCliente = { ...body.cliente, telefono: cliente.telefono };
+    } catch (err) {
+      if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
+      throw err;
+    }
+  }
+
   try {
     const { cita, profesionalNombre } = await crearReserva({
       sedeId: body.sedeId,
@@ -38,11 +56,12 @@ export async function POST(request: NextRequest) {
       profesionalId: body.profesionalId || null,
       fecha: body.fecha,
       horaInicioISO: body.horaInicioISO,
-      cliente: body.cliente,
+      cliente: datosCliente,
       aceptaComercial: Boolean(body.aceptaComercial),
       canal: "app",
       origen: "app",
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
+      pagarConSaldo,
     });
 
     return NextResponse.json({ cita, profesionalNombre });

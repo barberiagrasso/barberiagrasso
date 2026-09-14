@@ -71,7 +71,15 @@ function colorPuntoNivel(nivel: ResumenDiaDisponibilidad["nivel"] | undefined): 
   }
 }
 
-type EstadoCliente = { tipo: "vacio" } | { tipo: "buscando" } | { tipo: "encontrado"; nombre: string } | { tipo: "nuevo" };
+type EstadoCliente =
+  | { tipo: "vacio" }
+  | { tipo: "buscando" }
+  | { tipo: "encontrado"; nombre: string; saldoFidelizacionCentimos: number }
+  | { tipo: "nuevo" };
+
+function formatearPrecio(centimos: number) {
+  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+}
 
 export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; servicios: Servicio[] }) {
   const [abierto, setAbierto] = useState(false);
@@ -93,6 +101,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
   const [telefono, setTelefono] = useState("");
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [estadoCliente, setEstadoCliente] = useState<EstadoCliente>({ tipo: "vacio" });
+  const [pagarConSaldo, setPagarConSaldo] = useState(false);
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +119,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
     setTelefono("");
     setNombreNuevo("");
     setEstadoCliente({ tipo: "vacio" });
+    setPagarConSaldo(false);
     setError(null);
     setExito(false);
   }
@@ -173,17 +183,30 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
       return;
     }
     setEstadoCliente({ tipo: "buscando" });
+    setPagarConSaldo(false);
     const idTimeout = setTimeout(() => {
       fetch(`/api/admin/citas/buscar-cliente?telefono=${encodeURIComponent(telefonoLimpio)}`)
         .then((r) => r.json())
         .then((j) => {
-          if (j.nombre) setEstadoCliente({ tipo: "encontrado", nombre: j.nombre });
-          else setEstadoCliente({ tipo: "nuevo" });
+          if (j.nombre) {
+            setEstadoCliente({ tipo: "encontrado", nombre: j.nombre, saldoFidelizacionCentimos: j.saldoFidelizacionCentimos ?? 0 });
+          } else {
+            setEstadoCliente({ tipo: "nuevo" });
+          }
         })
         .catch(() => setEstadoCliente({ tipo: "vacio" }));
     }, 400);
     return () => clearTimeout(idTimeout);
   }, [telefono]);
+
+  const servicioElegido = servicios.find((s) => s.id === servicioId);
+  const totalCentimos = servicioElegido?.precio_centimos ?? 0;
+  const saldoDisponibleCentimos = estadoCliente.tipo === "encontrado" ? estadoCliente.saldoFidelizacionCentimos : 0;
+  const saldoCubreTotal = totalCentimos > 0 && saldoDisponibleCentimos >= totalCentimos;
+
+  useEffect(() => {
+    if (pagarConSaldo && !saldoCubreTotal) setPagarConSaldo(false);
+  }, [pagarConSaldo, saldoCubreTotal]);
 
   const horasUnicas = useMemo(
     () => Array.from(new Map(slots.map((s) => [s.hora_inicio, s])).values()),
@@ -212,6 +235,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
         horaInicioISO,
         cliente: { nombre: nombreParaGuardar, telefono },
         aceptaComercial: false,
+        pagarConSaldo: pagarConSaldo && saldoCubreTotal,
       }),
     });
     const json = await res.json();
@@ -420,9 +444,32 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
                   />
                   {estadoCliente.tipo === "buscando" && <p className="mt-1 text-xs text-stone-400">Buscando…</p>}
                   {estadoCliente.tipo === "encontrado" && (
-                    <p className="mt-1 text-sm text-emerald-700">
-                      Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
-                    </p>
+                    <div className="mt-1 space-y-1">
+                      <p className="text-sm text-emerald-700">
+                        Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
+                      </p>
+                      {estadoCliente.saldoFidelizacionCentimos > 0 && (
+                        <label
+                          className={
+                            "flex items-start gap-2 text-sm " + (saldoCubreTotal ? "text-stone-700" : "text-stone-400")
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={pagarConSaldo && saldoCubreTotal}
+                            disabled={!saldoCubreTotal}
+                            onChange={(e) => setPagarConSaldo(e.target.checked)}
+                          />
+                          <span>
+                            Saldo de fidelización: {formatearPrecio(estadoCliente.saldoFidelizacionCentimos)}
+                            {saldoCubreTotal
+                              ? " — pagar esta cita con su saldo"
+                              : " (no cubre el total de esta cita)"}
+                          </span>
+                        </label>
+                      )}
+                    </div>
                   )}
                   {estadoCliente.tipo === "nuevo" && (
                     <div className="mt-2">

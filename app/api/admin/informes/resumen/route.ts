@@ -12,6 +12,11 @@ interface CitaFila {
   origen: string;
   estado: string;
   inicio: string;
+  // Si es > 0, esta cita se pagó con saldo de fidelización: no entró
+  // dinero real, así que no debe sumar a ningún ingreso de este informe
+  // (ver ingresoCitaCentimos más abajo) aunque la cita en sí sí cuenta
+  // como cita completada.
+  saldo_canjeado_centimos: number;
   profesional: { nombre: string } | { nombre: string }[] | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
   sede: { nombre: string } | { nombre: string }[] | null;
@@ -21,8 +26,19 @@ function uno<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-// Ingresos totales (servicio + extras) de un conjunto de citas completadas,
-// dado el mapa de extras por cita_id ya cargado.
+// Ingreso real (en dinero) de una cita: precio del servicio + sus
+// complementos, salvo que se haya pagado con saldo de fidelización, en
+// cuyo caso no entró dinero de verdad y no debe contar en ningún informe
+// de facturación (ya se contó como gasto real cuando se generó ese saldo).
+function ingresoCitaCentimos(c: CitaFila, extrasPorCita: Map<string, number>): number {
+  if (c.saldo_canjeado_centimos > 0) return 0;
+  const servicio = uno(c.servicio);
+  return (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
+}
+
+// Ingresos totales (servicio + extras, excluyendo lo pagado con saldo) de
+// un conjunto de citas completadas, dado el mapa de extras por cita_id ya
+// cargado.
 async function calcularIngresos(supabase: ReturnType<typeof createAdminClient>, citasCompletadas: CitaFila[]) {
   const ids = citasCompletadas.map((c) => c.id);
   const { data: extras } = await supabase
@@ -33,10 +49,10 @@ async function calcularIngresos(supabase: ReturnType<typeof createAdminClient>, 
   for (const e of extras ?? []) {
     extrasPorCita.set(e.cita_id, (extrasPorCita.get(e.cita_id) ?? 0) + e.precio_centimos);
   }
-  return { extrasPorCita, ingresosTotalCentimos: citasCompletadas.reduce((acc, c) => {
-    const servicio = uno(c.servicio);
-    return acc + (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
-  }, 0) };
+  return {
+    extrasPorCita,
+    ingresosTotalCentimos: citasCompletadas.reduce((acc, c) => acc + ingresoCitaCentimos(c, extrasPorCita), 0),
+  };
 }
 
 /**
@@ -65,7 +81,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
 
   const SELECT =
-    "id, sede_id, profesional_id, origen, estado, inicio, profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos), sede:sedes(nombre)";
+    "id, sede_id, profesional_id, origen, estado, inicio, saldo_canjeado_centimos, profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos), sede:sedes(nombre)";
 
   let query = supabase.from("citas").select(SELECT).gte("inicio", rango.desdeUTC.toISOString()).lte("inicio", rango.hastaUTC.toISOString());
   if (sedeId && sedeId !== "todas") query = query.eq("sede_id", sedeId);
@@ -84,7 +100,7 @@ export async function GET(request: NextRequest) {
     const anterior = rangoAnterior(rango);
     let queryAnterior = supabase
       .from("citas")
-      .select("id, estado, servicio:servicios(precio_centimos)")
+      .select("id, estado, saldo_canjeado_centimos, servicio:servicios(precio_centimos)")
       .gte("inicio", anterior.desdeUTC.toISOString())
       .lte("inicio", anterior.hastaUTC.toISOString())
       .eq("estado", "completada");
@@ -102,8 +118,7 @@ export async function GET(request: NextRequest) {
   const buckets = generarBuckets(rango, granularidad);
   const ingresosPorBucket = new Map<string, number>();
   for (const c of citasCompletadas) {
-    const servicio = uno(c.servicio);
-    const ingresoCita = (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
+    const ingresoCita = ingresoCitaCentimos(c, extrasPorCita);
     const { clave } = bucketDe(c.inicio, granularidad);
     ingresosPorBucket.set(clave, (ingresosPorBucket.get(clave) ?? 0) + ingresoCita);
   }
@@ -113,8 +128,7 @@ export async function GET(request: NextRequest) {
   const porSedeMap = new Map<string, { nombre: string; ingresosCentimos: number }>();
   const porBarberoMap = new Map<string, { nombre: string; ingresosCentimos: number }>();
   for (const c of citasCompletadas) {
-    const servicio = uno(c.servicio);
-    const ingresoCita = (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
+    const ingresoCita = ingresoCitaCentimos(c, extrasPorCita);
 
     const sede = uno(c.sede);
     const claveSede = c.sede_id;
@@ -138,13 +152,17 @@ export async function GET(request: NextRequest) {
     .select("cita_id, precio_centimos, servicio:servicios(nombre)")
     .in("cita_id", idsCitasCompletadas.length ? idsCitasCompletadas : ["00000000-0000-0000-0000-000000000000"]);
 
+  // Citas pagadas con saldo: cuentan igualmente como "vendidas" (cantidad)
+  // pero sin ingreso real, igual que en el resto del informe.
+  const idsCitasConSaldo = new Set(citasCompletadas.filter((c) => c.saldo_canjeado_centimos > 0).map((c) => c.id));
+
   const conteoServicios = new Map<string, { nombre: string; cantidad: number; ingresosCentimos: number }>();
   for (const c of citasCompletadas) {
     const servicio = uno(c.servicio);
     const nombre = servicio?.nombre ?? "Servicio";
     const actual = conteoServicios.get(nombre) ?? { nombre, cantidad: 0, ingresosCentimos: 0 };
     actual.cantidad += 1;
-    actual.ingresosCentimos += servicio?.precio_centimos ?? 0;
+    actual.ingresosCentimos += idsCitasConSaldo.has(c.id) ? 0 : servicio?.precio_centimos ?? 0;
     conteoServicios.set(nombre, actual);
   }
   for (const e of extrasConNombre ?? []) {
@@ -152,7 +170,7 @@ export async function GET(request: NextRequest) {
     const nombre = servicio?.nombre ?? "Complemento";
     const actual = conteoServicios.get(nombre) ?? { nombre, cantidad: 0, ingresosCentimos: 0 };
     actual.cantidad += 1;
-    actual.ingresosCentimos += e.precio_centimos;
+    actual.ingresosCentimos += idsCitasConSaldo.has(e.cita_id) ? 0 : e.precio_centimos;
     conteoServicios.set(nombre, actual);
   }
   const topServicios = Array.from(conteoServicios.values())
@@ -162,8 +180,7 @@ export async function GET(request: NextRequest) {
   // --- Desglose por canal (origen de la reserva) ---
   const porCanalMap = new Map<string, { canal: string; citas: number; ingresosCentimos: number }>();
   for (const c of citasCompletadas) {
-    const servicio = uno(c.servicio);
-    const ingresoCita = (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
+    const ingresoCita = ingresoCitaCentimos(c, extrasPorCita);
     const actual = porCanalMap.get(c.origen) ?? { canal: c.origen, citas: 0, ingresosCentimos: 0 };
     actual.citas += 1;
     actual.ingresosCentimos += ingresoCita;

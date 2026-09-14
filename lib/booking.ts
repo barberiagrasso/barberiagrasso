@@ -5,6 +5,7 @@ import { getAvailableSlots } from "@/lib/availability";
 import { buscarOCrearCliente, normalizarTelefono } from "@/lib/clientes";
 import { sincronizarClienteHubSpot, sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { canjearSaldoEnCita, reembolsarSaldoDeCita, saldoDelCliente, SaldoInsuficienteError } from "@/lib/fidelizacion";
 import type { CanalConsentimiento } from "@/lib/types";
 
 // Fecha "YYYY-MM-DD" de un instante ISO en la zona horaria del negocio
@@ -47,6 +48,11 @@ interface CrearReservaParams {
   // reserva (p. ej. cejas, lavado). Amplían el hueco bloqueado en la
   // agenda y quedan anotados en la cita para que el barbero cobre bien.
   complementoIds?: string[];
+  // Si es true, el cliente paga el total de la cita con su saldo de
+  // fidelización en vez de en efectivo/tarjeta. Solo se admite si el
+  // saldo cubre el total exacto (ver lib/fidelizacion.ts) — no hay canje
+  // parcial.
+  pagarConSaldo?: boolean;
 }
 
 export class ReservaError extends Error {}
@@ -236,7 +242,7 @@ export async function crearReserva(params: CrearReservaParams) {
 
   const { data: servicio } = await supabase
     .from("servicios")
-    .select("duracion_minutos")
+    .select("duracion_minutos, precio_centimos")
     .eq("id", params.servicioId)
     .single();
   const { data: override } = await supabase
@@ -246,6 +252,16 @@ export async function crearReserva(params: CrearReservaParams) {
     .eq("servicio_id", params.servicioId)
     .maybeSingle();
   const duracionMinutos = (override?.duracion_minutos ?? servicio?.duracion_minutos ?? 30) + duracionExtraMinutos;
+
+  // Total de la cita (servicio + complementos) — el mismo número que ve
+  // el cliente en el paso de confirmación de app/reservar. sede_servicios
+  // tiene una columna de precio propia por sede que hoy no se usa en
+  // ningún otro sitio de la app (tampoco en los informes de facturación),
+  // así que el saldo de fidelización sigue ese mismo criterio para no
+  // introducir una fuente de verdad distinta.
+  const precioServicioCentimos = servicio?.precio_centimos ?? 0;
+  const totalCentimos =
+    precioServicioCentimos + complementosParaGuardar.reduce((acc, c) => acc + c.precio_centimos, 0);
 
   const inicio = new Date(params.horaInicioISO);
   const fin = addMinutes(inicio, duracionMinutos);
@@ -282,6 +298,20 @@ export async function crearReserva(params: CrearReservaParams) {
     });
   }
 
+  // Si el cliente quiere pagar con su saldo de fidelización, se comprueba
+  // ANTES de crear la cita que le cubre el total exacto — no se admite
+  // canje parcial ("descontar" solo una parte no está permitido). Esto
+  // evita crear y tener que deshacer la cita en el caso normal; el canje
+  // real (más abajo) se vuelve a comprobar en la propia base de datos por
+  // si el saldo cambiase justo en medio, por ejemplo por otra reserva
+  // simultánea del mismo cliente.
+  if (params.pagarConSaldo) {
+    const saldoActual = await saldoDelCliente(supabase, clienteId);
+    if (saldoActual < totalCentimos) {
+      throw new ReservaError("El saldo acumulado no cubre el total de esta cita.");
+    }
+  }
+
   // 2. Crear la cita
   const { data: cita, error: errorCita } = await supabase
     .from("citas")
@@ -294,6 +324,7 @@ export async function crearReserva(params: CrearReservaParams) {
       fin: fin.toISOString(),
       origen: params.origen,
       notas: notaComplementos,
+      saldo_canjeado_centimos: params.pagarConSaldo ? totalCentimos : 0,
     })
     .select("*")
     .single();
@@ -306,6 +337,22 @@ export async function crearReserva(params: CrearReservaParams) {
     await supabase.from("cita_extras").insert(
       complementosParaGuardar.map((c) => ({ cita_id: cita.id, ...c }))
     );
+  }
+
+  if (params.pagarConSaldo && totalCentimos > 0) {
+    try {
+      await canjearSaldoEnCita(supabase, { clienteId, citaId: cita.id, importeCentimos: totalCentimos });
+    } catch (err) {
+      // El saldo dejó de alcanzar justo entre la comprobación de arriba y
+      // este momento (carrera muy poco probable, pero posible). Se
+      // deshace la cita recién creada (cita_extras se borra en cascada)
+      // en vez de dejarla creada sin haberse cobrado de verdad.
+      await supabase.from("citas").delete().eq("id", cita.id);
+      if (err instanceof SaldoInsuficienteError) {
+        throw new ReservaError("El saldo acumulado no cubre el total de esta cita.");
+      }
+      throw err;
+    }
   }
 
   // Si este cliente estaba apuntado a la lista de espera para este mismo
@@ -360,6 +407,10 @@ export async function cancelarCita(citaId: string) {
   if (error || !cita) throw new ReservaError("No se pudo cancelar la cita.");
   await sincronizarCitaHubSpot(supabase, cita.id);
   await notificarListaEsperaPorHueco(cita);
+  // Si esta cita se había pagado con saldo de fidelización, se le
+  // devuelve íntegro al cliente: cancelar no debería costarle el saldo
+  // que ya tenía ganado.
+  await reembolsarSaldoDeCita(supabase, cita);
   return cita;
 }
 

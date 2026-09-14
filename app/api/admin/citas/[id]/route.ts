@@ -4,6 +4,7 @@ import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { cancelarCita, ReservaError } from "@/lib/booking";
+import { acumularPorCitaCompletada, reembolsarSaldoDeCita } from "@/lib/fidelizacion";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +35,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ ok: true });
   }
   if (body?.estado) {
-    const { error } = await supabase.from("citas").update({ estado: body.estado }).eq("id", id);
-    if (error) return NextResponse.json({ error: "No se pudo actualizar la cita." }, { status: 500 });
+    const { data: citaActualizada, error } = await supabase
+      .from("citas")
+      .update({ estado: body.estado })
+      .eq("id", id)
+      .select("id, cliente_id, saldo_canjeado_centimos")
+      .single();
+    if (error || !citaActualizada) return NextResponse.json({ error: "No se pudo actualizar la cita." }, { status: 500 });
     await sincronizarCitaHubSpot(supabase, id);
+    // Fidelización: el 10% se acumula al completar la cita (nunca antes,
+    // para no premiar citas que al final no se presentan); si se marca
+    // "no presentada" y se había pagado con saldo, se le devuelve al
+    // cliente — ver lib/fidelizacion.ts para la política completa.
+    if (body.estado === "completada") {
+      await acumularPorCitaCompletada(supabase, citaActualizada);
+    } else if (body.estado === "no_presentada") {
+      await reembolsarSaldoDeCita(supabase, citaActualizada);
+    }
     return NextResponse.json({ ok: true });
   }
 

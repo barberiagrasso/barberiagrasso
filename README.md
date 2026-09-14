@@ -31,7 +31,9 @@ simplemente describe qué quieres conseguir.
   - **Equipo**: alta de barberos, a qué sedes y servicios están asignados, y su horario
     semanal.
   - **Vacaciones**: bloqueos puntuales por barbero o por sede.
-  - **Clientes (CRM)**: listado con su estado de consentimiento comercial.
+  - **Clientes (CRM)** (`/admin/clientes`): listado con su estado de consentimiento comercial,
+    su saldo de fidelización y el histórico de movimientos de ese saldo (acumulaciones,
+    canjes, reembolsos y ajustes manuales) — ver "Fidelización" más abajo.
   - **Campañas**: segmentar clientes (por sede, etiqueta, o quién no viene desde hace
     tiempo) y mandarles un mensaje de WhatsApp — solo a quien haya dado su consentimiento.
   - **Plantillas**: registro de las plantillas de WhatsApp que Meta te apruebe, para
@@ -123,6 +125,48 @@ que aprender.
   esto respalda los datos día a día. Si alguna vez necesitas restaurar algo desde una de
   estas copias, descarga el archivo del día que te interese y pídeselo a Claude.
 
+### Fidelización: saldo acumulable y tarjeta digital
+
+Cada cliente acumula automáticamente un **10%** de lo que se gasta en cada cita (servicio +
+complementos) como saldo, válido en cualquiera de las dos sedes. Las piezas:
+
+- **Cuándo se acumula**: solo al marcar una cita como **completada** desde `/admin/dashboard`
+  (nunca al reservarla) — así no se premia una cita que luego se cancela o no se presenta.
+  Si la cita se había pagado con saldo, no genera saldo nuevo (no hubo gasto real que
+  recompensar).
+- **Cómo se canjea**: el cliente ve su saldo disponible en el paso de confirmación de
+  `/reservar` (y el barbero, en la cita rápida del panel) y puede marcar "pagar con mi saldo"
+  **solo si el saldo cubre el total exacto** de esa cita — no se admite canje parcial, tal y
+  como pediste. Si no llega, simplemente no aparece la opción.
+- **Si se cancela o no se presenta**: el saldo canjeado se devuelve íntegro al cliente
+  automáticamente — cancelar o faltar a una cita no le debe costar el saldo que ya tenía
+  ganado.
+- **Ficha de cada cliente** (`/admin/clientes/[id]`): saldo actual, histórico completo de
+  movimientos (de dónde salió cada céntimo) y un botón para hacer un **ajuste manual** (p. ej.
+  un detalle comercial), siempre con motivo obligatorio y quedando registrado quién lo hizo.
+- **El asistente de WhatsApp con IA NO puede canjear saldo** — de momento, pagar con saldo
+  solo se puede hacer desde `/reservar` (el cliente, con su sesión iniciada) o desde el panel
+  (un barbero, en persona). Es una decisión deliberada: mover saldo es mover dinero de
+  verdad, y prefiero que eso pase siempre por una sesión de cliente autenticada o por una
+  persona del equipo, nunca por una conversación automática de IA. Si más adelante quieres
+  que la IA también lo ofrezca por WhatsApp, pídeselo a Claude.
+- **Tarjeta digital**: en `/perfil/tarjeta`, cualquier cliente puede ver y **descargar una
+  imagen** de su tarjeta (logo, su nombre y su saldo actualizado) para guardarla donde
+  quiera — funciona ya, hoy, sin ninguna cuenta ni coste adicional.
+- **Apple Wallet / Google Wallet reales**: el código ya está preparado (`lib/wallet/`,
+  `app/api/wallet/`) para que el cliente pueda añadir la tarjeta directamente a su Wallet del
+  móvil, con el saldo actualizándose. Los botones ya están en `/perfil/tarjeta`, pero
+  aparecen desactivados ("Todavía no está activado") hasta que completes esto:
+  - **Apple Wallet** necesita una cuenta de Apple Developer (de pago, ~99$/año) y generar un
+    certificado de "Pass Type" — la guía paso a paso, con los nombres exactos de las
+    variables de entorno que hay que añadir en Vercel, está comentada al principio de
+    `lib/wallet/appleWallet.ts`.
+  - **Google Wallet** necesita una cuenta de Google Cloud (gratis) y que Google apruebe tu
+    solicitud como "issuer" (puede tardar unos días) — la guía, igual de detallada, está en
+    `lib/wallet/googleWallet.ts`.
+  - En cuanto añadas esas variables de entorno en Vercel, los botones se activan solos, sin
+    tocar ni una línea de código más.
+
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
 - **Publicarla en App Store / Google Play**: la reserva ya se puede "instalar" desde el
@@ -132,7 +176,8 @@ que aprender.
   similar) — solo tiene sentido si más adelante quieres esa presencia por marketing o
   prestigio, no por funcionalidad.
 - **Pagos y señales anticipadas** (por ejemplo con Stripe) para reducir las citas fantasma.
-- **Fidelización por puntos o visitas** (ej. cada 10 cortes, uno gratis).
+- **Activar Apple Wallet / Google Wallet reales** para la tarjeta de fidelización — ver la
+  sección de arriba, el código ya está listo, solo falta que crees las cuentas.
 - Cualquier otra idea nueva que se te ocurra — este proyecto sigue evolucionando contigo.
 
 ---
@@ -289,8 +334,11 @@ supabase/seed.sql                      Datos de ejemplo opcionales
 supabase/actualizar-datos-reales.sql   Catálogo real de servicios/barberos/horarios (re-ejecutable)
 supabase/actualizar-funcionalidad-avanzada.sql  Tablas de campañas/plantillas/recordatorios (re-ejecutable)
 supabase/actualizar-monitorizacion-produccion.sql  Tabla de errores del sistema (re-ejecutable)
+supabase/actualizar-fidelizacion.sql   Saldo de fidelización: tablas, columnas y función (re-ejecutable)
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
+lib/fidelizacion.ts        Acumular, canjear y reembolsar saldo de fidelización
+lib/wallet/                Apple Wallet / Google Wallet reales (preparado, ver README arriba)
 lib/aiAssistant.ts         El asistente de WhatsApp con IA (prompt + herramientas)
 lib/whatsapp.ts            Envío de mensajes de WhatsApp (texto libre y plantillas)
 lib/segmentacion.ts        Cálculo de a qué clientes llega una campaña
@@ -302,7 +350,9 @@ components/pwa/            Registro del service worker y aviso de "Instalar app"
 .github/workflows/recordatorios.yml     Disparador externo (GitHub Actions) de los recordatorios
 .github/workflows/backup.yml            Disparador externo (GitHub Actions) de la copia de seguridad
 app/reservar/              Página pública de reserva
+app/perfil/tarjeta/        Tarjeta digital de fidelización (descarga + Apple/Google Wallet)
 app/admin/                 Panel de control (agenda, servicios, equipo, CRM, campañas, informes, errores...)
+app/admin/clientes/        Ficha de cada cliente: saldo, histórico y ajuste manual
 app/api/                   Toda la lógica del servidor (reservas, disponibilidad, webhook…)
 app/api/cron/recordatorios Endpoint que manda los recordatorios (llamado por GitHub Actions)
 ```

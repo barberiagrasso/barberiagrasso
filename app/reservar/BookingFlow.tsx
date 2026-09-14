@@ -65,6 +65,10 @@ interface ClienteInicial {
   nombre: string;
   telefono: string;
   email: string | null;
+  // Saldo de fidelización acumulado (10% de lo gastado en citas
+  // anteriores) — ver lib/fidelizacion.ts. Se puede canjear en esta
+  // reserva solo si cubre el total exacto.
+  saldoFidelizacionCentimos: number;
 }
 
 interface Props {
@@ -315,6 +319,7 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   const [telefono, setTelefono] = useState(clienteInicial?.telefono ?? "");
   const [email, setEmail] = useState(clienteInicial?.email ?? "");
   const [aceptaComercial, setAceptaComercial] = useState(true);
+  const [pagarConSaldo, setPagarConSaldo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citaConfirmada, setCitaConfirmada] = useState<{ inicio: string; profesionalNombre: string } | null>(null);
@@ -335,6 +340,18 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   const precioTotalCentimos =
     (servicioSeleccionado?.precio_centimos ?? 0) +
     complementosElegidos.reduce((acc, c) => acc + c.precio_centimos, 0);
+  const saldoDisponibleCentimos = clienteInicial?.saldoFidelizacionCentimos ?? 0;
+  // El canje no admite parcialidad: el saldo tiene que cubrir el total
+  // exacto de la cita, o no se puede usar en absoluto (ver lib/fidelizacion.ts).
+  const saldoCubreTotal = precioTotalCentimos > 0 && saldoDisponibleCentimos >= precioTotalCentimos;
+
+  // Si el cliente marcó "pagar con saldo" y luego cambia de servicio o
+  // añade un complemento que ya no le cubre el saldo, se desmarca solo:
+  // así el estado interno nunca se queda "marcado" por detrás de una
+  // casilla que ahora se ve deshabilitada.
+  useEffect(() => {
+    if (pagarConSaldo && !saldoCubreTotal) setPagarConSaldo(false);
+  }, [pagarConSaldo, saldoCubreTotal]);
 
   async function elegirServicioYContinuar(id: string) {
     setServicioId(id);
@@ -508,6 +525,7 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
           cliente: { nombre, telefono, email: email || null },
           aceptaComercial,
           complementoIds,
+          pagarConSaldo: pagarConSaldo && saldoCubreTotal,
         }),
       });
       const json = await res.json();
@@ -849,7 +867,35 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
             {complementosElegidos.map((c) => (
               <div key={c.id}>+ {c.nombre}</div>
             ))}
-            <div className="mt-1 font-mono text-brand-yellow">Total: {formatearPrecio(precioTotalCentimos)}</div>
+            <div className="mt-1 font-mono text-brand-yellow">
+              Total:{" "}
+              {pagarConSaldo && saldoCubreTotal ? (
+                <span className="line-through opacity-60">{formatearPrecio(precioTotalCentimos)}</span>
+              ) : (
+                formatearPrecio(precioTotalCentimos)
+              )}
+              {pagarConSaldo && saldoCubreTotal && <span className="ml-1">0,00 € (con tu saldo)</span>}
+            </div>
+            {saldoDisponibleCentimos > 0 && (
+              <label
+                className={
+                  "mt-3 flex items-start gap-2 border-t border-brand-line pt-3 " +
+                  (saldoCubreTotal ? "text-brand-white" : "text-brand-white-dim opacity-60")
+                }
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 accent-brand-yellow"
+                  checked={pagarConSaldo && saldoCubreTotal}
+                  disabled={!saldoCubreTotal}
+                  onChange={(e) => setPagarConSaldo(e.target.checked)}
+                />
+                <span>
+                  Pagar con mi saldo ({formatearPrecio(saldoDisponibleCentimos)} disponible)
+                  {!saldoCubreTotal && " — todavía no te cubre el total de esta cita"}
+                </span>
+              </label>
+            )}
           </div>
           <div className="space-y-3">
             <input

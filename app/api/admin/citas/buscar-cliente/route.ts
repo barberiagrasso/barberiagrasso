@@ -28,9 +28,12 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("nombre")
+    .select("nombre, saldo_fidelizacion_centimos")
     .eq("telefono", telefono)
     .maybeSingle();
 
-  return NextResponse.json({ nombre: cliente?.nombre ?? null });
+  return NextResponse.json({
+    nombre: cliente?.nombre ?? null,
+    saldoFidelizacionCentimos: cliente?.saldo_fidelizacion_centimos ?? 0,
+  });
 }
