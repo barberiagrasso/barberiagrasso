@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
+import { requireRolAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -9,23 +9,25 @@ export const dynamic = "force-dynamic";
 // de un solo golpe sin ida y vuelta por cada fila.
 export async function GET() {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
   }
 
   const supabase = createAdminClient();
-  const [{ data: profesionales }, { data: sedesVinculo }, { data: serviciosVinculo }] = await Promise.all([
+  const [{ data: profesionales }, { data: sedesVinculo }, { data: serviciosVinculo }, { data: accesos }] = await Promise.all([
     supabase.from("profesionales").select("*").order("nombre"),
     supabase.from("profesional_sedes").select("profesional_id, sede_id"),
     supabase.from("profesional_servicios").select("profesional_id, servicio_id"),
+    supabase.from("admins").select("profesional_id, usuario").not("profesional_id", "is", null),
   ]);
 
   const conAsignaciones = (profesionales ?? []).map((p) => ({
     ...p,
     sede_ids: (sedesVinculo ?? []).filter((v) => v.profesional_id === p.id).map((v) => v.sede_id),
     servicio_ids: (serviciosVinculo ?? []).filter((v) => v.profesional_id === p.id).map((v) => v.servicio_id),
+    usuario: (accesos ?? []).find((a) => a.profesional_id === p.id)?.usuario ?? null,
   }));
 
   return NextResponse.json({ profesionales: conAsignaciones });
@@ -33,7 +35,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;

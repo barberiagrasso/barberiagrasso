@@ -32,7 +32,8 @@ simplemente describe qué quieres conseguir.
     venir antes — el hueco reservado sigue intacto si no contesta o prefiere mantenerlo.
   - **Servicios**: catálogo, precios, duración y en qué desplegable aparece cada uno.
   - **Equipo**: alta de barberos, a qué sedes y servicios están asignados, y su horario
-    semanal.
+    semanal. Desde aquí también le das a cada barbero su propio acceso al panel — ver
+    "Cuentas de equipo" más abajo.
   - **Vacaciones**: bloqueos puntuales por barbero o por sede.
   - **Clientes (CRM)** (`/admin/clientes`): listado con su estado de consentimiento comercial,
     su saldo de fidelización y el histórico de movimientos de ese saldo (acumulaciones,
@@ -186,12 +187,17 @@ que los recordatorios y las campañas: son mensajes que inicia el negocio sin qu
 haya escrito antes, así que también hace falta una **plantilla aprobada por Meta** para cada
 uno (repite los pasos de la sección "Recordatorios y campañas" de arriba, con estos textos):
 
-- **Recuperar contraseña** — regístrala en `/admin/plantillas` con tipo "Recuperar
-  contraseña (código)" y variables `nombre, codigo` (en ese orden). Texto sugerido para
-  Meta, categoría "Utility":
-  `Hola {{1}}, tu código para recuperar la contraseña de Barbería Grasso es {{2}}. Caduca en 10 minutos. Si no lo has pedido tú, ignora este mensaje.`
-- **Bienvenida al registrarse** — tipo "Bienvenida al registrarse", variables `nombre,
-  telefono`. Texto sugerido, categoría "Utility":
+- **Recuperar contraseña** — Meta obliga a que un código de un solo uso vaya en la
+  categoría especial **"Autenticación"**, no "Utility": el texto NO lo escribes tú (Meta
+  pone uno fijo, tipo "123456 es tu código de verificación"), solo eliges un botón para
+  copiar el código y, opcionalmente, activas el aviso de caducidad (ponle 10 minutos, para
+  que coincida con lo que dura de verdad) y el de seguridad ("no compartas este código").
+  Regístrala en `/admin/plantillas` con tipo "Recuperar contraseña (código)" y variables
+  `codigo` (una sola, sin `nombre` — Meta no permite poner el nombre en este tipo de
+  plantilla).
+- **Bienvenida al registrarse** — esta sí es una plantilla normal, categoría "Utility",
+  con el texto que quieras. Tipo "Bienvenida al registrarse", variables `nombre, telefono`.
+  Texto sugerido:
   `¡Hola {{1}}! Tu cuenta en Barbería Grasso ya está creada con el número {{2}}. Desde ahí puedes reservar, ver tus citas y tu saldo de fidelización.`
 
 Mientras no registres estas dos plantillas, ambas funciones simplemente no mandan el
@@ -204,6 +210,46 @@ El código de recuperación caduca a los 10 minutos, solo vale una vez, y se gua
 (nunca en texto plano) en la tabla `codigos_recuperacion` — que, como es un rastro totalmente
 temporal, no se incluye en la copia de seguridad diaria (igual que ya pasaba con
 `intentos_seguridad`).
+
+### Cuentas de equipo: un acceso propio para cada barbero, con permisos reducidos
+
+Hasta ahora solo existía tu cuenta, con acceso a todo el panel. Ahora cada barbero puede
+tener la suya, con dos diferencias respecto a la tuya:
+
+- **Solo ve una parte del panel.** Una cuenta de equipo (rol "barbero") no ve ni puede
+  entrar a **Equipo, Campañas, Plantillas ni Informes** — ni en el menú ni escribiendo la
+  URL a mano (está bloqueado también por detrás, no es solo que el botón esté oculto). Todo
+  lo demás (Agenda, Clientes, Servicios, Vacaciones, WhatsApp, Errores) lo ve igual que tú.
+  Tu cuenta sigue siendo rol "admin", con acceso a todo — eso no ha cambiado.
+- **Entra con un usuario sencillo, no con email.** Igual que el cliente se identifica por
+  teléfono, cada barbero se identifica por un "usuario" corto (p. ej. `lucas`, o `juan.molinos`
+  cuando hay dos con el mismo nombre) en vez de un email — por debajo sigue siendo Supabase
+  Auth, con un email inventado que nadie usa nunca. Tú sigues entrando con tu email real; el
+  campo de `/admin/login` ahora acepta cualquiera de los dos.
+
+**Cómo dar de alta (o resetear) el acceso de un barbero**: desde `/admin/profesionales`,
+junto a su nombre, pulsa **"Crear acceso al panel"**. Te enseña el usuario generado y una
+contraseña temporal (`12345`) — apúntala en ese momento, es la única vez que se ve, aunque
+siempre puedes generar una nueva pulsando el mismo botón (ahora dirá "Acceso: usuario
+(restablecer)"). En su primer inicio de sesión, el panel le obliga a elegir su propia
+contraseña (mínimo 8 caracteres) antes de dejarle ver nada — no hay forma de saltarse ese
+paso.
+
+Ahora mismo ya tienen su acceso creado los 7 profesionales activos:
+
+| Profesional | Usuario |
+| --- | --- |
+| Arthur | `arthur` |
+| Cristian | `cristian` |
+| Daniel | `daniel` |
+| David | `david` |
+| Juan (Avenida de las Ciudades) | `juan.avenida.ciudades` |
+| Juan (Los Molinos) | `juan.molinos` |
+| Lucas | `lucas` |
+
+Todos con la contraseña temporal `12345`, pendiente de cambiar en su primer acceso. Dales
+su usuario (no hace falta que sepan el email inventado de detrás) y esa contraseña para que
+entren la primera vez.
 
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
@@ -384,6 +430,11 @@ lib/aiAssistant.ts         El asistente de WhatsApp con IA (prompt + herramienta
 lib/whatsapp.ts            Envío de mensajes de WhatsApp (texto libre y plantillas)
 lib/segmentacion.ts        Cálculo de a qué clientes llega una campaña
 lib/errorLog.ts            Registrar un error de producción para verlo en /admin/errores
+lib/adminAuth.ts           requireAdmin / requireRolAdmin (páginas del panel)
+lib/adminApiAuth.ts        requireAdminApi / requireRolAdminApi (rutas /api/admin/...)
+lib/usuarioEquipo.ts       Usuario ↔ email sintético para las cuentas de equipo (barberos)
+app/admin/cambiar-password/  Cambio de contraseña (obligatorio en el primer acceso de un barbero)
+app/api/admin/equipo/      Crear o resetear el acceso al panel de un barbero
 instrumentation.ts         Red de seguridad: captura cualquier error que se escape sin registrar
 app/manifest.ts            Manifest de la PWA (nombre, iconos, colores — instalar como app)
 public/sw.js               Service worker mínimo (solo para ser "instalable", nunca cachea datos)

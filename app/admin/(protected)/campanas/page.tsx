@@ -1,9 +1,11 @@
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import CampanasClient from "./CampanasClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function CampanasPage() {
+  await requireRolAdmin();
   const supabase = createAdminClient();
   const [{ data: sedes }, { data: plantillas }] = await Promise.all([
     supabase.from("sedes").select("id, nombre").order("nombre"),

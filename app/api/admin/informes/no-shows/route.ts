@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
+import { requireRolAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseRango, granularidadParaRango, bucketDe, generarBuckets } from "@/lib/informes";
 
@@ -32,7 +32,7 @@ function pct(parte: number, base: number): number {
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;

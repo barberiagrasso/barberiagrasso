@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
+import { requireRolAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseRango, rangoAnterior, variacionPct, granularidadParaRango, bucketDe, generarBuckets } from "@/lib/informes";
 
@@ -62,7 +62,7 @@ async function calcularIngresos(supabase: ReturnType<typeof createAdminClient>, 
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;

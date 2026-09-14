@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
+import { requireRolAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { resolverVariablesPlantilla } from "@/lib/plantillaVariables";
@@ -14,7 +14,7 @@ export const maxDuration = 60;
 // para poder ver el resultado en el panel.
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;

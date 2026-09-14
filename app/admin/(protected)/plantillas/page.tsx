@@ -1,8 +1,10 @@
+import { requireRolAdmin } from "@/lib/adminAuth";
 import PlantillasClient from "./PlantillasClient";
 
 export const dynamic = "force-dynamic";
 
-export default function PlantillasPage() {
+export default async function PlantillasPage() {
+  await requireRolAdmin();
   return (
     <div>
       <h1 className="mb-1 text-xl font-bold text-stone-900">Plantillas de WhatsApp</h1>

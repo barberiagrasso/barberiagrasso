@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { differenceInCalendarDays } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
+import { requireRolAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseRango, granularidadParaRango, bucketDe, generarBuckets, TZ } from "@/lib/informes";
 
@@ -37,7 +37,7 @@ function uno<T>(v: T | T[] | null): T | null {
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;

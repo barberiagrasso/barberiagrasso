@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { GrassoMark } from "@/components/brand/GrassoMark";
+import { emailSinteticoParaUsuarioEquipo } from "@/lib/usuarioEquipo";
 
 export default function AdminLoginPage() {
   return (
@@ -16,7 +17,7 @@ export default function AdminLoginPage() {
 function AdminLoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(
     params.get("error") === "no-autorizado"
@@ -30,7 +31,14 @@ function AdminLoginForm() {
     setCargando(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Tu cuenta entra con tu email real; las cuentas de equipo (cada
+    // barbero) entran con un usuario sencillo, sin @ — que aquí se
+    // traduce al email sintético que espera Supabase Auth por debajo.
+    const usuarioLimpio = usuario.trim();
+    const emailReal = usuarioLimpio.includes("@")
+      ? usuarioLimpio
+      : emailSinteticoParaUsuarioEquipo(usuarioLimpio.toLowerCase());
+    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
     setCargando(false);
     if (error) {
       setError("Email o contraseña incorrectos.");
@@ -50,11 +58,12 @@ function AdminLoginForm() {
         </div>
         <form onSubmit={iniciarSesion} className="space-y-4 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
           <input
-            type="email"
+            type="text"
             required
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Usuario o email"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
+            autoCapitalize="none"
             className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
           />
           <input

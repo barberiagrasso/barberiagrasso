@@ -17,6 +17,7 @@ interface Profesional {
   activo: boolean;
   sede_ids: string[];
   servicio_ids: string[];
+  usuario: string | null;
 }
 interface Horario {
   id: string;
@@ -33,6 +34,13 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
   const [creando, setCreando] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [expandidoId, setExpandidoId] = useState<string | null>(null);
+  const [creandoAccesoId, setCreandoAccesoId] = useState<string | null>(null);
+  const [credenciales, setCredenciales] = useState<{
+    nombre: string;
+    usuario: string;
+    password: string;
+    reseteado: boolean;
+  } | null>(null);
 
   async function cargar() {
     setCargando(true);
@@ -70,6 +78,29 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
     cargar();
   }
 
+  async function crearOResetearAcceso(p: Profesional) {
+    if (
+      p.usuario &&
+      !confirm(`${p.nombre} ya tiene acceso (usuario "${p.usuario}"). ¿Restablecer su contraseña a la de por defecto?`)
+    ) {
+      return;
+    }
+    setCreandoAccesoId(p.id);
+    const res = await fetch("/api/admin/equipo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profesionalId: p.id }),
+    });
+    const json = await res.json();
+    setCreandoAccesoId(null);
+    if (!res.ok) {
+      alert(json.error || "No se pudo crear el acceso.");
+      return;
+    }
+    setCredenciales({ nombre: p.nombre, usuario: json.usuario, password: json.passwordTemporal, reseteado: json.reseteado });
+    cargar();
+  }
+
   return (
     <div className="space-y-4">
       <button onClick={() => setCreando((v) => !v)} className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white">
@@ -89,6 +120,27 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
         </div>
       )}
 
+      {credenciales && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-medium">
+              {credenciales.reseteado ? "Acceso restablecido" : "Acceso creado"} para {credenciales.nombre}
+            </p>
+            <button onClick={() => setCredenciales(null)} className="text-emerald-700 underline">
+              Cerrar
+            </button>
+          </div>
+          <p className="mt-1">
+            Usuario: <code className="rounded bg-white px-1.5 py-0.5">{credenciales.usuario}</code> · Contraseña
+            temporal: <code className="rounded bg-white px-1.5 py-0.5">{credenciales.password}</code>
+          </p>
+          <p className="mt-1 text-emerald-800">
+            Apúntalo ahora — no vas a poder volver a ver esta contraseña (aunque siempre puedes restablecerla otra
+            vez desde aquí). En el primer inicio de sesión, el panel le obligará a elegir una contraseña nueva.
+          </p>
+        </div>
+      )}
+
       {cargando && <p className="text-sm text-stone-500">Cargando…</p>}
 
       <div className="space-y-3">
@@ -101,6 +153,17 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
               <div className="flex items-center gap-3 text-xs">
                 <button onClick={() => setExpandidoId(expandidoId === p.id ? null : p.id)} className="text-brand-yellow-dark underline">
                   {expandidoId === p.id ? "Cerrar" : "Sedes, servicios y horario"}
+                </button>
+                <button
+                  onClick={() => crearOResetearAcceso(p)}
+                  disabled={creandoAccesoId === p.id}
+                  className="text-blue-700 underline disabled:opacity-50"
+                >
+                  {creandoAccesoId === p.id
+                    ? "Un momento…"
+                    : p.usuario
+                      ? `Acceso: ${p.usuario} (restablecer)`
+                      : "Crear acceso al panel"}
                 </button>
                 <button onClick={() => alternarActivo(p)} className={p.activo ? "text-red-700 underline" : "text-green-700 underline"}>
                   {p.activo ? "Desactivar" : "Reactivar"}

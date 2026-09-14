@@ -50,10 +50,13 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               <GrassoMark className="h-6 w-6 text-brand-yellow" />
               <span className="font-heading text-lg italic text-brand-white">Barbería Grasso</span>
             </div>
-            <AdminNav />
+            <AdminNav rol={admin.rol} />
           </div>
           <div className="flex items-center gap-3 font-body text-sm text-brand-white-dim">
             <span>{admin.nombre || "Administrador"}</span>
+            <Link href="/admin/cambiar-password" className="underline decoration-brand-line hover:text-brand-yellow">
+              Cambiar contraseña
+            </Link>
             <SignOutButton />
           </div>
         </div>

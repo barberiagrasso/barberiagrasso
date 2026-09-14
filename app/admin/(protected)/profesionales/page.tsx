@@ -1,9 +1,11 @@
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import ProfesionalesClient from "./ProfesionalesClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfesionalesPage() {
+  await requireRolAdmin();
   const supabase = createAdminClient();
   const [{ data: sedes }, { data: servicios }] = await Promise.all([
     supabase.from("sedes").select("id, nombre").order("nombre"),

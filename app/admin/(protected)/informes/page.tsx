@@ -1,9 +1,11 @@
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import InformesClient from "./InformesClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function InformesPage() {
+  await requireRolAdmin();
   const supabase = createAdminClient();
   const { data: sedes } = await supabase.from("sedes").select("id, nombre").order("nombre");
 
