@@ -37,6 +37,11 @@ simplemente describe qué quieres conseguir.
   - **Clientes (CRM)** (`/admin/clientes`): listado con su estado de consentimiento comercial,
     su saldo de fidelización y el histórico de movimientos de ese saldo (acumulaciones,
     canjes, reembolsos y ajustes manuales) — ver "Fidelización" más abajo.
+  - **Cuentas de cliente** (`/acceso`): el cliente se registra y entra con teléfono y
+    contraseña. Si olvida la contraseña, pulsa "¿Olvidaste tu contraseña?", recibe un código
+    de 6 dígitos **por WhatsApp** (nunca por email — ver por qué en la sección de abajo) y
+    elige una nueva. Al crear la cuenta, también se le avisa por WhatsApp de que ya está dada
+    de alta — ver "Recuperar contraseña y aviso de alta" más abajo.
   - **Campañas**: segmentar clientes (por sede, etiqueta, o quién no viene desde hace
     tiempo) y mandarles un mensaje de WhatsApp — solo a quien haya dado su consentimiento.
   - **Plantillas**: registro de las plantillas de WhatsApp que Meta te apruebe, para
@@ -169,6 +174,36 @@ complementos) como saldo, válido en cualquiera de las dos sedes. Las piezas:
     `lib/wallet/googleWallet.ts`.
   - En cuanto añadas esas variables de entorno en Vercel, los botones se activan solos, sin
     tocar ni una línea de código más.
+
+### Recuperar contraseña y aviso de alta: dos plantillas más
+
+El identificador real de cada cliente en toda la app es su **teléfono**, no un email — de
+hecho, la cuenta técnica de acceso (Supabase Auth) se crea con una dirección inventada a
+partir del teléfono que nadie lee nunca, así que el sistema de "recuperar contraseña por
+email" de serie no serviría de nada aquí. Por eso, tanto el código para recuperar la
+contraseña como el aviso de que la cuenta ya está creada se mandan **por WhatsApp**, igual
+que los recordatorios y las campañas: son mensajes que inicia el negocio sin que el cliente
+haya escrito antes, así que también hace falta una **plantilla aprobada por Meta** para cada
+uno (repite los pasos de la sección "Recordatorios y campañas" de arriba, con estos textos):
+
+- **Recuperar contraseña** — regístrala en `/admin/plantillas` con tipo "Recuperar
+  contraseña (código)" y variables `nombre, codigo` (en ese orden). Texto sugerido para
+  Meta, categoría "Utility":
+  `Hola {{1}}, tu código para recuperar la contraseña de Barbería Grasso es {{2}}. Caduca en 10 minutos. Si no lo has pedido tú, ignora este mensaje.`
+- **Bienvenida al registrarse** — tipo "Bienvenida al registrarse", variables `nombre,
+  telefono`. Texto sugerido, categoría "Utility":
+  `¡Hola {{1}}! Tu cuenta en Barbería Grasso ya está creada con el número {{2}}. Desde ahí puedes reservar, ver tus citas y tu saldo de fidelización.`
+
+Mientras no registres estas dos plantillas, ambas funciones simplemente no mandan el
+WhatsApp (sin dar ningún error al cliente): el cliente que pide recuperar su contraseña ve
+igualmente el mensaje de "te hemos enviado un código" (para no delatar si un teléfono tiene
+o no cuenta), y el registro se completa igual sin el aviso de bienvenida. En ambos casos
+queda anotado en `/admin/errores` para que lo veas.
+
+El código de recuperación caduca a los 10 minutos, solo vale una vez, y se guarda **hasheado**
+(nunca en texto plano) en la tabla `codigos_recuperacion` — que, como es un rastro totalmente
+temporal, no se incluye en la copia de seguridad diaria (igual que ya pasaba con
+`intentos_seguridad`).
 
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
@@ -338,9 +373,12 @@ supabase/actualizar-datos-reales.sql   Catálogo real de servicios/barberos/hora
 supabase/actualizar-funcionalidad-avanzada.sql  Tablas de campañas/plantillas/recordatorios (re-ejecutable)
 supabase/actualizar-monitorizacion-produccion.sql  Tabla de errores del sistema (re-ejecutable)
 supabase/actualizar-fidelizacion.sql   Saldo de fidelización: tablas, columnas y función (re-ejecutable)
+supabase/actualizar-recuperacion-password.sql  Códigos de recuperación y plantillas nuevas (re-ejecutable)
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
 lib/fidelizacion.ts        Acumular, canjear y reembolsar saldo de fidelización
+lib/recuperacionPassword.ts  Generar/hashear/verificar el código de recuperación de contraseña
+app/api/auth/recuperar/    Pedir código y confirmarlo con contraseña nueva
 lib/wallet/                Apple Wallet / Google Wallet reales (preparado, ver README arriba)
 lib/aiAssistant.ts         El asistente de WhatsApp con IA (prompt + herramientas)
 lib/whatsapp.ts            Envío de mensajes de WhatsApp (texto libre y plantillas)

@@ -4,6 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buscarOCrearCliente, emailSinteticoParaTelefono, normalizarTelefono } from "@/lib/clientes";
 import { sincronizarClienteHubSpot } from "@/lib/hubspot";
 import { comprobarLimite, ipDePeticion, RESPUESTA_DEMASIADOS_INTENTOS } from "@/lib/rateLimit";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { resolverVariablesPlantilla } from "@/lib/plantillaVariables";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +92,14 @@ export async function POST(request: NextRequest) {
   // registro si HubSpot falla).
   await sincronizarClienteHubSpot(admin, clienteId);
 
+  // Avisa por WhatsApp de que la cuenta ya está creada. Es un mensaje que
+  // inicia el negocio sin que el cliente haya escrito antes, así que hace
+  // falta una plantilla aprobada por Meta (ver /admin/plantillas, tipo
+  // "bienvenida"). Nunca bloquea el registro: si no hay plantilla
+  // configurada, o el envío falla, simplemente se registra el error para
+  // que Diego lo vea en /admin/errores.
+  await avisarAltaCliente(admin, { nombre, telefono });
+
   // Inicia la sesión de verdad (deja la cookie puesta) con el cliente
   // normal, no con el de servicio.
   const supabase = await createClient();
@@ -104,4 +115,35 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function avisarAltaCliente(
+  admin: ReturnType<typeof createAdminClient>,
+  { nombre, telefono }: { nombre: string; telefono: string }
+) {
+  try {
+    const { data: plantilla } = await admin
+      .from("plantillas_whatsapp")
+      .select("*")
+      .eq("tipo", "bienvenida")
+      .eq("activa", true)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+
+    if (!plantilla) {
+      // No es un error de verdad: simplemente Diego no ha registrado
+      // todavía la plantilla de bienvenida en /admin/plantillas.
+      return;
+    }
+
+    const variables = resolverVariablesPlantilla(plantilla.variables ?? [], { nombre, telefono });
+    await sendWhatsAppTemplate(telefono, plantilla.nombre_meta, plantilla.idioma, variables);
+  } catch (err) {
+    await registrarError({
+      origen: "aviso_alta",
+      mensaje: `No se pudo avisar por WhatsApp a ${nombre} de que su cuenta ya está creada.`,
+      detalle: err,
+    });
+  }
 }
