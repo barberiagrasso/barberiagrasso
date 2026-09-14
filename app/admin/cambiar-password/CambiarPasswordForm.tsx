@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function CambiarPasswordForm({ obligatorio }: { obligatorio: boolean }) {
+export default function CambiarPasswordForm({ obligatorio, destino }: { obligatorio: boolean; destino: string }) {
   const router = useRouter();
   const [passwordNueva, setPasswordNueva] = useState("");
   const [repetir, setRepetir] = useState("");
@@ -33,7 +33,7 @@ export default function CambiarPasswordForm({ obligatorio }: { obligatorio: bool
         setError(json.error || "No se pudo cambiar la contraseña.");
         return;
       }
-      router.push("/admin/dashboard");
+      router.push(destino);
       router.refresh();
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
@@ -73,7 +73,7 @@ export default function CambiarPasswordForm({ obligatorio }: { obligatorio: bool
       {!obligatorio && (
         <button
           type="button"
-          onClick={() => router.push("/admin/dashboard")}
+          onClick={() => router.push(destino)}
           className="w-full font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
         >
           Cancelar

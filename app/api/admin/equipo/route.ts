@@ -9,8 +9,11 @@ export const dynamic = "force-dynamic";
 // Contraseña con la que se crea (o se resetea) cualquier cuenta de
 // equipo — el panel obliga a cambiarla en el siguiente inicio de sesión
 // (debe_cambiar_password), así que no hace falta que sea distinta cada
-// vez.
-const PASSWORD_POR_DEFECTO = "12345";
+// vez. Supabase exige un mínimo de 6 caracteres en las contraseñas
+// creadas por su API de administración (auth.admin.createUser /
+// updateUserById le devuelve un AuthWeakPasswordError si son más
+// cortas), así que no puede ser más corta que eso.
+const PASSWORD_POR_DEFECTO = "123456";
 
 /**
  * Da de alta el acceso al panel de un barbero (o, si ya lo tenía, se lo

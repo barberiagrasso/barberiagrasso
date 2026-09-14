@@ -87,17 +87,28 @@ body {
    su propio color de texto — con lo que heredaban ese crema y quedaban casi
    ilegibles sobre fondo claro (valores de fecha, opciones de <select>,
    placeholders...). Los formularios del sitio público sí fijan su color
-   explícitamente (text-brand-white), así que esta regla no les afecta: una
-   clase de Tailwind siempre gana en especificidad a un selector de
-   etiqueta como este. */
-input,
-select,
-textarea {
-  color: var(--brand-black);
-}
+   explícitamente (text-brand-white).
 
-input::placeholder,
-textarea::placeholder {
-  color: #78716c; /* stone-500 */
-  opacity: 1;
+   OJO: esta regla tiene que ir dentro de @layer base. Tailwind v4 genera
+   sus utilidades (text-brand-white incluida) dentro de @layer utilities, y
+   con CSS Cascade Layers una regla SIN capa (como esta lo estaba antes)
+   gana siempre a cualquier regla CON capa, sin importar su especificidad
+   — así que aunque una clase de Tailwind "pese más" que un selector de
+   etiqueta como `input`, si esta regla no estaba en ninguna capa, seguía
+   ganando ella y dejaba el texto casi negro (invisible) sobre los fondos
+   oscuros del sitio público: login, alta de cliente y el paso final de la
+   reserva. Metiéndola en @layer base vuelve a perder frente a las
+   utilidades de Tailwind, que es el comportamiento que se buscaba. */
+@layer base {
+  input,
+  select,
+  textarea {
+    color: var(--brand-black);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #78716c; /* stone-500 */
+    opacity: 1;
+  }
 }

@@ -45,12 +45,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     <div className="min-h-screen bg-stone-50">
       <header className="border-b border-black/10 bg-brand-black">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2">
-              <GrassoMark className="h-6 w-6 text-brand-yellow" />
-              <span className="font-heading text-lg italic text-brand-white">Barbería Grasso</span>
-            </div>
-            <AdminNav rol={admin.rol} />
+          <div className="flex items-center gap-2">
+            <GrassoMark className="h-6 w-6 text-brand-yellow" />
+            <span className="font-heading text-lg italic text-brand-white">Barbería Grasso</span>
           </div>
           <div className="flex items-center gap-3 font-body text-sm text-brand-white-dim">
             <span>{admin.nombre || "Administrador"}</span>
@@ -58,6 +55,11 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               Cambiar contraseña
             </Link>
             <SignOutButton />
+          </div>
+        </div>
+        <div className="border-t border-white/[0.06] bg-brand-black-soft">
+          <div className="mx-auto max-w-6xl px-4">
+            <AdminNav rol={admin.rol} />
           </div>
         </div>
       </header>

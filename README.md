@@ -229,7 +229,7 @@ tener la suya, con dos diferencias respecto a la tuya:
 
 **Cómo dar de alta (o resetear) el acceso de un barbero**: desde `/admin/profesionales`,
 junto a su nombre, pulsa **"Crear acceso al panel"**. Te enseña el usuario generado y una
-contraseña temporal (`12345`) — apúntala en ese momento, es la única vez que se ve, aunque
+contraseña temporal (`123456`) — apúntala en ese momento, es la única vez que se ve, aunque
 siempre puedes generar una nueva pulsando el mismo botón (ahora dirá "Acceso: usuario
 (restablecer)"). En su primer inicio de sesión, el panel le obliga a elegir su propia
 contraseña (mínimo 8 caracteres) antes de dejarle ver nada — no hay forma de saltarse ese
@@ -247,9 +247,9 @@ Ahora mismo ya tienen su acceso creado los 7 profesionales activos:
 | Juan (Los Molinos) | `juan.molinos` |
 | Lucas | `lucas` |
 
-Todos con la contraseña temporal `12345`, pendiente de cambiar en su primer acceso. Dales
-su usuario (no hace falta que sepan el email inventado de detrás) y esa contraseña para que
-entren la primera vez.
+Todos con la contraseña temporal `123456`, pendiente de cambiar en su primer acceso (salvo
+Lucas, que ya la cambió al probarlo). Dales su usuario (no hace falta que sepan el email
+inventado de detrás) y esa contraseña para que entren la primera vez.
 
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 

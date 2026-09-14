@@ -26,7 +26,12 @@ export default function AdminNav({ rol }: { rol: string }) {
   const items = rol === "admin" ? NAV : NAV.filter((item) => !SOLO_ADMIN.has(item.href));
 
   return (
-    <nav className="flex flex-wrap gap-x-5 gap-y-1 font-body text-sm">
+    // overflow-x-auto en vez de flex-wrap: con 10 secciones, envolver el
+    // menú en varias líneas dentro de la cabecera quedaba desordenado
+    // (y en el rol "admin" empujaba el resto de la cabecera). Ahora es
+    // una sola tira que se desplaza en horizontal si no cabe — el patrón
+    // habitual de pestañas en paneles (GitHub, Linear, Stripe...).
+    <nav className="flex gap-1 overflow-x-auto font-body text-sm">
       {items.map((item) => {
         const activo = pathname?.startsWith(item.href);
         return (
@@ -34,10 +39,10 @@ export default function AdminNav({ rol }: { rol: string }) {
             key={item.href}
             href={item.href}
             className={
-              "pb-0.5 transition-colors " +
+              "shrink-0 whitespace-nowrap border-b-2 px-3 py-3 transition-colors " +
               (activo
-                ? "border-b-2 border-brand-yellow text-brand-yellow"
-                : "border-b-2 border-transparent text-brand-white-dim hover:text-brand-white")
+                ? "border-brand-yellow bg-brand-yellow/10 font-semibold text-brand-yellow"
+                : "border-transparent text-brand-white-dim hover:bg-white/[0.06] hover:text-brand-white")
             }
           >
             {item.label}

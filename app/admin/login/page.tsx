@@ -2,9 +2,11 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import { emailSinteticoParaUsuarioEquipo } from "@/lib/usuarioEquipo";
+import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
 
 export default function AdminLoginPage() {
   return (
@@ -44,7 +46,10 @@ function AdminLoginForm() {
       setError("Email o contraseña incorrectos.");
       return;
     }
-    router.push("/admin/dashboard");
+    // Si llegaste aquí porque intentaste entrar a una pantalla concreta
+    // sin sesión (p. ej. un enlace directo a una conversación de
+    // WhatsApp), vuelve ahí en vez de mandarte siempre a la Agenda.
+    router.push(rutaSiguienteSegura(params.get("next"), "/admin/dashboard"));
     router.refresh();
   }
 
@@ -86,6 +91,14 @@ function AdminLoginForm() {
           ¿No tienes acceso todavía? Créalo desde Supabase Authentication y añádete a la tabla
           `admins` (ver README, sección &quot;Crea tu usuario administrador&quot;).
         </p>
+        <div className="mt-4 text-center">
+          <Link
+            href="/acceso"
+            className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          >
+            ¿Eres cliente? Entra por aquí
+          </Link>
+        </div>
       </div>
     </main>
   );

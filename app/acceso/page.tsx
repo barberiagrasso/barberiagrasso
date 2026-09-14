@@ -1,12 +1,16 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
+import InstalarApp from "@/components/pwa/InstalarApp";
+import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
 
 type Modo = "login" | "registro" | "recuperar-telefono" | "recuperar-codigo";
+
+const MODOS_VALIDOS: Modo[] = ["login", "registro", "recuperar-telefono", "recuperar-codigo"];
 
 export default function AccesoPage() {
   return (
@@ -18,7 +22,22 @@ export default function AccesoPage() {
 
 function AccesoForm() {
   const router = useRouter();
-  const [modo, setModo] = useState<Modo>("login");
+  const params = useSearchParams();
+
+  // El modo (login / crear cuenta / recuperar...) vive en la URL en vez
+  // de en un useState suelto: así, al cambiar de pestaña se añade una
+  // entrada al historial del navegador y el botón "atrás" del móvil
+  // vuelve al paso anterior de este mismo formulario en vez de sacarte
+  // de la pantalla de acceso directamente.
+  const modoParam = params.get("modo");
+  const modo: Modo = MODOS_VALIDOS.includes(modoParam as Modo) ? (modoParam as Modo) : "login";
+
+  // A dónde volver después de iniciar sesión (o registrarte, o
+  // recuperar la contraseña): la página que te mandó aquí porque hacía
+  // falta sesión (ver requireCliente en lib/clienteAuth.ts), o la home
+  // si has entrado directamente en /acceso.
+  const next = rutaSiguienteSegura(params.get("next"), "/");
+
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
@@ -29,8 +48,16 @@ function AccesoForm() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
+  function irAModo(nuevoModo: Modo) {
+    const qs = new URLSearchParams();
+    if (nuevoModo !== "login") qs.set("modo", nuevoModo);
+    if (next !== "/") qs.set("next", next);
+    const cadena = qs.toString();
+    router.push(cadena ? `/acceso?${cadena}` : "/acceso");
+  }
+
   function irALogin() {
-    setModo("login");
+    irAModo("login");
     setError(null);
     setAviso(null);
   }
@@ -52,7 +79,7 @@ function AccesoForm() {
         setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
         return;
       }
-      router.push("/");
+      router.push(next);
       router.refresh();
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
@@ -77,7 +104,7 @@ function AccesoForm() {
         return;
       }
       setAviso(json.mensaje || "Si ese número tiene una cuenta, te hemos enviado un código por WhatsApp.");
-      setModo("recuperar-codigo");
+      irAModo("recuperar-codigo");
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
     } finally {
@@ -104,7 +131,7 @@ function AccesoForm() {
         setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
         return;
       }
-      router.push("/");
+      router.push(next);
       router.refresh();
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
@@ -131,12 +158,14 @@ function AccesoForm() {
           <p className="font-mono text-xs uppercase tracking-widest text-brand-white-dim">Barbería Grasso</p>
         </div>
 
+        <InstalarApp />
+
         {!esRecuperar && (
           <div className="mb-5 flex rounded-full border border-brand-line p-1">
             <button
               type="button"
               onClick={() => {
-                setModo("login");
+                irAModo("login");
                 setError(null);
               }}
               className={
@@ -149,7 +178,7 @@ function AccesoForm() {
             <button
               type="button"
               onClick={() => {
-                setModo("registro");
+                irAModo("registro");
                 setError(null);
               }}
               className={
@@ -203,7 +232,7 @@ function AccesoForm() {
               <button
                 type="button"
                 onClick={() => {
-                  setModo("recuperar-telefono");
+                  irAModo("recuperar-telefono");
                   setError(null);
                   setAviso(null);
                 }}
@@ -284,7 +313,7 @@ function AccesoForm() {
             <button
               type="button"
               onClick={() => {
-                setModo("recuperar-telefono");
+                irAModo("recuperar-telefono");
                 setError(null);
               }}
               className="w-full font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"

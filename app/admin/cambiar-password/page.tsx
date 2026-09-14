@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/adminAuth";
+import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import CambiarPasswordForm from "./CambiarPasswordForm";
 
@@ -7,8 +8,14 @@ export const dynamic = "force-dynamic";
 // Fuera del grupo (protected): requireAdmin() con saltarCambioObligatorio
 // para no entrar en un bucle de redirecciones cuando justo es esta
 // pantalla la que hay que ver antes que ninguna otra.
-export default async function CambiarPasswordPage() {
+export default async function CambiarPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   const { admin } = await requireAdmin({ saltarCambioObligatorio: true });
+  const { next } = await searchParams;
+  const destino = rutaSiguienteSegura(next, "/admin/dashboard");
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-brand-black px-4">
@@ -26,7 +33,7 @@ export default async function CambiarPasswordPage() {
             que te dieron por defecto).
           </p>
         )}
-        <CambiarPasswordForm obligatorio={admin.debe_cambiar_password} />
+        <CambiarPasswordForm obligatorio={admin.debe_cambiar_password} destino={destino} />
       </div>
     </main>
   );
