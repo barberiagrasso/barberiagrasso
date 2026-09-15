@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { calcularComision, siguienteTramo, validarTramos, rangoDelMes, mesActualStr, sumarMeses, etiquetaMes, type TramoComision } from "./comisiones";
+import {
+  calcularComision,
+  siguienteTramo,
+  validarTramos,
+  rangoDelMes,
+  mesActualStr,
+  sumarMeses,
+  etiquetaMes,
+  etiquetaTramo,
+  calcularRanking,
+  type TramoComision,
+} from "./comisiones";
 
 // Los mismos 4 tramos que pidió Diego, en céntimos:
 // 3.500-3.800€ → 35% · 3.800-4.000€ → 38% · 4.000-4.500€ → 40% · 4.500€+ → 42%
@@ -165,5 +176,61 @@ describe("sumarMeses", () => {
 describe("etiquetaMes", () => {
   it("devuelve el mes en español con la primera letra en mayúscula", () => {
     expect(etiquetaMes("2026-09")).toBe("Septiembre 2026");
+  });
+});
+
+describe("etiquetaTramo", () => {
+  it("etiqueta cada tramo según su posición, de menor a mayor facturación", () => {
+    expect(etiquetaTramo(TRAMOS[0], TRAMOS)).toBe("F1");
+    expect(etiquetaTramo(TRAMOS[1], TRAMOS)).toBe("F2");
+    expect(etiquetaTramo(TRAMOS[3], TRAMOS)).toBe("F4");
+  });
+
+  it("usa el orden de la lista recibida tal cual (el llamante debe pasarla ya ordenada)", () => {
+    const desordenados = [...TRAMOS].reverse(); // el primero de la lista pasa a ser F1
+    expect(etiquetaTramo(TRAMOS[3], desordenados)).toBe("F1");
+  });
+
+  it('devuelve cadena vacía si el tramo no está en la lista', () => {
+    const otro: TramoComision = { desdeCentimos: 999999, hastaCentimos: null, porcentaje: 50 };
+    expect(etiquetaTramo(otro, TRAMOS)).toBe("");
+  });
+});
+
+describe("calcularRanking", () => {
+  it("ordena de mayor a menor facturación y numera desde el 1", () => {
+    const filas = [
+      { nombre: "Ana", facturacionCentimos: 100000 },
+      { nombre: "Bea", facturacionCentimos: 300000 },
+      { nombre: "Cris", facturacionCentimos: 200000 },
+    ];
+    const resultado = calcularRanking(filas);
+    expect(resultado.map((f) => f.nombre)).toEqual(["Bea", "Cris", "Ana"]);
+    expect(resultado.map((f) => f.posicion)).toEqual([1, 2, 3]);
+    expect(resultado.every((f) => f.total === 3)).toBe(true);
+  });
+
+  it("dos facturaciones iguales comparten posición, y la siguiente salta el hueco", () => {
+    const filas = [
+      { nombre: "Ana", facturacionCentimos: 300000 },
+      { nombre: "Bea", facturacionCentimos: 300000 },
+      { nombre: "Cris", facturacionCentimos: 100000 },
+    ];
+    const resultado = calcularRanking(filas);
+    const porNombre = Object.fromEntries(resultado.map((f) => [f.nombre, f.posicion]));
+    expect(porNombre.Ana).toBe(1);
+    expect(porNombre.Bea).toBe(1);
+    expect(porNombre.Cris).toBe(3); // salta el 2, porque dos ya ocupan el 1
+  });
+
+  it("una lista de una sola fila queda en la posición 1 de 1", () => {
+    const resultado = calcularRanking([{ nombre: "Ana", facturacionCentimos: 50000 }]);
+    expect(resultado[0].posicion).toBe(1);
+    expect(resultado[0].total).toBe(1);
+  });
+
+  it("conserva el resto de campos de cada fila, no solo la facturación", () => {
+    const resultado = calcularRanking([{ nombre: "Ana", facturacionCentimos: 50000, citas: 3 }]);
+    expect(resultado[0].citas).toBe(3);
   });
 });

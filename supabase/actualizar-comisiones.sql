@@ -41,12 +41,19 @@ insert into comisiones_tramos (desde_centimos, hasta_centimos, porcentaje) value
 -- los cambios del administrador): borrado + inserción dentro de la
 -- misma transacción de la función, para que nunca haya una lectura a
 -- medio camino con la tabla vacía si dos peticiones coinciden.
+--
+-- "where true" en el delete no es decorativo: Supabase bloquea por
+-- defecto cualquier DELETE/UPDATE sin cláusula WHERE (protección
+-- estándar contra borrados masivos accidentales), así que un
+-- "delete from comisiones_tramos;" a secas falla con el error "DELETE
+-- requires a WHERE clause". "where true" sigue borrando exactamente lo
+-- mismo (todas las filas) pero sí cuenta como una cláusula WHERE válida.
 create or replace function reemplazar_tramos_comision(nuevos jsonb)
 returns setof comisiones_tramos
 language plpgsql
 as $$
 begin
-  delete from comisiones_tramos;
+  delete from comisiones_tramos where true;
   insert into comisiones_tramos (desde_centimos, hasta_centimos, porcentaje)
   select
     (t->>'desdeCentimos')::integer,

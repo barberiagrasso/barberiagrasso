@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { euros } from "@/lib/formato";
 import { descargarCSV } from "@/lib/csvExport";
 import { mesActualStr, sumarMeses, etiquetaMes, validarTramos, type TramoComision } from "@/lib/comisiones";
+import VistaBarbero from "./VistaBarbero";
 
 interface TramoConId extends TramoComision {
   id: string;
@@ -17,6 +18,8 @@ interface FilaComision {
   comisionCentimos: number;
   tramo: TramoComision | null;
   siguienteTramo: TramoComision | null;
+  posicion: number;
+  totalBarberos: number;
 }
 
 interface FilaEditable {
@@ -238,38 +241,8 @@ export default function ComisionesClient({ rol }: { rol: string }) {
           </div>
         </>
       ) : (
-        <>
-          {/* --- Vista de barbero: solo su propia comisión --- */}
-          {!propia ? (
-            <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-500">
-              No se ha encontrado tu ficha de profesional.
-            </p>
-          ) : (
-            <div className="rounded-lg border border-stone-200 bg-white p-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Tu facturación</div>
-                  <div className="mt-1 text-2xl font-bold text-stone-900">{euros(propia.facturacionCentimos)}</div>
-                  <div className="mt-0.5 text-xs text-stone-400">{propia.citasCompletadas} citas completadas</div>
-                </div>
-                <div>
-                  <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Tu tramo</div>
-                  <div className="mt-1 text-2xl font-bold text-stone-900">{propia.tramo ? `${propia.tramo.porcentaje}%` : "—"}</div>
-                </div>
-                <div>
-                  <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Tu comisión</div>
-                  <div className="mt-1 text-2xl font-bold text-brand-yellow-dark">{euros(propia.comisionCentimos)}</div>
-                </div>
-              </div>
-              {esMesActual && propia.siguienteTramo && (
-                <p className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">
-                  Te faltan <span className="font-semibold text-stone-900">{euros(propia.siguienteTramo.desdeCentimos - propia.facturacionCentimos)}</span> de
-                  facturación para subir al tramo del <span className="font-semibold text-stone-900">{propia.siguienteTramo.porcentaje}%</span>.
-                </p>
-              )}
-            </div>
-          )}
-        </>
+        /* --- Vista de barbero: meta, KPIs, ranking, recorrido y simulador --- */
+        <VistaBarbero fila={propia} tramos={tramos ?? []} mes={mes} esMesActual={esMesActual} />
       )}
 
       {/* --- Tramos de comisión: tabla de referencia para todos, editable solo para admin --- */}

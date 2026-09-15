@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseRango } from "@/lib/informes";
-import { calcularComision, rangoDelMes, siguienteTramo, mesActualStr, type TramoComision } from "@/lib/comisiones";
+import { calcularComision, calcularRanking, rangoDelMes, siguienteTramo, mesActualStr, type TramoComision } from "@/lib/comisiones";
 
 export const dynamic = "force-dynamic";
 
@@ -36,15 +36,21 @@ interface FilaComision {
   comisionCentimos: number;
   tramo: TramoComision | null;
   siguienteTramo: TramoComision | null;
+  posicion: number;
+  totalBarberos: number;
 }
 
 /**
- * Facturación, tramo y comisión de cada barbero para un mes dado. Un
+ * Facturación, tramo, comisión y ranking de cada barbero para un mes
+ * dado. Internamente SIEMPRE se calcula a todo el equipo (el ranking de
+ * un barbero no se puede saber sin comparar con el resto), pero un
  * barbero (rol "barbero") solo recibe SU PROPIA fila — el filtrado es en
  * el servidor, no en el cliente, para que nunca viaje por la red la
- * comisión de un compañero. El rol "admin" recibe a todo el equipo
- * activo (con 0€ los que no hayan facturado nada ese mes) más a
- * cualquier barbero ya dado de baja que sí facturara ese mes.
+ * facturación o comisión de un compañero, solo el número de su propia
+ * posición. Tampoco recibe los totales del equipo. El rol "admin" recibe
+ * a todo el equipo activo (con 0€ los que no hayan facturado nada ese
+ * mes) más a cualquier barbero ya dado de baja que sí facturara ese mes,
+ * y sí ve los totales.
  */
 export async function GET(request: NextRequest) {
   let admin: { rol: string; profesional_id: string | null };
@@ -75,7 +81,10 @@ export async function GET(request: NextRequest) {
     porcentaje: Number(t.porcentaje),
   }));
 
-  let citasQuery = supabase
+  // Siempre se piden las citas de TODO el equipo (no solo las del
+  // barbero que pregunta): su ranking depende de comparar con el resto,
+  // aunque luego solo se le devuelva a él su propia fila.
+  const { data: citasCrudas } = await supabase
     .from("citas")
     .select("id, profesional_id, saldo_canjeado_centimos, profesional:profesionales(nombre), servicio:servicios(precio_centimos)")
     .eq("estado", "completada")
@@ -83,11 +92,6 @@ export async function GET(request: NextRequest) {
     .lte("inicio", rango.hastaUTC.toISOString())
     .not("profesional_id", "is", null); // sin barbero asignado no hay a quién pagarle comisión
 
-  if (admin.rol === "barbero") {
-    citasQuery = citasQuery.eq("profesional_id", admin.profesional_id!);
-  }
-
-  const { data: citasCrudas } = await citasQuery;
   const citas = (citasCrudas ?? []) as unknown as CitaFila[];
 
   const idsCitas = citas.map((c) => c.id);
@@ -102,7 +106,7 @@ export async function GET(request: NextRequest) {
 
   // Agrega facturación y nº de citas por profesional a partir de las
   // citas reales del mes — cubre también a un barbero ya dado de baja
-  // que facturara ese mes (no apareceria en el roster de activos de
+  // que facturara ese mes (no aparecería en el roster de activos de
   // abajo, pero su comisión de ese mes sigue siendo un dato real).
   const porProfesional = new Map<string, { nombre: string; facturacionCentimos: number; citasCompletadas: number }>();
   for (const c of citas) {
@@ -114,35 +118,47 @@ export async function GET(request: NextRequest) {
     porProfesional.set(c.profesional_id, actual);
   }
 
-  // Para el rol "admin": añade con 0€ a cualquier profesional activo que
-  // no haya facturado nada este mes, para que el roster completo del
-  // equipo se vea de un vistazo (incluidos los que están a 0).
-  if (admin.rol === "admin") {
-    const { data: activos } = await supabase.from("profesionales").select("id, nombre").eq("activo", true);
-    for (const p of activos ?? []) {
-      if (!porProfesional.has(p.id)) {
-        porProfesional.set(p.id, { nombre: p.nombre, facturacionCentimos: 0, citasCompletadas: 0 });
-      }
+  // Añade con 0€ a cualquier profesional activo que no haya facturado
+  // nada este mes, para que el roster completo del equipo (y por tanto
+  // el ranking) sea real de verdad, incluidos los que están a 0.
+  const { data: activos } = await supabase.from("profesionales").select("id, nombre").eq("activo", true);
+  for (const p of activos ?? []) {
+    if (!porProfesional.has(p.id)) {
+      porProfesional.set(p.id, { nombre: p.nombre, facturacionCentimos: 0, citasCompletadas: 0 });
     }
   }
 
-  const filas: FilaComision[] = Array.from(porProfesional.entries())
-    .map(([profesionalId, datos]) => {
-      const { comisionCentimos, tramo } = calcularComision(datos.facturacionCentimos, tramos);
-      return {
-        profesionalId,
-        nombre: datos.nombre,
-        facturacionCentimos: datos.facturacionCentimos,
-        citasCompletadas: datos.citasCompletadas,
-        comisionCentimos,
-        tramo,
-        siguienteTramo: siguienteTramo(datos.facturacionCentimos, tramos),
-      };
-    })
-    .sort((a, b) => b.facturacionCentimos - a.facturacionCentimos);
+  const filasSinRanking = Array.from(porProfesional.entries()).map(([profesionalId, datos]) => {
+    const { comisionCentimos, tramo } = calcularComision(datos.facturacionCentimos, tramos);
+    return {
+      profesionalId,
+      nombre: datos.nombre,
+      facturacionCentimos: datos.facturacionCentimos,
+      citasCompletadas: datos.citasCompletadas,
+      comisionCentimos,
+      tramo,
+      siguienteTramo: siguienteTramo(datos.facturacionCentimos, tramos),
+    };
+  });
 
-  const totalComisionCentimos = filas.reduce((acc, f) => acc + f.comisionCentimos, 0);
-  const totalFacturacionCentimos = filas.reduce((acc, f) => acc + f.facturacionCentimos, 0);
+  const filasConRanking: FilaComision[] = calcularRanking(filasSinRanking).map((f) => ({
+    ...f,
+    totalBarberos: f.total,
+  }));
+  filasConRanking.sort((a, b) => b.facturacionCentimos - a.facturacionCentimos);
 
-  return NextResponse.json({ mes, filas, totalComisionCentimos, totalFacturacionCentimos });
+  if (admin.rol === "barbero") {
+    const propia = filasConRanking.find((f) => f.profesionalId === admin.profesional_id);
+    return NextResponse.json({
+      mes,
+      filas: propia ? [propia] : [],
+      totalComisionCentimos: null,
+      totalFacturacionCentimos: null,
+    });
+  }
+
+  const totalComisionCentimos = filasConRanking.reduce((acc, f) => acc + f.comisionCentimos, 0);
+  const totalFacturacionCentimos = filasConRanking.reduce((acc, f) => acc + f.facturacionCentimos, 0);
+
+  return NextResponse.json({ mes, filas: filasConRanking, totalComisionCentimos, totalFacturacionCentimos });
 }

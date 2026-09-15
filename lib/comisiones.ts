@@ -130,3 +130,34 @@ export function etiquetaMes(mesStr: string): string {
   const [anioStr, mesNumStr] = mesStr.split("-");
   return `${MESES_ES[Number(mesNumStr) - 1]} ${anioStr}`;
 }
+
+/**
+ * Etiqueta corta de un tramo ("F1", "F2"...) según su posición dentro de
+ * la lista de tramos YA ORDENADA de menor a mayor facturación — para que
+ * un barbero pueda hablar de "subir a F3" sin tener que decir el importe
+ * exacto cada vez. Cadena vacía si el tramo no está en la lista.
+ */
+export function etiquetaTramo(tramo: TramoComision, tramosOrdenados: TramoComision[]): string {
+  const indice = tramosOrdenados.findIndex((t) => t.desdeCentimos === tramo.desdeCentimos);
+  return indice === -1 ? "" : `F${indice + 1}`;
+}
+
+export interface ConFacturacion {
+  facturacionCentimos: number;
+}
+
+/**
+ * Añade la posición en el ranking (1º, 2º...) de cada fila según su
+ * facturación, de mayor a menor — con "ranking por competición": dos
+ * facturaciones iguales comparten posición, y la siguiente salta el
+ * hueco (1, 2, 2, 4...), en vez de desempatar de forma arbitraria por
+ * quién apareciera antes en la lista.
+ */
+export function calcularRanking<T extends ConFacturacion>(filas: T[]): (T & { posicion: number; total: number })[] {
+  const ordenadas = [...filas].sort((a, b) => b.facturacionCentimos - a.facturacionCentimos);
+  let posicionActual = 1;
+  return ordenadas.map((f, i) => {
+    if (i > 0 && f.facturacionCentimos < ordenadas[i - 1].facturacionCentimos) posicionActual = i + 1;
+    return { ...f, posicion: posicionActual, total: ordenadas.length };
+  });
+}
