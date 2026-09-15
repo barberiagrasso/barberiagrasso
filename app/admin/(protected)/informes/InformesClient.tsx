@@ -5,19 +5,21 @@ import SeccionIngresos from "./SeccionIngresos";
 import SeccionOcupacion from "./SeccionOcupacion";
 import SeccionNoShows from "./SeccionNoShows";
 import SeccionClientes from "./SeccionClientes";
+import SeccionComisiones from "./SeccionComisiones";
 
 interface Sede {
   id: string;
   nombre: string;
 }
 
-type Pestana = "ingresos" | "ocupacion" | "no-shows" | "clientes";
+type Pestana = "ingresos" | "ocupacion" | "no-shows" | "clientes" | "comisiones";
 
 const PESTANAS: { clave: Pestana; etiqueta: string }[] = [
   { clave: "ingresos", etiqueta: "Ingresos" },
   { clave: "ocupacion", etiqueta: "Ocupación" },
   { clave: "no-shows", etiqueta: "No presentados y cancelaciones" },
   { clave: "clientes", etiqueta: "Clientes" },
+  { clave: "comisiones", etiqueta: "Comisiones" },
 ];
 
 function pad2(n: number): string {
@@ -161,6 +163,9 @@ export default function InformesClient({ sedes }: { sedes: Sede[] }) {
       </div>
       <div className={pestana === "clientes" ? "" : "hidden"}>
         <SeccionClientes sedeId={sedeId} desde={desde} hasta={hasta} />
+      </div>
+      <div className={pestana === "comisiones" ? "" : "hidden"}>
+        <SeccionComisiones />
       </div>
     </div>
   );

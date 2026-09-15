@@ -2,6 +2,13 @@
 
 import type { ReactNode } from "react";
 import { descargarCSV } from "@/lib/csvExport";
+import { euros } from "@/lib/formato";
+
+// Reexportado (en vez de re-implementado) para que SeccionIngresos.tsx y
+// compañía sigan importando `euros` desde aquí sin tocarlas — la
+// implementación real vive en lib/formato.ts porque Comisiones también
+// la necesita y no está bajo esta misma carpeta de informes/.
+export { euros };
 
 // Piezas reutilizables por las 4 secciones de informes (tarjetas de KPI,
 // contenedor de gráfica con título + acción, botón de exportar CSV) —
@@ -22,9 +29,6 @@ export const COLORES_GRAFICA = [
   "#64748b", // slate-500
 ];
 
-export function euros(centimos: number): string {
-  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-}
 
 export function formatoVariacion(pctVar: number | null): { texto: string; color: "verde" | "rojo" | "neutro" } {
   if (pctVar === null) return { texto: "sin datos del periodo anterior", color: "neutro" };

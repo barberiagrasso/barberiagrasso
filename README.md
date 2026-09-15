@@ -251,6 +251,40 @@ Todos con la contraseña temporal `123456`, pendiente de cambiar en su primer ac
 Lucas, que ya la cambió al probarlo). Dales su usuario (no hace falta que sepan el email
 inventado de detrás) y esa contraseña para que entren la primera vez.
 
+### Comisiones: tramos de facturación configurables, uno por barbero
+
+Cada barbero cobra una comisión sobre lo que factura cada mes, según en qué tramo caiga su
+**facturación total del mes** (no es progresivo por escalones como el IRPF: se mira el total
+facturado, se identifica el tramo en el que cae, y ese porcentaje se aplica a TODA la
+facturación, no solo a la parte dentro del tramo). Por debajo del tramo más bajo no hay
+comisión. Los tramos con los que arranca son los que definiste:
+
+| Facturación del mes | Comisión |
+| --- | --- |
+| Hasta 3.500€ | 0% |
+| 3.500€ – 3.800€ | 35% |
+| 3.800€ – 4.000€ | 38% |
+| 4.000€ – 4.500€ | 40% |
+| A partir de 4.500€ | 42% |
+
+**Dónde verlo**: nueva pestaña **Comisiones** en el menú del panel (para todo el mundo, no
+solo para ti) y una pestaña más dentro de **Informes** (esa, como el resto de Informes, solo
+para tu rol "admin"):
+
+- **Tú (admin)** ves a todo el equipo: facturación, tramo aplicado y comisión de cada
+  barbero, mes a mes (con flechas para moverte a meses anteriores), más el total a pagar ese
+  mes y un botón para exportarlo a CSV. Justo debajo puedes **editar los tramos** (importes y
+  porcentajes, añadir o quitar tramos) — se guarda al momento y se refleja tanto en tu propia
+  vista como en la de cada barbero.
+- **Cada barbero** solo ve **su propia** facturación, tramo y comisión de cada mes — nunca la
+  de sus compañeros, ese filtro está aplicado en el servidor, no solo escondido en la
+  pantalla. También ve un aviso de "te faltan X€ para subir al Y%" cuando le falta poco para
+  el siguiente tramo, y la tabla de tramos vigente (en solo lectura, no puede editarla).
+
+Se calcula siempre al momento a partir de las citas ya completadas ese mes (igual que el resto
+de Informes) — no hace falta "cerrar" el mes ni ningún paso manual: el día 1, cuando toque
+pagar, el mes anterior ya está fijo porque no se pueden completar citas con fecha pasada.
+
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
 - **Publicarla en App Store / Google Play**: la reserva ya se puede "instalar" desde el
@@ -420,6 +454,10 @@ supabase/actualizar-funcionalidad-avanzada.sql  Tablas de campañas/plantillas/r
 supabase/actualizar-monitorizacion-produccion.sql  Tabla de errores del sistema (re-ejecutable)
 supabase/actualizar-fidelizacion.sql   Saldo de fidelización: tablas, columnas y función (re-ejecutable)
 supabase/actualizar-recuperacion-password.sql  Códigos de recuperación y plantillas nuevas (re-ejecutable)
+supabase/actualizar-comisiones.sql     Tabla de tramos de comisión + función de reemplazo (re-ejecutable)
+lib/comisiones.ts          Cálculo de comisión por tramos, validación y utilidades de mes
+app/admin/comisiones/      Comisión propia (barbero) o de todo el equipo (admin), con edición de tramos
+app/api/admin/comisiones/  Facturación/comisión por barbero del mes + CRUD de tramos
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
 lib/fidelizacion.ts        Acumular, canjear y reembolsar saldo de fidelización
