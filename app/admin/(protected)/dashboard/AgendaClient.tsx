@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import FinalizarCitaModal from "./FinalizarCitaModal";
+import CalendarioDia from "./CalendarioDia";
 
 interface Sede {
   id: string;
@@ -85,6 +86,8 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
   const [fecha, setFecha] = useState(hoyISO());
   const [vista, setVista] = useState<"dia" | "semana">("dia");
   const [citas, setCitas] = useState<Cita[]>([]);
+  const [profesionalesDia, setProfesionalesDia] = useState<{ id: string; nombre: string }[]>([]);
+  const [horariosDia, setHorariosDia] = useState<{ profesional_id: string; hora_inicio: string; hora_fin: string }[]>([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarNueva, setMostrarNueva] = useState(false);
   const [finalizando, setFinalizando] = useState<Cita | null>(null);
@@ -106,6 +109,8 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
     const res = await fetch(`/api/admin/citas?sedeId=${sedeId}&fecha=${fechaInicio}&fechaFin=${fechaFinRango}`);
     const json = await res.json();
     setCitas(json.citas ?? []);
+    setProfesionalesDia(json.profesionales ?? []);
+    setHorariosDia(json.horarios ?? []);
     setCargando(false);
   }
 
@@ -236,73 +241,17 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
       )}
 
       {vista === "dia" ? (
-        <>
-          {cargando && <p className="text-sm text-stone-500">Cargando…</p>}
-          {!cargando && citas.length === 0 && (
-            <p className="text-sm text-stone-500">No hay citas ese día en esta sede.</p>
-          )}
-
-          <div className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
-            {citas.map((cita) => (
-              <div key={cita.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
-                <div>
-                  <div className="font-medium text-stone-900">
-                    {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
-                  </div>
-                  <div className="text-sm text-stone-500">
-                    {cita.servicio?.nombre} · {cita.profesional?.nombre} · {cita.cliente?.telefono}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={
-                      "rounded-full px-2 py-1 text-xs " +
-                      (cita.estado === "cancelada"
-                        ? "bg-red-100 text-red-700"
-                        : cita.estado === "completada"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-stone-100 text-stone-700")
-                    }
-                  >
-                    {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
-                  </span>
-                  {(cita.estado === "confirmada" || cita.estado === "completada") && (
-                    <button
-                      onClick={() => avisarDisponible(cita.id)}
-                      disabled={avisando === cita.id}
-                      className="text-xs text-blue-700 underline disabled:opacity-50"
-                      title="Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible"
-                    >
-                      {avisando === cita.id ? "Avisando…" : "Avisar disponible"}
-                    </button>
-                  )}
-                  {cita.estado === "confirmada" && (
-                    <>
-                      <button
-                        onClick={() => setFinalizando(cita)}
-                        className="text-xs text-green-700 underline"
-                      >
-                        Completada
-                      </button>
-                      <button
-                        onClick={() => cambiarEstado(cita.id, "no_presentada")}
-                        className="text-xs text-amber-700 underline"
-                      >
-                        No presentada
-                      </button>
-                      <button
-                        onClick={() => cambiarEstado(cita.id, "cancelada")}
-                        className="text-xs text-red-700 underline"
-                      >
-                        Cancelar
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <CalendarioDia
+          fecha={fecha}
+          citas={citas}
+          profesionales={profesionalesDia}
+          horarios={horariosDia}
+          cargando={cargando}
+          onFinalizar={setFinalizando}
+          onCambiarEstado={cambiarEstado}
+          onAvisarDisponible={avisarDisponible}
+          avisando={avisando}
+        />
       ) : (
         <VistaSemanal
           dias={diasSemana}

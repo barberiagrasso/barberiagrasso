@@ -54,3 +54,20 @@ export function isoDesdeMadrid(fechaYMD: string, horaHM: string): string {
   const desfaseMs = objetivo.getTime() - marcaEnMadridComoUTC.getTime();
   return new Date(objetivo.getTime() + desfaseMs).toISOString();
 }
+
+/**
+ * Minutos desde medianoche de una hora en formato "HH:mm" o "HH:mm:ss"
+ * (como las que guarda Postgres en columnas `time`, p. ej. las de
+ * `horarios`). Útil para posicionar algo en un eje vertical de horas
+ * (el calendario de la vista de día). No hace ninguna conversión de
+ * huso horario: es aritmética pura sobre el texto de la hora.
+ */
+export function minutosDeHora(horaHMS: string): number {
+  const [h, m] = horaHMS.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+/** Minutos desde medianoche (en Europe/Madrid) de un instante ISO. */
+export function minutosEnMadrid(iso: string): number {
+  return minutosDeHora(horaEnMadrid(iso));
+}

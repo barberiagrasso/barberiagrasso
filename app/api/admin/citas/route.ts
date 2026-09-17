@@ -42,7 +42,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No se pudieron cargar las citas." }, { status: 500 });
   }
 
-  return NextResponse.json({ citas });
+  // Profesionales de la sede y su horario del día de "fecha" — lo usa el
+  // calendario de la vista de día (columnas por barbero + rango de
+  // horas visible). Se calcula siempre a partir del día de "fecha" (el
+  // primero del rango), así que en la vista semanal estos dos campos no
+  // se usan y se pueden ignorar sin problema.
+  const { data: profesionalesSede } = await supabase
+    .from("profesional_sedes")
+    .select("profesional_id, profesionales!inner(id, nombre, activo)")
+    .eq("sede_id", sedeId)
+    .eq("profesionales.activo", true);
+  const profesionales = (profesionalesSede ?? [])
+    .map((sp) => {
+      const prof = Array.isArray(sp.profesionales) ? sp.profesionales[0] : sp.profesionales;
+      return { id: sp.profesional_id, nombre: (prof as { nombre: string })?.nombre ?? "" };
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  // Mediodía (no medianoche) para sacar el día de la semana: así da igual
+  // en qué huso horario esté corriendo el servidor, nunca cae al otro
+  // lado de la fecha.
+  const diaSemana = new Date(`${fecha}T12:00:00`).getDay();
+  const { data: horarios } = await supabase
+    .from("horarios")
+    .select("profesional_id, hora_inicio, hora_fin")
+    .eq("sede_id", sedeId)
+    .eq("dia_semana", diaSemana);
+
+  return NextResponse.json({ citas, profesionales, horarios: horarios ?? [] });
 }
 
 export async function POST(request: NextRequest) {
