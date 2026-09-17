@@ -324,9 +324,12 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   const [error, setError] = useState<string | null>(null);
   const [citaConfirmada, setCitaConfirmada] = useState<{ inicio: string; profesionalNombre: string } | null>(null);
   const [mostrarFormListaEspera, setMostrarFormListaEspera] = useState(false);
+  const [flexibilidadListaEspera, setFlexibilidadListaEspera] = useState<0 | 1 | 2>(0);
   const [enviandoListaEspera, setEnviandoListaEspera] = useState(false);
   const [errorListaEspera, setErrorListaEspera] = useState<string | null>(null);
   const [listaEsperaApuntada, setListaEsperaApuntada] = useState(false);
+  const [buscandoProximo, setBuscandoProximo] = useState(false);
+  const [errorProximo, setErrorProximo] = useState<string | null>(null);
 
   const sedeSeleccionada = sedes.find((s) => s.id === sedeId);
   const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
@@ -399,8 +402,10 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
     // Cada día es una lista de espera distinta: al cambiar de fecha se
     // limpia cualquier formulario/confirmación que quedara del día anterior.
     setMostrarFormListaEspera(false);
+    setFlexibilidadListaEspera(0);
     setListaEsperaApuntada(false);
     setErrorListaEspera(null);
+    setErrorProximo(null);
   }
 
   async function apuntarseAListaEspera() {
@@ -416,6 +421,7 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
           servicioId,
           profesionalId,
           fecha,
+          flexibilidadDias: flexibilidadListaEspera,
           cliente: { nombre, telefono, email: email || null },
           aceptaComercial,
         }),
@@ -430,6 +436,39 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
       setErrorListaEspera("No se pudo conectar con el servidor. Inténtalo de nuevo.");
     } finally {
       setEnviandoListaEspera(false);
+    }
+  }
+
+  // Botón "Próximos espacios": salta directamente al primer día posterior
+  // con hueco (con el barbero elegido, o "Cualquiera" si no se eligió
+  // ninguno) y deja ya seleccionados ese día y su primer hueco.
+  async function buscarProximoDisponible() {
+    if (!sedeId || !servicioId || !fecha) return;
+    setBuscandoProximo(true);
+    setErrorProximo(null);
+    try {
+      const params = new URLSearchParams({ sedeId, servicioId, desde: fecha });
+      if (profesionalId) params.set("profesionalId", profesionalId);
+      if (duracionExtraMinutos > 0) params.set("duracionExtraMinutos", String(duracionExtraMinutos));
+      const res = await fetch(`/api/disponibilidad/proximo?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) {
+        setErrorProximo(json.error || "No se pudo buscar el próximo hueco.");
+        return;
+      }
+      const [anioNuevo, mesNuevo] = json.fecha.split("-").map(Number);
+      setMesVisible({ anio: anioNuevo, mes: mesNuevo });
+      setFecha(json.fecha);
+      setSlots(json.slots ?? []);
+      setSlotElegido(json.slots?.[0] ?? null);
+      setMostrarFormListaEspera(false);
+      setFlexibilidadListaEspera(0);
+      setListaEsperaApuntada(false);
+      setErrorListaEspera(null);
+    } catch {
+      setErrorProximo("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setBuscandoProximo(false);
     }
   }
 
@@ -776,17 +815,40 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
           {fecha && cargandoSlots && <p className="font-body text-sm text-brand-white-dim">Buscando huecos…</p>}
           {fecha && !cargandoSlots && horasUnicas.length === 0 && (
             <div className="space-y-3 rounded-xl border border-brand-line bg-black/20 p-4">
-              <p className="font-body text-sm text-brand-white-dim">No hay huecos ese día. Prueba con otra fecha.</p>
+              <p className="font-body text-sm text-brand-white-dim">No hay huecos ese día.</p>
 
               {listaEsperaApuntada ? (
                 <p className="font-body text-sm text-brand-yellow">
-                  ¡Listo! Te avisaremos por WhatsApp si se libera un hueco ese día.
+                  ¡Listo! En cuanto se libere un hueco que encaje te reservaremos la cita y te avisaremos por
+                  WhatsApp.
                 </p>
               ) : mostrarFormListaEspera ? (
-                <div className="space-y-2">
-                  <p className="font-body text-xs text-brand-white-dim">
-                    Te avisamos por WhatsApp en cuanto se libere un hueco ese día.
-                  </p>
+                <div className="space-y-3">
+                  <div>
+                    <p className="mb-1.5 font-body text-xs text-brand-white-dim">¿Qué fecha te interesa?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { valor: 0, etiqueta: "Fecha exacta" },
+                          { valor: 1, etiqueta: "+/- 1 día" },
+                          { valor: 2, etiqueta: "+/- 2 días" },
+                        ] as const
+                      ).map((opcion) => (
+                        <button
+                          key={opcion.valor}
+                          onClick={() => setFlexibilidadListaEspera(opcion.valor)}
+                          className={
+                            "rounded-full border px-3 py-1.5 font-body text-xs transition-colors " +
+                            (flexibilidadListaEspera === opcion.valor
+                              ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                              : "border-brand-line text-brand-white hover:border-brand-yellow/60")
+                          }
+                        >
+                          {opcion.etiqueta}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input
                     className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                     placeholder="Nombre y apellidos"
@@ -804,16 +866,22 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
                     disabled={!nombre || !telefono || enviandoListaEspera}
                     onClick={apuntarseAListaEspera}
                   >
-                    {enviandoListaEspera ? "Apuntando…" : "Avisadme"}
+                    {enviandoListaEspera ? "Apuntando…" : "Notificarme cuando haya un espacio"}
                   </BotonPrimario>
                 </div>
               ) : (
-                <button
-                  onClick={() => setMostrarFormListaEspera(true)}
-                  className="font-body text-sm text-brand-yellow underline decoration-brand-yellow/40 underline-offset-4"
-                >
-                  Avisarme por WhatsApp si se libera un hueco
-                </button>
+                <div className="space-y-2">
+                  <BotonPrimario onClick={buscarProximoDisponible} disabled={buscandoProximo}>
+                    {buscandoProximo ? "Buscando…" : "Próximos espacios"}
+                  </BotonPrimario>
+                  {errorProximo && <p className="font-body text-xs text-red-400">{errorProximo}</p>}
+                  <button
+                    onClick={() => setMostrarFormListaEspera(true)}
+                    className="block font-body text-sm text-brand-yellow underline decoration-brand-yellow/40 underline-offset-4"
+                  >
+                    Lista de espera: avisadme cuando haya un hueco
+                  </button>
+                </div>
               )}
             </div>
           )}

@@ -6,6 +6,7 @@ import { buscarOCrearCliente, normalizarTelefono } from "@/lib/clientes";
 import { sincronizarClienteHubSpot, sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { canjearSaldoEnCita, reembolsarSaldoDeCita, saldoDelCliente, SaldoInsuficienteError } from "@/lib/fidelizacion";
+import { fechaDentroDeFlexibilidad, sumarDias } from "@/lib/listaEspera";
 import type { CanalConsentimiento } from "@/lib/types";
 
 // Fecha "YYYY-MM-DD" de un instante ISO en la zona horaria del negocio
@@ -43,7 +44,10 @@ interface CrearReservaParams {
   cliente: DatosCliente;
   aceptaComercial: boolean;
   canal: CanalConsentimiento;
-  origen: "app" | "panel" | "whatsapp";
+  // "lista_espera": la crea sola el sistema al liberarse un hueco que le
+  // encajaba a alguien apuntado (ver asignarListaEsperaPorHueco), no el
+  // propio cliente en el momento.
+  origen: "app" | "panel" | "whatsapp" | "lista_espera";
   // Complementos añadidos al servicio principal en el paso extra de la
   // reserva (p. ej. cejas, lavado). Amplían el hueco bloqueado en la
   // agenda y quedan anotados en la cita para que el barbero cobre bien.
@@ -63,6 +67,9 @@ interface ApuntarseListaEsperaParams {
   // null/omitido = le vale cualquier profesional de la sede.
   profesionalId?: string | null;
   fecha: string; // "YYYY-MM-DD", el mismo día que el cliente veía sin huecos
+  // 0 = solo ese día exacto, 1 = ±1 día, 2 = ±2 días — lo que responda a
+  // "¿qué fecha te interesa?" en el paso de fecha de app/reservar.
+  flexibilidadDias: number;
   cliente: DatosCliente;
   aceptaComercial: boolean;
   canal: CanalConsentimiento;
@@ -71,8 +78,10 @@ interface ApuntarseListaEsperaParams {
 /**
  * Apunta a un cliente a la lista de espera de un día sin huecos. Se usa
  * desde el paso de fecha de app/reservar cuando la búsqueda de huecos
- * viene vacía. Si el mismo cliente ya estaba apuntado a lo mismo, no
- * duplica la fila: simplemente devuelve la que ya había.
+ * viene vacía. Si el mismo cliente ya estaba apuntado a lo mismo (mismo
+ * barbero pedido, o "cualquiera"), no duplica la fila: actualiza el
+ * margen de flexibilidad por si ha cambiado de idea y devuelve esa
+ * misma entrada.
  */
 export async function apuntarseListaEspera(params: ApuntarseListaEsperaParams) {
   const supabase = createAdminClient();
@@ -101,16 +110,29 @@ export async function apuntarseListaEspera(params: ApuntarseListaEsperaParams) {
     });
   }
 
-  const { data: existente } = await supabase
+  let consultaExistente = supabase
     .from("lista_espera")
     .select("*")
     .eq("cliente_id", clienteId)
     .eq("sede_id", params.sedeId)
     .eq("servicio_id", params.servicioId)
     .eq("fecha", params.fecha)
-    .eq("estado", "pendiente")
-    .maybeSingle();
-  if (existente) return { entrada: existente };
+    .eq("estado", "pendiente");
+  consultaExistente = params.profesionalId
+    ? consultaExistente.eq("profesional_id", params.profesionalId)
+    : consultaExistente.is("profesional_id", null);
+  const { data: existente } = await consultaExistente.maybeSingle();
+
+  if (existente) {
+    if (existente.flexibilidad_dias === params.flexibilidadDias) return { entrada: existente };
+    const { data: actualizada } = await supabase
+      .from("lista_espera")
+      .update({ flexibilidad_dias: params.flexibilidadDias })
+      .eq("id", existente.id)
+      .select("*")
+      .single();
+    return { entrada: actualizada ?? existente };
+  }
 
   const { data: entrada, error } = await supabase
     .from("lista_espera")
@@ -120,6 +142,7 @@ export async function apuntarseListaEspera(params: ApuntarseListaEsperaParams) {
       servicio_id: params.servicioId,
       profesional_id: params.profesionalId || null,
       fecha: params.fecha,
+      flexibilidad_dias: params.flexibilidadDias,
     })
     .select("*")
     .single();
@@ -128,66 +151,113 @@ export async function apuntarseListaEspera(params: ApuntarseListaEsperaParams) {
   return { entrada };
 }
 
-// Cuántas personas de la lista de espera se avisan por cada hueco que se
-// libera. Solo hay un hueco real, así que se avisa a los primeros en
-// apuntarse (orden de llegada) en vez de a todos: si avisáramos a todos,
-// varios competirían por la misma hora y la mayoría se llevaría un chasco.
-// Quien reciba el aviso y no llegue a tiempo sigue disponible para el
-// siguiente hueco que se libere ese mismo día (ver más abajo: queda
-// "notificado", no "reservado").
-const MAX_AVISOS_LISTA_ESPERA_POR_HUECO = 3;
+// Cuántos candidatos de la lista de espera se prueban, como mucho, por
+// cada cancelación. Solo se le acaba asignando el hueco a UNO (el
+// primero al que de verdad le encaje en el momento de comprobarlo), pero
+// si a los primeros no les cabe el servicio que pidieron en el hueco que
+// ha quedado, se sigue probando con los siguientes en vez de rendirse.
+const MAX_CANDIDATOS_LISTA_ESPERA_POR_HUECO = 8;
 
 /**
- * Al cancelarse una cita, avisa por WhatsApp a quien esté en la lista de
- * espera para ese mismo día, sede y servicio (y que no pidiera un
- * profesional distinto al que se ha quedado libre). Nunca lanza: un fallo
- * al avisar no debe impedir que la cancelación en sí se complete.
+ * Al cancelarse una cita, comprueba si alguien de la lista de espera de
+ * esa sede puede ocupar ahora un hueco real ese mismo día — decisión de
+ * Diego (18/09/2026): la lista de espera ya no solo avisa, reserva sola
+ * y avisa por WhatsApp de la cita ya hecha. Se prueba en orden de
+ * llegada (quien se apuntó antes tiene preferencia); de cada candidato
+ * se comprueba que el día liberado caiga dentro de su margen de
+ * flexibilidad (día exacto, ±1 o ±2) y que, con el profesional que pidió
+ * (o cualquiera), quede de verdad un hueco que le encaje en duración —
+ * volviendo a calcular la disponibilidad real de ese día en vez de fiarse
+ * de la cita que se acaba de cancelar, porque puede que ese hueco
+ * concreto no le sirva (otro servicio, otra duración) pero SÍ le sirva
+ * otro hueco distinto que ya hubiera libre ese día. En cuanto uno se
+ * lleva un hueco, dejará de aparecer disponible para el siguiente
+ * candidato (se vuelve a comprobar la disponibilidad real en cada
+ * intento). Nunca lanza: un fallo aquí no debe impedir que la
+ * cancelación en sí se complete.
  */
-async function notificarListaEsperaPorHueco(citaCancelada: {
-  sede_id: string;
-  servicio_id: string;
-  profesional_id: string | null;
-  inicio: string;
-}) {
+async function asignarListaEsperaPorHueco(citaCancelada: { sede_id: string; inicio: string }) {
   try {
     const supabase = createAdminClient();
-    const fecha = fechaMadrid(citaCancelada.inicio);
+    const fechaLiberada = fechaMadrid(citaCancelada.inicio);
 
-    let consulta = supabase
+    const { data: candidatos } = await supabase
       .from("lista_espera")
-      .select("id, cliente:clientes(nombre, telefono)")
+      .select("id, servicio_id, profesional_id, fecha, flexibilidad_dias, cliente:clientes(nombre, telefono, email)")
       .eq("sede_id", citaCancelada.sede_id)
-      .eq("servicio_id", citaCancelada.servicio_id)
-      .eq("fecha", fecha)
       .eq("estado", "pendiente")
+      // Rango amplio (máxima flexibilidad posible, ±2 días) para no
+      // dejar fuera a nadie que pudiera encajar; el filtro exacto por su
+      // propio margen se hace abajo, candidato a candidato.
+      .gte("fecha", sumarDias(fechaLiberada, -2))
+      .lte("fecha", sumarDias(fechaLiberada, 2))
       .order("created_at", { ascending: true })
-      .limit(MAX_AVISOS_LISTA_ESPERA_POR_HUECO);
+      .limit(MAX_CANDIDATOS_LISTA_ESPERA_POR_HUECO);
 
-    // "Cualquiera" (profesional_id null) siempre encaja; si además había
-    // pedido un profesional concreto, solo encaja si es justo el que ha
-    // quedado libre.
-    consulta = citaCancelada.profesional_id
-      ? consulta.or(`profesional_id.is.null,profesional_id.eq.${citaCancelada.profesional_id}`)
-      : consulta.is("profesional_id", null);
-
-    const { data: candidatos } = await consulta;
     if (!candidatos || candidatos.length === 0) return;
 
     for (const candidato of candidatos) {
+      if (!fechaDentroDeFlexibilidad(candidato.fecha, fechaLiberada, candidato.flexibilidad_dias)) continue;
+
       const cliente = Array.isArray(candidato.cliente) ? candidato.cliente[0] : candidato.cliente;
       if (!cliente?.telefono) continue;
+
+      const slots = await getAvailableSlots({
+        sedeId: citaCancelada.sede_id,
+        servicioId: candidato.servicio_id,
+        fecha: fechaLiberada,
+        profesionalId: candidato.profesional_id,
+      });
+      if (slots.length === 0) continue; // este día en concreto no le encaja de verdad; se sigue probando con el siguiente
+
+      let cita;
+      let profesionalNombre: string;
+      try {
+        const resultado = await crearReserva({
+          sedeId: citaCancelada.sede_id,
+          servicioId: candidato.servicio_id,
+          profesionalId: slots[0].profesional_id,
+          fecha: fechaLiberada,
+          horaInicioISO: slots[0].hora_inicio,
+          cliente: { nombre: cliente.nombre, telefono: cliente.telefono, email: cliente.email },
+          aceptaComercial: false,
+          canal: "app",
+          origen: "lista_espera",
+        });
+        cita = resultado.cita;
+        profesionalNombre = resultado.profesionalNombre;
+      } catch (err) {
+        // Alguien se lo ha llevado justo a la vez (carrera improbable) u
+        // otro fallo puntual: se sigue probando con el siguiente en vez
+        // de dejar el hueco sin asignar a nadie.
+        console.error("No se pudo asignar automáticamente un hueco de la lista de espera a un candidato", err);
+        continue;
+      }
+
+      // La entrada de este candidato puede tener una fecha distinta a la
+      // liberada (pidió flexibilidad), así que se marca por su propio id
+      // en vez del filtro por fecha exacta que ya hace crearReserva.
+      await supabase.from("lista_espera").update({ estado: "reservado" }).eq("id", candidato.id);
+
       const nombrePila = cliente.nombre?.split(" ")[0] || "";
-      await sendWhatsAppMessage(
-        cliente.telefono,
-        `¡Hola${nombrePila ? " " + nombrePila : ""}! Se acaba de liberar un hueco el día que nos pediste en Barbería Grasso. Entra en https://barberiagrasso.es/reservar para cogerlo antes de que se lo lleve otra persona.`
-      );
-      await supabase
-        .from("lista_espera")
-        .update({ estado: "notificado", notificado_at: new Date().toISOString() })
-        .eq("id", candidato.id);
+      const horaTexto = new Date(cita.inicio).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+      const fechaTexto = new Date(`${fechaLiberada}T12:00:00`).toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        timeZone: "Europe/Madrid",
+      });
+      try {
+        await sendWhatsAppMessage(
+          cliente.telefono,
+          `¡Hola${nombrePila ? " " + nombrePila : ""}! Se ha liberado un hueco y te hemos reservado ya tu cita en Barbería Grasso el ${fechaTexto} a las ${horaTexto} con ${profesionalNombre}. Si no puedes venir, cancélala desde la app o escríbenos.`
+        );
+      } catch (err) {
+        console.error("No se pudo avisar por WhatsApp de la cita asignada automáticamente por la lista de espera", err);
+      }
     }
   } catch (err) {
-    console.error("Error avisando a la lista de espera", err);
+    console.error("Error asignando la lista de espera", err);
   }
 }
 
@@ -406,7 +476,7 @@ export async function cancelarCita(citaId: string) {
     .single();
   if (error || !cita) throw new ReservaError("No se pudo cancelar la cita.");
   await sincronizarCitaHubSpot(supabase, cita.id);
-  await notificarListaEsperaPorHueco(cita);
+  await asignarListaEsperaPorHueco(cita);
   // Si esta cita se había pagado con saldo de fidelización, se le
   // devuelve íntegro al cliente: cancelar no debería costarle el saldo
   // que ya tenía ganado.

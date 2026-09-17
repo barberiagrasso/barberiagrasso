@@ -275,6 +275,52 @@ export async function getMonthAvailabilitySummary({
   return resumen;
 }
 
+/**
+ * Botón "Próximos espacios" del paso de fecha de app/reservar: cuando un
+ * día elegido no tiene huecos, busca el primer día POSTERIOR con al
+ * menos un hueco (con el profesional pedido, o con cualquiera si no se
+ * eligió ninguno) y devuelve ya sus huecos, para llevar al cliente
+ * directo ahí sin que tenga que ir probando día a día. Reutiliza el
+ * resumen mensual (barato) para encontrar el día y solo calcula los
+ * huecos en detalle una vez, sobre ese día ya encontrado. Devuelve null
+ * si no hay ningún hueco en los próximos `maxMeses` meses.
+ */
+export async function buscarProximoDiaConHueco({
+  sedeId,
+  servicioId,
+  profesionalId,
+  desde,
+  duracionExtraMinutos,
+  maxMeses = 3,
+}: {
+  sedeId: string;
+  servicioId: string;
+  profesionalId?: string | null;
+  desde: string; // "YYYY-MM-DD" — se busca a partir del día siguiente a este
+  duracionExtraMinutos?: number;
+  maxMeses?: number;
+}): Promise<{ fecha: string; slots: FranjaDisponible[] } | null> {
+  let [anio, mes] = desde.split("-").map(Number);
+
+  for (let i = 0; i <= maxMeses; i++) {
+    const resumen = await getMonthAvailabilitySummary({ sedeId, servicioId, profesionalId, anio, mes, duracionExtraMinutos });
+    const diaEncontrado = resumen.find((d) => d.fecha > desde && d.seleccionable);
+    if (diaEncontrado) {
+      const slots = await getAvailableSlots({ sedeId, servicioId, fecha: diaEncontrado.fecha, profesionalId, duracionExtraMinutos });
+      // Por si el hueco desaparece justo entre el resumen y el detalle
+      // (alguien lo acaba de reservar): seguimos buscando en vez de
+      // devolver un día sin huecos de verdad.
+      if (slots.length > 0) return { fecha: diaEncontrado.fecha, slots };
+    }
+    mes += 1;
+    if (mes > 12) {
+      mes = 1;
+      anio += 1;
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------
 // Helpers compartidos
 // ---------------------------------------------------------------------

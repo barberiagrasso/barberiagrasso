@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apuntarseListaEspera, ReservaError } from "@/lib/booking";
 import { normalizarTelefono } from "@/lib/clientes";
 import { comprobarLimite, ipDePeticion, RESPUESTA_DEMASIADOS_INTENTOS } from "@/lib/rateLimit";
+import { esFlexibilidadValida } from "@/lib/listaEspera";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,11 @@ export async function POST(request: NextRequest) {
 
   if (!body?.sedeId || !body?.servicioId || !body?.fecha || !body?.cliente?.nombre || !body?.cliente?.telefono) {
     return NextResponse.json({ error: "Faltan datos obligatorios." }, { status: 400 });
+  }
+  // 0 si no se manda (compatibilidad hacia atrás: "solo ese día exacto").
+  const flexibilidadDias = body.flexibilidadDias ?? 0;
+  if (!esFlexibilidadValida(flexibilidadDias)) {
+    return NextResponse.json({ error: "La flexibilidad de fecha no es válida." }, { status: 400 });
   }
 
   const telefono = normalizarTelefono(body.cliente.telefono);
@@ -31,6 +37,7 @@ export async function POST(request: NextRequest) {
       servicioId: body.servicioId,
       profesionalId: body.profesionalId || null,
       fecha: body.fecha,
+      flexibilidadDias,
       cliente: body.cliente,
       aceptaComercial: Boolean(body.aceptaComercial),
       canal: "app",
