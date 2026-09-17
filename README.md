@@ -278,12 +278,41 @@ para tu rol "admin"):
   vista como en la de cada barbero.
 - **Cada barbero** solo ve **su propia** facturación, tramo y comisión de cada mes — nunca la
   de sus compañeros, ese filtro está aplicado en el servidor, no solo escondido en la
-  pantalla. También ve un aviso de "te faltan X€ para subir al Y%" cuando le falta poco para
-  el siguiente tramo, y la tabla de tramos vigente (en solo lectura, no puede editarla).
+  pantalla. También ve: un aviso de "te faltan X€ para subir a F_ y pasar del X% al Y%" cuando
+  le falta poco para el siguiente tramo; su ranking del mes entre todo el equipo (solo su
+  posición, "3º de 7" — nunca la facturación de sus compañeros); una barra visual con su
+  recorrido por los tramos; un simulador con un slider ("si facturara tanto, me llevaría
+  tanto"); y la tabla de tramos vigente (en solo lectura, no puede editarla).
 
 Se calcula siempre al momento a partir de las citas ya completadas ese mes (igual que el resto
 de Informes) — no hace falta "cerrar" el mes ni ningún paso manual: el día 1, cuando toque
 pagar, el mes anterior ya está fijo porque no se pueden completar citas con fecha pasada.
+
+### Productos: venta en persona, con su propia comisión
+
+Además de los servicios, hay un catálogo de **productos** (champús, ceras, productos de barba…)
+que **no se pueden ver ni comprar desde la reserva online** — solo existen para que el barbero
+los añada a una cita ya cerrada. Se editan en la pestaña **Productos** del panel (nombre, precio,
+categoría, activo/inactivo), igual que Servicios.
+
+Al pulsar **"Completada"** en una cita, se abre una pantalla de **"Finalizar cita"** donde el
+barbero puede, todo de una vez:
+
+- cambiar el servicio principal que hizo,
+- añadir o quitar complementos (cejas, lavado…),
+- añadir los productos que haya vendido en el momento, con su cantidad,
+- corregir quién la hizo de verdad,
+- y ajustar la hora real de inicio y de fin.
+
+Una vez guardada, la cita queda completada y esa pantalla ya no se vuelve a abrir para ella (si
+hay que corregir algo después, se hace a mano en Supabase).
+
+La comisión de productos es **aparte** de la de servicios: un único **porcentaje plano** sobre
+todo lo vendido ese mes (empieza en 15%, editable por ti en la pestaña Comisiones), **sin
+tramos y desde el primer euro** — a diferencia de los servicios, no hace falta llegar a ningún
+mínimo. No cuenta para el ranking, que sigue siendo solo por facturación de servicios. Los
+productos tampoco generan saldo de fidelización al cliente ni aparecen en ningún sitio de la
+app o del historial que ve el cliente — se quedan enteramente dentro del panel.
 
 ## Qué falta todavía (siguientes iteraciones, pídeselo a Claude cuando quieras)
 
@@ -455,9 +484,16 @@ supabase/actualizar-monitorizacion-produccion.sql  Tabla de errores del sistema 
 supabase/actualizar-fidelizacion.sql   Saldo de fidelización: tablas, columnas y función (re-ejecutable)
 supabase/actualizar-recuperacion-password.sql  Códigos de recuperación y plantillas nuevas (re-ejecutable)
 supabase/actualizar-comisiones.sql     Tabla de tramos de comisión + función de reemplazo (re-ejecutable)
+supabase/anadir-productos.sql          Catálogo de productos, cita_productos y comisión plana de productos (re-ejecutable)
 lib/comisiones.ts          Cálculo de comisión por tramos, validación y utilidades de mes
-app/admin/comisiones/      Comisión propia (barbero) o de todo el equipo (admin), con edición de tramos
-app/api/admin/comisiones/  Facturación/comisión por barbero del mes + CRUD de tramos
+lib/productos.ts           Cálculo de la comisión plana de productos (sin tramos)
+lib/horarioLocal.ts        Conversión hora de reloj (Europe/Madrid) ↔ instante UTC, para corregir horarios a mano
+app/admin/comisiones/      Comisión propia (barbero) o de todo el equipo (admin), con edición de tramos y del % de productos
+app/admin/productos/       Catálogo de productos (nombre, precio, categoría, activo/inactivo)
+app/api/admin/comisiones/  Facturación/comisión por barbero del mes + CRUD de tramos + % de comisión de productos
+app/api/admin/productos/   CRUD del catálogo de productos
+app/api/admin/citas/[id]/finalizar/  Cierra una cita: servicio, complementos, productos, barbero y horario en un paso
+app/admin/dashboard/FinalizarCitaModal.tsx  Pantalla que se abre al marcar una cita como "Completada"
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
 lib/fidelizacion.ts        Acumular, canjear y reembolsar saldo de fidelización

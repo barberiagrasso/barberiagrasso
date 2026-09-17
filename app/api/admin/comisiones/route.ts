@@ -3,6 +3,7 @@ import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseRango } from "@/lib/informes";
 import { calcularComision, calcularRanking, rangoDelMes, siguienteTramo, mesActualStr, type TramoComision } from "@/lib/comisiones";
+import { calcularComisionProductos } from "@/lib/productos";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,11 @@ interface FilaComision {
   siguienteTramo: TramoComision | null;
   posicion: number;
   totalBarberos: number;
+  // Venta de productos: aparte de la facturación de servicios, con su
+  // propia comisión plana (sin tramos, ver lib/productos.ts) — no cuenta
+  // para el ranking, que sigue siendo solo por servicios.
+  productosCentimos: number;
+  comisionProductosCentimos: number;
 }
 
 /**
@@ -81,6 +87,9 @@ export async function GET(request: NextRequest) {
     porcentaje: Number(t.porcentaje),
   }));
 
+  const { data: configProductos } = await supabase.from("comisiones_config_productos").select("porcentaje").eq("id", true).maybeSingle();
+  const porcentajeProductos = Number(configProductos?.porcentaje ?? 0);
+
   // Siempre se piden las citas de TODO el equipo (no solo las del
   // barbero que pregunta): su ranking depende de comparar con el resto,
   // aunque luego solo se le devuelva a él su propia fila.
@@ -104,17 +113,33 @@ export async function GET(request: NextRequest) {
     extrasPorCita.set(e.cita_id, (extrasPorCita.get(e.cita_id) ?? 0) + e.precio_centimos);
   }
 
+  // Venta de productos del mes: siempre cuenta entera (a diferencia de
+  // los servicios, un producto no se puede pagar con saldo de
+  // fidelización, así que no hay nada que restar aquí).
+  const { data: productosCrudos } = await supabase
+    .from("cita_productos")
+    .select("cita_id, cantidad, precio_centimos")
+    .in("cita_id", idsCitas.length ? idsCitas : ["00000000-0000-0000-0000-000000000000"]);
+  const productosPorCita = new Map<string, number>();
+  for (const p of productosCrudos ?? []) {
+    productosPorCita.set(p.cita_id, (productosPorCita.get(p.cita_id) ?? 0) + p.cantidad * p.precio_centimos);
+  }
+
   // Agrega facturación y nº de citas por profesional a partir de las
   // citas reales del mes — cubre también a un barbero ya dado de baja
   // que facturara ese mes (no aparecería en el roster de activos de
   // abajo, pero su comisión de ese mes sigue siendo un dato real).
-  const porProfesional = new Map<string, { nombre: string; facturacionCentimos: number; citasCompletadas: number }>();
+  const porProfesional = new Map<
+    string,
+    { nombre: string; facturacionCentimos: number; citasCompletadas: number; productosCentimos: number }
+  >();
   for (const c of citas) {
     if (!c.profesional_id) continue;
     const nombre = uno(c.profesional)?.nombre ?? "Sin nombre";
-    const actual = porProfesional.get(c.profesional_id) ?? { nombre, facturacionCentimos: 0, citasCompletadas: 0 };
+    const actual = porProfesional.get(c.profesional_id) ?? { nombre, facturacionCentimos: 0, citasCompletadas: 0, productosCentimos: 0 };
     actual.facturacionCentimos += ingresoCitaCentimos(c, extrasPorCita);
     actual.citasCompletadas += 1;
+    actual.productosCentimos += productosPorCita.get(c.id) ?? 0;
     porProfesional.set(c.profesional_id, actual);
   }
 
@@ -124,7 +149,7 @@ export async function GET(request: NextRequest) {
   const { data: activos } = await supabase.from("profesionales").select("id, nombre").eq("activo", true);
   for (const p of activos ?? []) {
     if (!porProfesional.has(p.id)) {
-      porProfesional.set(p.id, { nombre: p.nombre, facturacionCentimos: 0, citasCompletadas: 0 });
+      porProfesional.set(p.id, { nombre: p.nombre, facturacionCentimos: 0, citasCompletadas: 0, productosCentimos: 0 });
     }
   }
 
@@ -138,6 +163,8 @@ export async function GET(request: NextRequest) {
       comisionCentimos,
       tramo,
       siguienteTramo: siguienteTramo(datos.facturacionCentimos, tramos),
+      productosCentimos: datos.productosCentimos,
+      comisionProductosCentimos: calcularComisionProductos(datos.productosCentimos, porcentajeProductos),
     };
   });
 
@@ -154,11 +181,24 @@ export async function GET(request: NextRequest) {
       filas: propia ? [propia] : [],
       totalComisionCentimos: null,
       totalFacturacionCentimos: null,
+      totalProductosCentimos: null,
+      totalComisionProductosCentimos: null,
+      porcentajeProductos,
     });
   }
 
   const totalComisionCentimos = filasConRanking.reduce((acc, f) => acc + f.comisionCentimos, 0);
   const totalFacturacionCentimos = filasConRanking.reduce((acc, f) => acc + f.facturacionCentimos, 0);
+  const totalProductosCentimos = filasConRanking.reduce((acc, f) => acc + f.productosCentimos, 0);
+  const totalComisionProductosCentimos = filasConRanking.reduce((acc, f) => acc + f.comisionProductosCentimos, 0);
 
-  return NextResponse.json({ mes, filas: filasConRanking, totalComisionCentimos, totalFacturacionCentimos });
+  return NextResponse.json({
+    mes,
+    filas: filasConRanking,
+    totalComisionCentimos,
+    totalFacturacionCentimos,
+    totalProductosCentimos,
+    totalComisionProductosCentimos,
+    porcentajeProductos,
+  });
 }

@@ -12,6 +12,8 @@ interface FilaComision {
   citasCompletadas: number;
   comisionCentimos: number;
   tramo: TramoComision | null;
+  productosCentimos: number;
+  comisionProductosCentimos: number;
 }
 
 // A diferencia de las otras 3 secciones de Informes, esta no usa el
@@ -23,7 +25,13 @@ interface FilaComision {
 // en /admin/comisiones.
 export default function SeccionComisiones() {
   const [mes, setMes] = useState(mesActualStr());
-  const [datos, setDatos] = useState<{ filas: FilaComision[]; totalComisionCentimos: number; totalFacturacionCentimos: number } | null>(null);
+  const [datos, setDatos] = useState<{
+    filas: FilaComision[];
+    totalComisionCentimos: number;
+    totalFacturacionCentimos: number;
+    totalProductosCentimos: number;
+    totalComisionProductosCentimos: number;
+  } | null>(null);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -62,14 +70,22 @@ export default function SeccionComisiones() {
         <p className="text-sm text-stone-500">Calculando…</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border border-stone-200 bg-white p-4">
               <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Facturación del equipo</div>
               <div className="mt-1 text-2xl font-bold text-stone-900">{euros(datos?.totalFacturacionCentimos ?? 0)}</div>
             </div>
             <div className="rounded-lg border border-stone-200 bg-white p-4">
-              <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Comisiones a pagar</div>
+              <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Comisiones a pagar (servicios)</div>
               <div className="mt-1 text-2xl font-bold text-stone-900">{euros(datos?.totalComisionCentimos ?? 0)}</div>
+            </div>
+            <div className="rounded-lg border border-stone-200 bg-white p-4">
+              <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Venta de productos</div>
+              <div className="mt-1 text-2xl font-bold text-stone-900">{euros(datos?.totalProductosCentimos ?? 0)}</div>
+            </div>
+            <div className="rounded-lg border border-stone-200 bg-white p-4">
+              <div className="font-mono text-xs uppercase tracking-wider text-stone-500">Comisión por productos</div>
+              <div className="mt-1 text-2xl font-bold text-stone-900">{euros(datos?.totalComisionProductosCentimos ?? 0)}</div>
             </div>
           </div>
 
@@ -87,6 +103,8 @@ export default function SeccionComisiones() {
                       <th className="py-2 pr-3 font-mono font-normal">Facturación</th>
                       <th className="py-2 pr-3 font-mono font-normal">Tramo</th>
                       <th className="py-2 pr-3 font-mono font-normal">Comisión</th>
+                      <th className="py-2 pr-3 font-mono font-normal">Productos</th>
+                      <th className="py-2 pr-3 font-mono font-normal">Com. productos</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
@@ -103,6 +121,8 @@ export default function SeccionComisiones() {
                           )}
                         </td>
                         <td className="py-2 pr-3 font-mono font-semibold text-stone-900">{euros(f.comisionCentimos)}</td>
+                        <td className="py-2 pr-3 font-mono text-stone-500">{euros(f.productosCentimos)}</td>
+                        <td className="py-2 pr-3 font-mono font-semibold text-stone-900">{euros(f.comisionProductosCentimos)}</td>
                       </tr>
                     ))}
                   </tbody>

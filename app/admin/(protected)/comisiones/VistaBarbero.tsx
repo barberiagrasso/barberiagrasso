@@ -14,6 +14,8 @@ interface FilaComision {
   siguienteTramo: TramoComision | null;
   posicion: number;
   totalBarberos: number;
+  productosCentimos: number;
+  comisionProductosCentimos: number;
 }
 
 // Color base de las zonas de la barra (el mismo amarillo de marca que el
@@ -127,7 +129,19 @@ function Simulador({ tramos, facturacionInicialCentimos }: { tramos: TramoComisi
   );
 }
 
-export default function VistaBarbero({ fila, tramos, mes, esMesActual }: { fila: FilaComision | undefined; tramos: TramoComision[]; mes: string; esMesActual: boolean }) {
+export default function VistaBarbero({
+  fila,
+  tramos,
+  mes,
+  esMesActual,
+  porcentajeProductos,
+}: {
+  fila: FilaComision | undefined;
+  tramos: TramoComision[];
+  mes: string;
+  esMesActual: boolean;
+  porcentajeProductos: number;
+}) {
   if (!fila) {
     return <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-500">No se ha encontrado tu ficha de profesional.</p>;
   }
@@ -175,6 +189,25 @@ export default function VistaBarbero({ fila, tramos, mes, esMesActual }: { fila:
           </div>
           <div className="mt-0.5 text-xs text-stone-400">por facturación este mes</div>
         </div>
+      </div>
+
+      {/* --- Productos: aparte de servicios, comisión plana sin tramos --- */}
+      <div className="rounded-lg border border-stone-200 bg-white p-4">
+        <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Productos de {etiquetaMes(mes)}</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-xs text-stone-500">Vendido</div>
+            <div className="mt-0.5 text-xl font-bold text-stone-900">{euros(fila.productosCentimos)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-stone-500">Tu comisión ({porcentajeProductos}%)</div>
+            <div className="mt-0.5 text-xl font-bold text-brand-yellow-dark">{euros(fila.comisionProductosCentimos)}</div>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-stone-400">
+          Un porcentaje fijo sobre lo vendido, sin tramos ni mínimo — no cuenta para el ranking de arriba, que es solo por
+          servicios.
+        </p>
       </div>
 
       {/* --- Progreso visual hacia el siguiente tramo --- */}

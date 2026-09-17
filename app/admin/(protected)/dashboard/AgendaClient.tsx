@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FinalizarCitaModal from "./FinalizarCitaModal";
 
 interface Sede {
   id: string;
@@ -12,6 +13,7 @@ interface Servicio {
   nombre: string;
   duracion_minutos: number;
   precio_centimos: number;
+  categoria: string | null;
 }
 interface Cita {
   id: string;
@@ -22,6 +24,7 @@ interface Cita {
   cliente: { id: string; nombre: string; telefono: string } | null;
   servicio: { id: string; nombre: string } | null;
   profesional: { id: string; nombre: string } | null;
+  extras?: { servicio_id: string }[];
 }
 
 function hoyISO() {
@@ -84,6 +87,7 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
   const [citas, setCitas] = useState<Cita[]>([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarNueva, setMostrarNueva] = useState(false);
+  const [finalizando, setFinalizando] = useState<Cita | null>(null);
 
   // En modo semana, "fecha" sigue siendo el día ancla (el que se ve en el
   // selector antes de cambiar de vista); los 7 días mostrados son los de
@@ -275,7 +279,7 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
                   {cita.estado === "confirmada" && (
                     <>
                       <button
-                        onClick={() => cambiarEstado(cita.id, "completada")}
+                        onClick={() => setFinalizando(cita)}
                         className="text-xs text-green-700 underline"
                       >
                         Completada
@@ -304,9 +308,23 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
           dias={diasSemana}
           citas={citas}
           cargando={cargando}
+          onFinalizar={setFinalizando}
           onCambiarEstado={cambiarEstado}
           onAvisarDisponible={avisarDisponible}
           avisando={avisando}
+        />
+      )}
+
+      {finalizando && (
+        <FinalizarCitaModal
+          cita={finalizando}
+          sedeId={sedeId}
+          servicios={servicios}
+          onCerrar={() => setFinalizando(null)}
+          onGuardada={() => {
+            setFinalizando(null);
+            cargarCitas();
+          }}
         />
       )}
     </div>
@@ -317,6 +335,7 @@ function VistaSemanal({
   dias,
   citas,
   cargando,
+  onFinalizar,
   onCambiarEstado,
   onAvisarDisponible,
   avisando,
@@ -324,6 +343,7 @@ function VistaSemanal({
   dias: string[];
   citas: Cita[];
   cargando: boolean;
+  onFinalizar: (cita: Cita) => void;
   onCambiarEstado: (id: string, estado: string) => void;
   onAvisarDisponible: (id: string) => void;
   avisando: string | null;
@@ -393,7 +413,7 @@ function VistaSemanal({
                     {cita.estado === "confirmada" && (
                       <>
                         <button
-                          onClick={() => onCambiarEstado(cita.id, "completada")}
+                          onClick={() => onFinalizar(cita)}
                           className="text-green-700 underline"
                           title="Marcar como completada"
                         >

@@ -7,7 +7,7 @@ export default async function DashboardPage() {
   const supabase = createAdminClient();
   const [{ data: sedes }, { data: servicios }] = await Promise.all([
     supabase.from("sedes").select("id, nombre, slug").order("nombre"),
-    supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos").order("nombre"),
+    supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos, categoria").order("nombre"),
   ]);
 
   return (
