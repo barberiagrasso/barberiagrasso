@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { colorDeProfesional, fechasDelRango } from "@/lib/vacaciones";
 
 interface Profesional {
@@ -72,6 +73,7 @@ export default function VacacionesClient({
   nombrePropio: string | null;
 }) {
   const esAdmin = rol === "admin";
+  const router = useRouter();
   const hoy = new Date();
   const [mesVisible, setMesVisible] = useState({ anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 });
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
@@ -148,16 +150,21 @@ export default function VacacionesClient({
     });
   }
 
+  // Un clic elige un solo día (de inicio y de fin, ambos ese día); el
+  // rango se afina con los dos campos de fecha del panel de abajo, igual
+  // que en "Bloquear fechas" — más claro y fiable que intentar adivinar
+  // si un segundo clic amplía el rango o empieza uno nuevo.
   function clicarDia(fecha: string) {
     if (!esAdmin && fechasBloqueadas.has(fecha)) return; // un barbero no puede ni empezar a seleccionar ahí
-    if (!seleccion || (seleccion.inicio && seleccion.fin)) {
-      setSeleccion({ inicio: fecha, fin: fecha });
-    } else {
-      const inicio = seleccion.inicio < fecha ? seleccion.inicio : fecha;
-      const fin = seleccion.inicio < fecha ? fecha : seleccion.inicio;
-      setSeleccion({ inicio, fin });
-    }
+    setSeleccion({ inicio: fecha, fin: fecha });
     setError(null);
+  }
+
+  function cambiarInicioSeleccion(inicio: string) {
+    setSeleccion((s) => (s ? { inicio, fin: s.fin < inicio ? inicio : s.fin } : { inicio, fin: inicio }));
+  }
+  function cambiarFinSeleccion(fin: string) {
+    setSeleccion((s) => (s ? { inicio: s.inicio > fin ? fin : s.inicio, fin } : { inicio: fin, fin }));
   }
 
   async function enviarSolicitud() {
@@ -186,6 +193,7 @@ export default function VacacionesClient({
     setBarberoElegido("");
     setAprobarDirectamente(false);
     cargar();
+    router.refresh(); // por si esto cambia el aviso de pendientes del admin (alta directa ya aprobada no lo toca, pero no está de más)
   }
 
   async function resolver(id: string, estado: "aprobada" | "rechazada") {
@@ -201,12 +209,17 @@ export default function VacacionesClient({
       return;
     }
     cargar();
+    // El aviso ámbar de "solicitudes pendientes" vive en el layout (un
+    // Server Component) — sin esto se queda con el número antiguo hasta
+    // que se navegue a otra pantalla, aunque aquí ya no quede ninguna.
+    router.refresh();
   }
 
   async function retirar(id: string) {
     if (!confirm("¿Retirar esta solicitud?")) return;
     await fetch(`/api/admin/vacaciones/${id}`, { method: "DELETE" });
     cargar();
+    router.refresh();
   }
 
   async function crearBloqueo() {
@@ -267,13 +280,19 @@ export default function VacacionesClient({
         )}
 
         <div className="mb-3 flex items-center justify-between">
-          <button onClick={() => cambiarMes(-1)} className="rounded-lg border border-stone-300 px-2 py-1 text-sm hover:border-stone-400">
+          <button
+            onClick={() => cambiarMes(-1)}
+            className="rounded-lg border border-stone-300 px-2 py-1 text-sm font-semibold text-stone-900 hover:border-stone-400"
+          >
             ←
           </button>
           <span className="font-medium text-stone-800">
             {nombreMes(mesVisible.anio, mesVisible.mes)} {mesVisible.anio}
           </span>
-          <button onClick={() => cambiarMes(1)} className="rounded-lg border border-stone-300 px-2 py-1 text-sm hover:border-stone-400">
+          <button
+            onClick={() => cambiarMes(1)}
+            className="rounded-lg border border-stone-300 px-2 py-1 text-sm font-semibold text-stone-900 hover:border-stone-400"
+          >
             →
           </button>
         </div>
@@ -349,9 +368,21 @@ export default function VacacionesClient({
 
         {seleccion && (
           <div className="mt-4 space-y-2 rounded-lg border border-brand-yellow bg-brand-yellow/10 p-3 text-sm">
-            <p className="font-medium text-stone-800">
-              {seleccion.inicio === seleccion.fin ? seleccion.inicio : `${seleccion.inicio} — ${seleccion.fin}`}
-            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={seleccion.inicio}
+                onChange={(e) => cambiarInicioSeleccion(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-1.5 text-sm"
+              />
+              <span className="text-stone-400">a</span>
+              <input
+                type="date"
+                value={seleccion.fin}
+                onChange={(e) => cambiarFinSeleccion(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-1.5 text-sm"
+              />
+            </div>
             {esAdmin && (
               <div className="flex flex-wrap items-center gap-2">
                 <select
@@ -394,7 +425,8 @@ export default function VacacionesClient({
         )}
         {!seleccion && (
           <p className="mt-3 text-xs text-stone-400">
-            Toca un día para empezar, y otro para elegir el rango completo. {esAdmin ? "" : "No puedes pedir días ya bloqueados ni ya ocupados por otro barbero."}
+            Toca un día del calendario para empezar; luego puedes ajustar la fecha de inicio y la de fin a mano en el
+            panel (pueden ser el mismo día). {esAdmin ? "" : "No puedes pedir días ya bloqueados ni ya ocupados por otro barbero."}
           </p>
         )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
