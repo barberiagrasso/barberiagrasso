@@ -65,11 +65,27 @@ export async function GET(request: NextRequest) {
   const diaSemana = new Date(`${fecha}T12:00:00`).getDay();
   const { data: horarios } = await supabase
     .from("horarios")
-    .select("profesional_id, hora_inicio, hora_fin")
+    .select("profesional_id, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
     .eq("sede_id", sedeId)
     .eq("dia_semana", diaSemana);
 
-  return NextResponse.json({ citas, profesionales, horarios: horarios ?? [] });
+  // Excepciones puntuales de descanso para el día concreto de "fecha" (no
+  // de todo el rango: solo la vista de día pinta el bloque de descanso,
+  // y siempre muestra un único día). Solo el admin puede haberlas creado,
+  // pero cualquiera que vea la agenda de ese día necesita conocerlas para
+  // pintar el bloque correcto.
+  const { data: descansosExcepciones } = await supabase
+    .from("descansos_excepciones")
+    .select("profesional_id, hora_inicio, hora_fin")
+    .eq("sede_id", sedeId)
+    .eq("fecha", fecha);
+
+  return NextResponse.json({
+    citas,
+    profesionales,
+    horarios: horarios ?? [],
+    descansosExcepciones: descansosExcepciones ?? [],
+  });
 }
 
 export async function POST(request: NextRequest) {

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { columnasVisibles, rangoHorario, ID_SIN_ASIGNAR, type Profesional, type Horario, type CitaParaColumna } from "./calendarioDia";
+import {
+  columnasVisibles,
+  rangoHorario,
+  resolverDescansosDia,
+  ID_SIN_ASIGNAR,
+  type Profesional,
+  type Horario,
+  type CitaParaColumna,
+  type DescansoExcepcion,
+} from "./calendarioDia";
 
 const LUCAS: Profesional = { id: "lucas", nombre: "Lucas" };
 const DAVID: Profesional = { id: "david", nombre: "David" };
@@ -83,5 +92,57 @@ describe("rangoHorario", () => {
 
   it("sin horarios ni citas, usa el rango por defecto", () => {
     expect(rangoHorario([], [], [])).toEqual({ minInicio: 9 * 60, maxFin: 20 * 60 });
+  });
+});
+
+describe("resolverDescansosDia", () => {
+  it("usa la regla general del horario cuando no hay excepción ese día", () => {
+    const horarios: Horario[] = [
+      { profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30", descanso_inicio: "14:00", descanso_fin: "15:00" },
+    ];
+    const resultado = resolverDescansosDia(horarios, []);
+    expect(resultado).toEqual([{ profesional_id: "lucas", hora_inicio: "14:00", hora_fin: "15:00", esExcepcion: false }]);
+  });
+
+  it("la excepción puntual del día manda sobre la regla general", () => {
+    const horarios: Horario[] = [
+      { profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30", descanso_inicio: "14:00", descanso_fin: "15:00" },
+    ];
+    const excepciones: DescansoExcepcion[] = [{ profesional_id: "lucas", hora_inicio: "15:30", hora_fin: "16:30" }];
+    const resultado = resolverDescansosDia(horarios, excepciones);
+    expect(resultado).toEqual([{ profesional_id: "lucas", hora_inicio: "15:30", hora_fin: "16:30", esExcepcion: true }]);
+  });
+
+  it("sin regla general ni excepción, no hay descanso ese día", () => {
+    const horarios: Horario[] = [{ profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30" }];
+    expect(resolverDescansosDia(horarios, [])).toEqual([]);
+  });
+
+  it("una excepción puede darle descanso a alguien sin regla general (día suelto)", () => {
+    const horarios: Horario[] = [{ profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30" }];
+    const excepciones: DescansoExcepcion[] = [{ profesional_id: "lucas", hora_inicio: "13:00", hora_fin: "13:30" }];
+    const resultado = resolverDescansosDia(horarios, excepciones);
+    expect(resultado).toEqual([{ profesional_id: "lucas", hora_inicio: "13:00", hora_fin: "13:30", esExcepcion: true }]);
+  });
+
+  it("resuelve el descanso de cada profesional por separado", () => {
+    const horarios: Horario[] = [
+      { profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30", descanso_inicio: "14:00", descanso_fin: "15:00" },
+      { profesional_id: "david", hora_inicio: "09:30", hora_fin: "20:30", descanso_inicio: "13:00", descanso_fin: "14:00" },
+    ];
+    const excepciones: DescansoExcepcion[] = [{ profesional_id: "david", hora_inicio: "16:00", hora_fin: "17:00" }];
+    const resultado = resolverDescansosDia(horarios, excepciones);
+    expect(resultado).toEqual([
+      { profesional_id: "lucas", hora_inicio: "14:00", hora_fin: "15:00", esExcepcion: false },
+      { profesional_id: "david", hora_inicio: "16:00", hora_fin: "17:00", esExcepcion: true },
+    ]);
+  });
+
+  it("no duplica si por error hay dos filas de horario del mismo profesional ese día", () => {
+    const horarios: Horario[] = [
+      { profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30", descanso_inicio: "14:00", descanso_fin: "15:00" },
+      { profesional_id: "lucas", hora_inicio: "09:30", hora_fin: "20:30", descanso_inicio: "14:00", descanso_fin: "15:00" },
+    ];
+    expect(resolverDescansosDia(horarios, [])).toHaveLength(1);
   });
 });

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fechaEnMadrid, minutosEnMadrid } from "@/lib/horarioLocal";
-import { columnasVisibles, rangoHorario, ID_SIN_ASIGNAR } from "@/lib/calendarioDia";
+import { fechaEnMadrid, minutosEnMadrid, minutosDeHora } from "@/lib/horarioLocal";
+import { columnasVisibles, rangoHorario, resolverDescansosDia, ID_SIN_ASIGNAR } from "@/lib/calendarioDia";
 
 interface Cita {
   id: string;
@@ -22,6 +22,18 @@ interface Horario {
   profesional_id: string;
   hora_inicio: string;
   hora_fin: string;
+  descanso_inicio?: string | null;
+  descanso_fin?: string | null;
+}
+interface DescansoExcepcion {
+  profesional_id: string;
+  hora_inicio: string;
+  hora_fin: string;
+}
+
+function horaDeMinutos(min: number) {
+  const m = Math.max(0, Math.round(min));
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
 const ETIQUETA_ESTADO: Record<string, string> = {
@@ -68,24 +80,32 @@ function claseBloque(estado: string) {
  * para botones dentro.
  */
 export default function CalendarioDia({
+  sedeId,
   fecha,
   citas,
   profesionales,
   horarios,
+  descansosExcepciones,
+  esAdmin,
   cargando,
   onFinalizar,
   onCambiarEstado,
   onAvisarDisponible,
+  onDescansoMovido,
   avisando,
 }: {
+  sedeId: string;
   fecha: string;
   citas: Cita[];
   profesionales: Profesional[];
   horarios: Horario[];
+  descansosExcepciones: DescansoExcepcion[];
+  esAdmin: boolean;
   cargando: boolean;
   onFinalizar: (cita: Cita) => void;
   onCambiarEstado: (id: string, estado: string) => void;
   onAvisarDisponible: (id: string) => void;
+  onDescansoMovido: () => void;
   avisando: string | null;
 }) {
   const [seleccionada, setSeleccionada] = useState<Cita | null>(null);
@@ -109,6 +129,71 @@ export default function CalendarioDia({
     }
     return mapa;
   }, [citas]);
+
+  // Descanso para comer que le toca a cada barbero ese día concreto (la
+  // excepción puntual arrastrada, si existe, si no la regla general de su
+  // horario) — se pinta como un bloque oscuro no reservable.
+  const descansoPorColumna = useMemo(() => {
+    const resueltos = resolverDescansosDia(horarios, descansosExcepciones);
+    return new Map(resueltos.map((d) => [d.profesional_id, d]));
+  }, [horarios, descansosExcepciones]);
+
+  // Arrastre del bloque de descanso (solo admin): mientras se arrastra se
+  // guarda aquí una vista previa en minutos; al soltar se persiste como
+  // excepción de ESE día concreto (no cambia la regla general) y se
+  // recarga la agenda.
+  const [arrastrando, setArrastrando] = useState<{ profesionalId: string; inicioMin: number; duracionMin: number } | null>(null);
+  const [guardandoDescanso, setGuardandoDescanso] = useState(false);
+
+  function iniciarArrastreDescanso(
+    e: React.MouseEvent,
+    profesionalId: string,
+    inicioMin: number,
+    finMin: number,
+    limiteInicio: number,
+    limiteFin: number
+  ) {
+    if (!esAdmin || guardandoDescanso) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const duracionMin = finMin - inicioMin;
+    const yInicial = e.clientY;
+
+    function alMover(ev: MouseEvent) {
+      const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
+      const snapMin = Math.round(deltaMin / 15) * 15;
+      const nuevoInicio = Math.min(Math.max(inicioMin + snapMin, limiteInicio), limiteFin - duracionMin);
+      setArrastrando({ profesionalId, inicioMin: nuevoInicio, duracionMin });
+    }
+    async function alSoltar(ev: MouseEvent) {
+      window.removeEventListener("mousemove", alMover);
+      window.removeEventListener("mouseup", alSoltar);
+      const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
+      const snapMin = Math.round(deltaMin / 15) * 15;
+      const nuevoInicio = Math.min(Math.max(inicioMin + snapMin, limiteInicio), limiteFin - duracionMin);
+      setArrastrando(null);
+      if (nuevoInicio === inicioMin) return; // no se movió, nada que guardar
+      setGuardandoDescanso(true);
+      try {
+        await fetch(`/api/admin/profesionales/${profesionalId}/descanso-excepcion`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sedeId,
+            fecha,
+            horaInicio: horaDeMinutos(nuevoInicio),
+            horaFin: horaDeMinutos(nuevoInicio + duracionMin),
+          }),
+        });
+        onDescansoMovido();
+      } finally {
+        setGuardandoDescanso(false);
+      }
+    }
+
+    window.addEventListener("mousemove", alMover);
+    window.addEventListener("mouseup", alSoltar);
+  }
 
   // Rango de horas a mostrar: el de los turnos de ese día si hay alguno,
   // si no el de las citas ya puestas, y si tampoco hay nada, un horario
@@ -193,6 +278,31 @@ export default function CalendarioDia({
                       <div className="absolute -left-0.5 -top-1 h-2 w-2 rounded-full bg-red-500" />
                     </div>
                   )}
+
+                  {(() => {
+                    const descanso = descansoPorColumna.get(col.id);
+                    if (!descanso) return null;
+                    const enArrastre = arrastrando?.profesionalId === col.id;
+                    const desde = enArrastre ? arrastrando!.inicioMin : minutosDeHora(descanso.hora_inicio);
+                    const hasta = enArrastre ? arrastrando!.inicioMin + arrastrando!.duracionMin : minutosDeHora(descanso.hora_fin);
+                    const top = (desde - minInicio) * PX_POR_MINUTO;
+                    const alto = (hasta - desde) * PX_POR_MINUTO;
+                    return (
+                      <div
+                        key="descanso"
+                        onMouseDown={(e) => iniciarArrastreDescanso(e, col.id, minutosDeHora(descanso.hora_inicio), minutosDeHora(descanso.hora_fin), minInicio, maxFin)}
+                        className={
+                          "absolute inset-x-0 z-10 flex items-center justify-center border-y border-stone-700 bg-stone-800/90 text-[11px] font-medium text-white " +
+                          (esAdmin ? "cursor-grab select-none active:cursor-grabbing" : "")
+                        }
+                        style={{ top, height: alto }}
+                        title={esAdmin ? "Descanso — arrástralo para moverlo solo este día" : "Descanso"}
+                      >
+                        Descanso {horaDeMinutos(desde)}–{horaDeMinutos(hasta)}
+                        {descanso.esExcepcion && " *"}
+                      </div>
+                    );
+                  })()}
 
                   {(citasPorColumna.get(col.id) ?? []).map((cita) => {
                     const desde = minutosEnMadrid(cita.inicio);

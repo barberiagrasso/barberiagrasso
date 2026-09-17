@@ -15,7 +15,7 @@ const NAV = [
   { href: "/admin/productos", label: "Productos" },
   { href: "/admin/profesionales", label: "Equipo" },
   { href: "/admin/comisiones", label: "Comisiones" },
-  { href: "/admin/bloqueos", label: "Vacaciones" },
+  { href: "/admin/vacaciones", label: "Vacaciones" },
   { href: "/admin/campanas", label: "Campañas" },
   { href: "/admin/plantillas", label: "Plantillas" },
   { href: "/admin/informes", label: "Informes" },

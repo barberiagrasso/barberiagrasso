@@ -46,6 +46,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!sedeId) return NextResponse.json({ error: "Falta sedeId." }, { status: 400 });
 
   for (const t of turnos) {
+    const tieneDescanso = Boolean(t.descanso_inicio || t.descanso_fin);
     if (
       typeof t.dia_semana !== "number" ||
       t.dia_semana < 0 ||
@@ -55,6 +56,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       t.hora_fin <= t.hora_inicio
     ) {
       return NextResponse.json({ error: "Algún turno tiene datos inválidos (hora fin debe ser mayor que hora inicio)." }, { status: 400 });
+    }
+    if (
+      tieneDescanso &&
+      (!t.descanso_inicio ||
+        !t.descanso_fin ||
+        t.descanso_fin <= t.descanso_inicio ||
+        t.descanso_inicio < t.hora_inicio ||
+        t.descanso_fin > t.hora_fin)
+    ) {
+      return NextResponse.json(
+        { error: "El descanso debe tener hora de inicio y fin, y caer dentro del turno de ese día." },
+        { status: 400 }
+      );
     }
   }
 
@@ -68,12 +82,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   if (turnos.length > 0) {
     const { error } = await supabase.from("horarios").insert(
-      turnos.map((t: { dia_semana: number; hora_inicio: string; hora_fin: string }) => ({
+      turnos.map((t: { dia_semana: number; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }) => ({
         profesional_id: id,
         sede_id: sedeId,
         dia_semana: t.dia_semana,
         hora_inicio: t.hora_inicio,
         hora_fin: t.hora_fin,
+        descanso_inicio: t.descanso_inicio || null,
+        descanso_fin: t.descanso_fin || null,
       }))
     );
     if (error) return NextResponse.json({ error: "No se pudo guardar el horario." }, { status: 500 });

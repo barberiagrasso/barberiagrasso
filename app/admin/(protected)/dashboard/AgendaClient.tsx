@@ -81,13 +81,26 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   no_presentada: "No presentada",
 };
 
-export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; servicios: Servicio[] }) {
+export default function AgendaClient({
+  sedes,
+  servicios,
+  esAdmin,
+}: {
+  sedes: Sede[];
+  servicios: Servicio[];
+  esAdmin: boolean;
+}) {
   const [sedeId, setSedeId] = useState(sedes[0]?.id ?? "");
   const [fecha, setFecha] = useState(hoyISO());
   const [vista, setVista] = useState<"dia" | "semana">("dia");
   const [citas, setCitas] = useState<Cita[]>([]);
   const [profesionalesDia, setProfesionalesDia] = useState<{ id: string; nombre: string }[]>([]);
-  const [horariosDia, setHorariosDia] = useState<{ profesional_id: string; hora_inicio: string; hora_fin: string }[]>([]);
+  const [horariosDia, setHorariosDia] = useState<
+    { profesional_id: string; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }[]
+  >([]);
+  const [descansosExcepciones, setDescansosExcepciones] = useState<
+    { profesional_id: string; hora_inicio: string; hora_fin: string }[]
+  >([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarNueva, setMostrarNueva] = useState(false);
   const [finalizando, setFinalizando] = useState<Cita | null>(null);
@@ -111,6 +124,7 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
     setCitas(json.citas ?? []);
     setProfesionalesDia(json.profesionales ?? []);
     setHorariosDia(json.horarios ?? []);
+    setDescansosExcepciones(json.descansosExcepciones ?? []);
     setCargando(false);
   }
 
@@ -242,14 +256,18 @@ export default function AgendaClient({ sedes, servicios }: { sedes: Sede[]; serv
 
       {vista === "dia" ? (
         <CalendarioDia
+          sedeId={sedeId}
           fecha={fecha}
           citas={citas}
           profesionales={profesionalesDia}
           horarios={horariosDia}
+          descansosExcepciones={descansosExcepciones}
+          esAdmin={esAdmin}
           cargando={cargando}
           onFinalizar={setFinalizando}
           onCambiarEstado={cambiarEstado}
           onAvisarDisponible={avisarDisponible}
+          onDescansoMovido={cargarCitas}
           avisando={avisando}
         />
       ) : (

@@ -41,6 +41,13 @@ export interface Horario {
   dia_semana: number; // 0 = domingo ... 6 = sábado
   hora_inicio: string; // "HH:mm:ss"
   hora_fin: string; // "HH:mm:ss"
+  // Descanso para comer, regla general de ese día de la semana. NULL =
+  // sin descanso fijo ese día. Ver lib/availability.ts (se trata como un
+  // hueco ocupado más al calcular disponibilidad) y
+  // descansos_excepciones (para mover el descanso un día puntual sin
+  // tocar esta regla general).
+  descanso_inicio?: string | null;
+  descanso_fin?: string | null;
 }
 
 export interface Cliente {

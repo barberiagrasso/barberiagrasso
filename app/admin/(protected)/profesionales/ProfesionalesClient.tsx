@@ -24,6 +24,8 @@ interface Horario {
   dia_semana: number;
   hora_inicio: string;
   hora_fin: string;
+  descanso_inicio: string | null;
+  descanso_fin: string | null;
 }
 
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -281,23 +283,44 @@ function DetalleProfesional({
   );
 }
 
+interface DiaEditor {
+  activo: boolean;
+  inicio: string;
+  fin: string;
+  conDescanso: boolean;
+  descansoInicio: string;
+  descansoFin: string;
+}
+
+function diaVacio(): DiaEditor {
+  return { activo: false, inicio: "09:30", fin: "20:30", conDescanso: false, descansoInicio: "14:00", descansoFin: "15:00" };
+}
+
 function EditorHorario({ profesionalId, sedeId }: { profesionalId: string; sedeId: string }) {
-  const [dias, setDias] = useState<Record<number, { activo: boolean; inicio: string; fin: string }>>(() => {
-    const base: Record<number, { activo: boolean; inicio: string; fin: string }> = {};
-    for (let d = 0; d < 7; d++) base[d] = { activo: false, inicio: "09:30", fin: "20:30" };
+  const [dias, setDias] = useState<Record<number, DiaEditor>>(() => {
+    const base: Record<number, DiaEditor> = {};
+    for (let d = 0; d < 7; d++) base[d] = diaVacio();
     return base;
   });
   const [cargado, setCargado] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/admin/profesionales/${profesionalId}/horarios?sedeId=${sedeId}`)
       .then((r) => r.json())
       .then((j) => {
-        const nuevo: Record<number, { activo: boolean; inicio: string; fin: string }> = {};
-        for (let d = 0; d < 7; d++) nuevo[d] = { activo: false, inicio: "09:30", fin: "20:30" };
+        const nuevo: Record<number, DiaEditor> = {};
+        for (let d = 0; d < 7; d++) nuevo[d] = diaVacio();
         for (const h of (j.horarios ?? []) as Horario[]) {
-          nuevo[h.dia_semana] = { activo: true, inicio: h.hora_inicio.slice(0, 5), fin: h.hora_fin.slice(0, 5) };
+          nuevo[h.dia_semana] = {
+            activo: true,
+            inicio: h.hora_inicio.slice(0, 5),
+            fin: h.hora_fin.slice(0, 5),
+            conDescanso: Boolean(h.descanso_inicio && h.descanso_fin),
+            descansoInicio: h.descanso_inicio ? h.descanso_inicio.slice(0, 5) : "14:00",
+            descansoFin: h.descanso_fin ? h.descanso_fin.slice(0, 5) : "15:00",
+          };
         }
         setDias(nuevo);
         setCargado(true);
@@ -310,49 +333,92 @@ function EditorHorario({ profesionalId, sedeId }: { profesionalId: string; sedeI
   }
 
   async function guardar() {
+    setError(null);
     setGuardando(true);
     const turnos = Object.entries(dias)
       .filter(([, v]) => v.activo)
-      .map(([dia, v]) => ({ dia_semana: parseInt(dia, 10), hora_inicio: `${v.inicio}:00`, hora_fin: `${v.fin}:00` }));
-    await fetch(`/api/admin/profesionales/${profesionalId}/horarios`, {
+      .map(([dia, v]) => ({
+        dia_semana: parseInt(dia, 10),
+        hora_inicio: `${v.inicio}:00`,
+        hora_fin: `${v.fin}:00`,
+        descanso_inicio: v.conDescanso ? `${v.descansoInicio}:00` : null,
+        descanso_fin: v.conDescanso ? `${v.descansoFin}:00` : null,
+      }));
+    const res = await fetch(`/api/admin/profesionales/${profesionalId}/horarios`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sedeId, horarios: turnos }),
     });
     setGuardando(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      setError(json?.error || "No se pudo guardar el horario.");
+    }
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {DIAS.map((nombreDia, d) => (
-        <div key={d} className="flex flex-wrap items-center gap-2 text-sm">
-          <label className="flex w-28 items-center gap-1.5 text-stone-700">
-            <input
-              type="checkbox"
-              checked={dias[d].activo}
-              onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], activo: e.target.checked } })}
-            />
-            {nombreDia}
-          </label>
+        <div key={d} className="space-y-1.5 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex w-28 items-center gap-1.5 text-stone-700">
+              <input
+                type="checkbox"
+                checked={dias[d].activo}
+                onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], activo: e.target.checked } })}
+              />
+              {nombreDia}
+            </label>
+            {dias[d].activo && (
+              <>
+                <input
+                  type="time"
+                  value={dias[d].inicio}
+                  onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], inicio: e.target.value } })}
+                  className="rounded border border-stone-300 p-1 text-sm"
+                />
+                <span className="text-stone-400">a</span>
+                <input
+                  type="time"
+                  value={dias[d].fin}
+                  onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], fin: e.target.value } })}
+                  className="rounded border border-stone-300 p-1 text-sm"
+                />
+              </>
+            )}
+          </div>
           {dias[d].activo && (
-            <>
-              <input
-                type="time"
-                value={dias[d].inicio}
-                onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], inicio: e.target.value } })}
-                className="rounded border border-stone-300 p-1 text-sm"
-              />
-              <span className="text-stone-400">a</span>
-              <input
-                type="time"
-                value={dias[d].fin}
-                onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], fin: e.target.value } })}
-                className="rounded border border-stone-300 p-1 text-sm"
-              />
-            </>
+            <div className="ml-28 flex flex-wrap items-center gap-2 text-xs text-stone-600">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={dias[d].conDescanso}
+                  onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], conDescanso: e.target.checked } })}
+                />
+                Descanso para comer
+              </label>
+              {dias[d].conDescanso && (
+                <>
+                  <input
+                    type="time"
+                    value={dias[d].descansoInicio}
+                    onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], descansoInicio: e.target.value } })}
+                    className="rounded border border-stone-300 p-1 text-xs"
+                  />
+                  <span className="text-stone-400">a</span>
+                  <input
+                    type="time"
+                    value={dias[d].descansoFin}
+                    onChange={(e) => setDias({ ...dias, [d]: { ...dias[d], descansoFin: e.target.value } })}
+                    className="rounded border border-stone-300 p-1 text-xs"
+                  />
+                </>
+              )}
+            </div>
           )}
         </div>
       ))}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         disabled={guardando}
         onClick={guardar}
@@ -360,6 +426,10 @@ function EditorHorario({ profesionalId, sedeId }: { profesionalId: string; sedeI
       >
         {guardando ? "Guardando…" : "Guardar horario"}
       </button>
+      <p className="text-xs text-stone-400">
+        Si un día concreto hay que mover el descanso sin cambiar la regla general de aquí, se hace arrastrándolo
+        directamente en la Agenda (solo tú puedes hacerlo).
+      </p>
     </div>
   );
 }

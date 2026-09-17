@@ -33,12 +33,17 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     { count: escaladasPendientes },
     { count: fallosRecientes },
     { count: erroresSinResolver },
+    { count: vacacionesPendientes },
   ] = await Promise.all([
     supabase.from("sedes").select("id, nombre").order("nombre"),
     supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos").order("nombre"),
     supabase.from("conversaciones").select("id", { count: "exact", head: true }).eq("estado", "escalada"),
     supabase.from("fallos_asistente").select("id", { count: "exact", head: true }).gte("created_at", desde),
     supabase.from("errores_sistema").select("id", { count: "exact", head: true }).eq("resuelto", false),
+    // Solo le interesa al rol "admin" (es quien aprueba/rechaza) — se
+    // pide igualmente para todos y se filtra abajo, más simple que un
+    // if aparte, y el coste de una query de más es insignificante.
+    supabase.from("solicitudes_vacaciones").select("id", { count: "exact", head: true }).eq("estado", "pendiente"),
   ]);
 
   return (
@@ -63,9 +68,21 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           </div>
         </div>
       </header>
-      {((escaladasPendientes ?? 0) > 0 || (fallosRecientes ?? 0) > 0 || (erroresSinResolver ?? 0) > 0) && (
+      {((escaladasPendientes ?? 0) > 0 ||
+        (fallosRecientes ?? 0) > 0 ||
+        (erroresSinResolver ?? 0) > 0 ||
+        (admin.rol === "admin" && (vacacionesPendientes ?? 0) > 0)) && (
         <div className="border-b border-amber-300 bg-amber-50 px-4 py-2">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-1 text-sm text-amber-900">
+            {admin.rol === "admin" && (vacacionesPendientes ?? 0) > 0 && (
+              <Link
+                href="/admin/vacaciones"
+                className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"
+              >
+                {vacacionesPendientes} solicitud{vacacionesPendientes === 1 ? "" : "es"} de vacaciones esperando tu
+                aprobación
+              </Link>
+            )}
             {(escaladasPendientes ?? 0) > 0 && (
               <Link
                 href="/admin/conversaciones"

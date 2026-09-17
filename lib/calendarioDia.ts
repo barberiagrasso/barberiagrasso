@@ -15,9 +15,56 @@ export interface Horario {
   profesional_id: string;
   hora_inicio: string;
   hora_fin: string;
+  descanso_inicio?: string | null;
+  descanso_fin?: string | null;
 }
 export interface CitaParaColumna {
   profesional: { id: string; nombre: string } | null;
+}
+export interface DescansoExcepcion {
+  profesional_id: string;
+  hora_inicio: string;
+  hora_fin: string;
+}
+export interface DescansoResuelto {
+  profesional_id: string;
+  hora_inicio: string;
+  hora_fin: string;
+  /** true si es la excepción puntual de ese día (arrastrada), no la regla general. */
+  esExcepcion: boolean;
+}
+
+/**
+ * Descanso para comer que le toca a cada profesional ESE día concreto:
+ * la excepción puntual (arrastrada por el admin ese día) si existe, si no
+ * la regla general de su horario. Réplica local de `resolverDescansos` de
+ * lib/availability.ts — no se puede importar de ahí porque ese módulo
+ * tiene "server-only" y este componente es de cliente.
+ */
+export function resolverDescansosDia(
+  horariosDelDia: Horario[],
+  excepcionesDelDia: DescansoExcepcion[]
+): DescansoResuelto[] {
+  const excepcionPorProfesional = new Map(excepcionesDelDia.map((e) => [e.profesional_id, e]));
+  const resultado: DescansoResuelto[] = [];
+  const yaResueltos = new Set<string>();
+
+  for (const h of horariosDelDia) {
+    if (yaResueltos.has(h.profesional_id)) continue;
+    yaResueltos.add(h.profesional_id);
+    const excepcion = excepcionPorProfesional.get(h.profesional_id);
+    if (excepcion) {
+      resultado.push({ ...excepcion, esExcepcion: true });
+    } else if (h.descanso_inicio && h.descanso_fin) {
+      resultado.push({
+        profesional_id: h.profesional_id,
+        hora_inicio: h.descanso_inicio,
+        hora_fin: h.descanso_fin,
+        esExcepcion: false,
+      });
+    }
+  }
+  return resultado;
 }
 
 export const ID_SIN_ASIGNAR = "__sin_asignar__";
