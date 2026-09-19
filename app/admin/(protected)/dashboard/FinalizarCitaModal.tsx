@@ -16,6 +16,7 @@ import {
   IconBanknote,
   IconSmartphone,
   IconDots,
+  IconTicket,
 } from "@/components/ui/Icons";
 
 interface Servicio {
@@ -41,13 +42,42 @@ interface Cita {
   profesional: { id: string; nombre: string } | null;
   extras?: { servicio_id: string }[];
 }
+interface BonoTipo {
+  id: string;
+  clave: string;
+  nombre: string;
+  servicio_id: string;
+  precio_centimos: number;
+  usos_totales: number;
+  dias_validez: number;
+}
+interface Bono {
+  id: string;
+  usos_totales: number;
+  usos_restantes: number;
+  fecha_caducidad: string;
+  tipo: BonoTipo;
+}
 
 const METODOS_PAGO: { id: string; etiqueta: string; Icono: typeof IconCard }[] = [
   { id: "efectivo", etiqueta: "Efectivo", Icono: IconBanknote },
   { id: "tarjeta", etiqueta: "Tarjeta", Icono: IconCard },
   { id: "bizum", etiqueta: "Bizum", Icono: IconSmartphone },
+  { id: "bono", etiqueta: "Bono", Icono: IconTicket },
   { id: "otro", etiqueta: "Otro", Icono: IconDots },
 ];
+
+function formatoFechaCorta(fechaISO: string) {
+  const [anio, mes, dia] = fechaISO.split("-");
+  return `${dia}/${mes}/${anio}`;
+}
+
+// Un bono es utilizable si le quedan usos y no ha caducado — misma
+// regla que bonoEsUtilizable() en lib/bonos.ts (server-only, no se
+// puede importar aquí, así que se repite este cálculo trivial).
+function bonoEsUtilizable(bono: Pick<Bono, "usos_restantes" | "fecha_caducidad">): boolean {
+  return bono.usos_restantes > 0 && bono.fecha_caducidad >= new Date().toISOString().slice(0, 10);
+}
 
 function euros(centimos: number) {
   return (centimos / 100).toFixed(2);
@@ -98,6 +128,10 @@ export default function FinalizarCitaModal({
   const [productosElegidos, setProductosElegidos] = useState<Map<string, number>>(new Map());
   const [productoParaAnadir, setProductoParaAnadir] = useState("");
   const [metodoPago, setMetodoPago] = useState<string | null>(null);
+  const [bonos, setBonos] = useState<Bono[]>([]);
+  const [bonoTipos, setBonoTipos] = useState<BonoTipo[]>([]);
+  const [omitirBono, setOmitirBono] = useState(false);
+  const [bonoTipoParaComprarId, setBonoTipoParaComprarId] = useState("");
 
   const fechaOriginal = fechaEnMadrid(cita.inicio);
   const [horaInicio, setHoraInicio] = useState(horaEnMadrid(cita.inicio));
@@ -117,7 +151,29 @@ export default function FinalizarCitaModal({
     fetch("/api/admin/productos")
       .then((r) => r.json())
       .then((j) => setProductos((j.productos ?? []).filter((p: Producto) => p.activo)));
-  }, [sedeId, fechaOriginal]);
+    fetch("/api/admin/bonos-tipos")
+      .then((r) => r.json())
+      .then((j) => setBonoTipos(j.tipos ?? []));
+    if (cita.cliente?.id) {
+      fetch(`/api/admin/clientes/${cita.cliente.id}/bonos`)
+        .then((r) => r.json())
+        .then((j) => setBonos(j.bonos ?? []));
+    }
+  }, [sedeId, fechaOriginal, cita.cliente?.id]);
+
+  // Al pulsar "Bono" en el método de pago, se preselecciona el tipo que
+  // coincide con el servicio realizado (lo normal); al quitarlo, se
+  // olvida la elección para que la próxima vez vuelva a proponerla.
+  function elegirMetodoPago(id: string) {
+    const nuevo = metodoPago === id ? null : id;
+    setMetodoPago(nuevo);
+    if (nuevo === "bono") {
+      const coincidente = bonoTipos.find((t) => t.servicio_id === servicioId);
+      setBonoTipoParaComprarId((coincidente ?? bonoTipos[0])?.id ?? "");
+    } else {
+      setBonoTipoParaComprarId("");
+    }
+  }
 
   function anadirComplemento() {
     if (!complementoParaAnadir) return;
@@ -144,24 +200,59 @@ export default function FinalizarCitaModal({
     setProductoParaAnadir("");
   }
 
+  const precioPrincipalCentimos = useMemo(
+    () => servicios.find((s) => s.id === servicioId)?.precio_centimos ?? 0,
+    [servicios, servicioId]
+  );
+  const precioExtrasCentimos = useMemo(
+    () => extrasIds.reduce((acc, id) => acc + (servicios.find((s) => s.id === id)?.precio_centimos ?? 0), 0),
+    [servicios, extrasIds]
+  );
+
   // "Servicio" = precio del servicio principal + complementos: es el
   // importe que se puede corregir a mano (precioManualCentimos) y el que
   // cuentan comisiones, fidelización, HubSpot e historial del cliente
   // (ver lib/precios.ts). Los productos van siempre aparte, a precio de
   // catálogo — nunca han generado saldo ni comisión de servicio.
-  const totalServicioAutomaticoCentimos = useMemo(() => {
-    const principal = servicios.find((s) => s.id === servicioId)?.precio_centimos ?? 0;
-    const extras = extrasIds.reduce((acc, id) => acc + (servicios.find((s) => s.id === id)?.precio_centimos ?? 0), 0);
-    return principal + extras;
-  }, [servicios, servicioId, extrasIds]);
+  const totalServicioAutomaticoCentimos = precioPrincipalCentimos + precioExtrasCentimos;
+
+  // El bono que cubre el servicio principal elegido ahora mismo, si hay
+  // alguno con usos y sin caducar (ver bonoAplicable en lib/bonos.ts,
+  // mismo criterio reproducido aquí porque ese archivo es server-only).
+  // Los complementos NUNCA están incluidos en el bono — solo el
+  // servicio principal exacto al que corresponde.
+  const bonoAplicable = useMemo(() => {
+    const candidatos = bonos
+      .filter((b) => b.tipo?.servicio_id === servicioId && bonoEsUtilizable(b))
+      .sort((a, b) => a.fecha_caducidad.localeCompare(b.fecha_caducidad));
+    return candidatos[0] ?? null;
+  }, [bonos, servicioId]);
+
+  const bonoActivo = Boolean(bonoAplicable) && !omitirBono;
+  const bonoTipoParaComprar = bonoTipos.find((t) => t.id === bonoTipoParaComprarId) ?? null;
+  const comprandoBonoNuevo = metodoPago === "bono";
 
   const [precioManualCentimos, setPrecioManualCentimos] = useState<number | null>(null);
   const [editandoPrecio, setEditandoPrecio] = useState(false);
   const [precioManualTexto, setPrecioManualTexto] = useState("");
 
-  // Si el barbero todavía no ha tocado el precio, el "final" sigue al
-  // automático aunque cambie el servicio o los complementos.
-  const totalServicioCentimos = precioManualCentimos ?? totalServicioAutomaticoCentimos;
+  // Tres modos, de mayor a menor prioridad: vendiendo un bono nuevo (el
+  // precio es el del tipo elegido, no el del catálogo), canjeando un
+  // bono ya existente (el servicio principal pasa a costar 0 — solo se
+  // cobran los complementos), o el caso normal de siempre (precio
+  // manual si el barbero lo tocó, si no el automático). Si el barbero
+  // todavía no ha tocado el precio manual, éste sigue al automático
+  // aunque cambie el servicio o los complementos.
+  const totalServicioCentimos =
+    comprandoBonoNuevo && bonoTipoParaComprar
+      ? bonoTipoParaComprar.precio_centimos + precioExtrasCentimos
+      : bonoActivo
+        ? precioExtrasCentimos
+        : (precioManualCentimos ?? totalServicioAutomaticoCentimos);
+  // El precio de servicio ya no es el automático de catálogo: hay que
+  // mandarlo siempre como precioFinalCentimos al guardar, aunque el
+  // barbero no lo haya "tocado a mano" en el sentido de precioManualCentimos.
+  const precioServicioForzado = (comprandoBonoNuevo && bonoTipoParaComprar) || bonoActivo;
 
   function empezarAEditarPrecio() {
     setPrecioManualTexto(euros(totalServicioCentimos));
@@ -187,6 +278,12 @@ export default function FinalizarCitaModal({
     return total;
   }, [productos, productosElegidos]);
 
+  // Remanente que sí hay que cobrar de verdad cuando el servicio lo cubre
+  // un bono: los complementos y los productos. Si es 0, no hace falta que
+  // el barbero elija método de pago — la cita queda pagada con el bono.
+  const remanenteTrasBonoCentimos = precioExtrasCentimos + totalProductosCentimos;
+  const cubiertoDelTodoPorBono = bonoActivo && remanenteTrasBonoCentimos === 0;
+
   async function guardar() {
     if (!servicioId || !profesionalId) {
       setError("Falta el servicio o el profesional.");
@@ -196,8 +293,24 @@ export default function FinalizarCitaModal({
       setError("La hora de fin debe ser posterior a la de inicio.");
       return;
     }
+    if (comprandoBonoNuevo && !bonoTipoParaComprar) {
+      setError("Elige qué bono se está vendiendo.");
+      return;
+    }
     setGuardando(true);
     setError(null);
+
+    const bono =
+      comprandoBonoNuevo && bonoTipoParaComprar
+        ? { accion: "comprar" as const, bonoTipoId: bonoTipoParaComprar.id }
+        : bonoActivo && bonoAplicable
+          ? { accion: "canjear" as const, bonoId: bonoAplicable.id }
+          : null;
+    // Si el bono cubre todo el servicio (sin complementos ni productos
+    // que pagar aparte), se guarda como pagado con bono aunque el
+    // barbero no haya tocado los botones de método de pago.
+    const metodoPagoAEnviar = cubiertoDelTodoPorBono ? "bono" : metodoPago;
+
     const res = await fetch(`/api/admin/citas/${cita.id}/finalizar`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -208,8 +321,13 @@ export default function FinalizarCitaModal({
         finISO: isoDesdeMadrid(fechaOriginal, horaFin),
         extrasServicioIds: extrasIds,
         productos: Array.from(productosElegidos.entries()).map(([productoId, cantidad]) => ({ productoId, cantidad })),
-        metodoPago,
-        ...(precioManualCentimos !== null ? { precioFinalCentimos: precioManualCentimos } : {}),
+        metodoPago: metodoPagoAEnviar,
+        bono,
+        ...(precioServicioForzado
+          ? { precioFinalCentimos: totalServicioCentimos }
+          : precioManualCentimos !== null
+            ? { precioFinalCentimos: precioManualCentimos }
+            : {}),
       }),
     });
     setGuardando(false);
@@ -439,71 +557,142 @@ export default function FinalizarCitaModal({
             )}
           </div>
 
+          {bonoAplicable && (
+            <div className="py-4">
+              <Etiqueta icono={IconTicket} texto="Bono de este cliente" />
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+                <span>
+                  Bono {bonoAplicable.tipo.nombre} · quedan {bonoAplicable.usos_restantes} de {bonoAplicable.usos_totales}{" "}
+                  usos · caduca el {formatoFechaCorta(bonoAplicable.fecha_caducidad)}
+                </span>
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-xs text-stone-500">
+                <input type="checkbox" checked={omitirBono} onChange={(e) => setOmitirBono(e.target.checked)} />
+                No usar este bono en esta cita (cobrar el servicio normalmente)
+              </label>
+            </div>
+          )}
+
           <div className="py-4">
             <Etiqueta icono={IconCard} texto="Método de pago" />
-            <div className="flex flex-wrap gap-2">
-              {METODOS_PAGO.map((m) => {
-                const activo = metodoPago === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setMetodoPago(activo ? null : m.id)}
-                    className={
-                      "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition " +
-                      (activo
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                        : "border-stone-200 text-stone-600 hover:border-stone-300")
-                    }
-                  >
-                    <m.Icono className="h-4 w-4" />
-                    {m.etiqueta}
-                  </button>
-                );
-              })}
-            </div>
+            {cubiertoDelTodoPorBono ? (
+              <p className="rounded-lg bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
+                Pagado con el bono — no hace falta elegir método de pago.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {METODOS_PAGO.map((m) => {
+                  const activo = metodoPago === m.id;
+                  const deshabilitado = m.id === "bono" && bonoActivo;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={deshabilitado}
+                      title={deshabilitado ? "Ya se está usando un bono de este cliente para el servicio" : undefined}
+                      onClick={() => elegirMetodoPago(m.id)}
+                      className={
+                        "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 " +
+                        (activo
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-stone-200 text-stone-600 hover:border-stone-300")
+                      }
+                    >
+                      <m.Icono className="h-4 w-4" />
+                      {m.etiqueta}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {comprandoBonoNuevo && (
+              <div className="mt-3 rounded-lg border border-stone-200 p-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-400">Qué bono se vende</p>
+                <div className="flex flex-wrap gap-2">
+                  {bonoTipos.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setBonoTipoParaComprarId(t.id)}
+                      className={
+                        "rounded-lg border px-3 py-2 text-sm font-medium transition " +
+                        (bonoTipoParaComprarId === t.id
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-stone-200 text-stone-600 hover:border-stone-300")
+                      }
+                    >
+                      {t.nombre} · {euros(t.precio_centimos)}€
+                    </button>
+                  ))}
+                </div>
+                {bonoTipoParaComprar && (
+                  <p className="mt-2 text-xs text-stone-400">
+                    Se creará un bono de {bonoTipoParaComprar.usos_totales} usos, válido {bonoTipoParaComprar.dias_validez}{" "}
+                    días desde hoy (el uso de esta misma cita ya se descuenta).
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="py-4">
             <Etiqueta icono={IconCoin} texto="Precio final" />
             <div className="space-y-2 text-sm text-stone-700">
-              <div className="flex items-center justify-between">
-                <span>Servicio + complementos</span>
-                {editandoPrecio ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      autoFocus
-                      value={precioManualTexto}
-                      onChange={(e) => setPrecioManualTexto(e.target.value)}
-                      className="w-24 rounded-lg border border-emerald-400 p-1.5 text-right text-sm font-semibold"
-                    />
-                    <span>€</span>
-                    <button
-                      onClick={confirmarPrecioManual}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
-                      aria-label="Confirmar precio"
-                    >
-                      <IconCheck className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{euros(totalServicioCentimos)}€</span>
-                    <button onClick={empezarAEditarPrecio} className="text-stone-400 hover:text-stone-600" title="Editar precio a mano" aria-label="Editar precio">
-                      <IconPencil className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-              {precioTocado && !editandoPrecio && (
+              {comprandoBonoNuevo && bonoTipoParaComprar ? (
+                <div className="flex justify-between">
+                  <span>Bono nuevo · {bonoTipoParaComprar.nombre}</span>
+                  <span className="font-semibold">{euros(bonoTipoParaComprar.precio_centimos)}€</span>
+                </div>
+              ) : bonoActivo ? (
+                <div className="flex justify-between">
+                  <span>{cita.servicio?.nombre ?? "Servicio"} (incluido en el bono)</span>
+                  <span className="font-semibold text-emerald-700">Incluido en el bono</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span>Servicio + complementos</span>
+                  {editandoPrecio ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        autoFocus
+                        value={precioManualTexto}
+                        onChange={(e) => setPrecioManualTexto(e.target.value)}
+                        className="w-24 rounded-lg border border-emerald-400 p-1.5 text-right text-sm font-semibold"
+                      />
+                      <span>€</span>
+                      <button
+                        onClick={confirmarPrecioManual}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+                        aria-label="Confirmar precio"
+                      >
+                        <IconCheck className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{euros(totalServicioCentimos)}€</span>
+                      <button onClick={empezarAEditarPrecio} className="text-stone-400 hover:text-stone-600" title="Editar precio a mano" aria-label="Editar precio">
+                        <IconPencil className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {precioTocado && !editandoPrecio && !precioServicioForzado && (
                 <div className="flex items-center justify-between rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700">
                   <span>Precio corregido a mano (catálogo: {euros(totalServicioAutomaticoCentimos)}€)</span>
                   <button onClick={restablecerPrecio} className="font-medium underline">
                     Restablecer
                   </button>
+                </div>
+              )}
+              {(bonoActivo || comprandoBonoNuevo) && precioExtrasCentimos > 0 && (
+                <div className="flex justify-between">
+                  <span>Complementos</span>
+                  <span className="font-medium">{euros(precioExtrasCentimos)}€</span>
                 </div>
               )}
               {totalProductosCentimos > 0 && (

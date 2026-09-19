@@ -4,6 +4,7 @@ import { useState } from "react";
 import ServiciosClient from "../servicios/ServiciosClient";
 import ProductosClient from "../productos/ProductosClient";
 import ProfesionalesClient from "../profesionales/ProfesionalesClient";
+import BonosClient from "./BonosClient";
 
 interface Servicio {
   id: string;
@@ -33,8 +34,16 @@ interface ServicioEquipo {
   nombre: string;
   categoria: string | null;
 }
+interface BonoTipo {
+  id: string;
+  clave: string;
+  nombre: string;
+  precio_centimos: number;
+  usos_totales: number;
+  dias_validez: number;
+}
 
-type Pestana = "servicios" | "productos" | "equipo";
+type Pestana = "servicios" | "productos" | "bonos" | "equipo";
 
 /**
  * "Mi barbería": agrupa lo que antes eran tres pestañas sueltas del menú
@@ -52,21 +61,26 @@ type Pestana = "servicios" | "productos" | "equipo";
 export default function MiBarberiaClient({
   servicios,
   productos,
+  bonoTipos,
   esAdmin,
   sedesEquipo,
   serviciosEquipo,
 }: {
   servicios: Servicio[];
   productos: Producto[];
+  bonoTipos: BonoTipo[];
   esAdmin: boolean;
   sedesEquipo: Sede[];
   serviciosEquipo: ServicioEquipo[];
 }) {
   const [pestana, setPestana] = useState<Pestana>("servicios");
 
+  // "Bonos" solo la ve rol "admin" (como "Equipo"): cambiar su precio es
+  // dinero, y la API que lo hace ya exige requireRolAdminApi().
   const pestanas: { id: Pestana; label: string }[] = [
     { id: "servicios", label: "Servicios" },
     { id: "productos", label: "Productos" },
+    ...(esAdmin ? [{ id: "bonos" as Pestana, label: "Bonos" }] : []),
     ...(esAdmin ? [{ id: "equipo" as Pestana, label: "Equipo" }] : []),
   ];
 
@@ -89,6 +103,7 @@ export default function MiBarberiaClient({
 
       {pestana === "servicios" && <ServiciosClient servicios={servicios} />}
       {pestana === "productos" && <ProductosClient productos={productos} />}
+      {pestana === "bonos" && esAdmin && <BonosClient tipos={bonoTipos} />}
       {pestana === "equipo" && esAdmin && <ProfesionalesClient sedes={sedesEquipo} servicios={serviciosEquipo} />}
     </div>
   );

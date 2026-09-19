@@ -12,6 +12,7 @@ interface Cita {
   estado: string;
   origen: string;
   profesional_elegido_por_cliente?: boolean;
+  metodo_pago?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string } | null;
@@ -413,6 +414,9 @@ export default function CalendarioDia({
                             <span className="text-red-500" title="El cliente pidió a este profesional en concreto">♥</span>
                           )}
                           {cita.estado === "completada" && <span className="text-emerald-600" title="Completada">✓</span>}
+                          {cita.estado === "completada" && cita.metodo_pago && (
+                            <span className="text-emerald-600" title="Pagada">$</span>
+                          )}
                           {cita.estado === "no_presentada" && <span className="text-amber-600" title="No presentada">!</span>}
                           <div className="truncate font-medium">
                             {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
@@ -501,6 +505,11 @@ function DetalleCitaPanel({
             {cita.profesional_elegido_por_cliente && (
               <span className="ml-1 text-red-500" title="El cliente pidió a este profesional en concreto">
                 ♥
+              </span>
+            )}
+            {cita.estado === "completada" && cita.metodo_pago && (
+              <span className="ml-1 text-emerald-600" title="Pagada">
+                $
               </span>
             )}
           </div>

@@ -26,6 +26,7 @@ interface Cita {
   estado: string;
   origen: string;
   profesional_elegido_por_cliente?: boolean;
+  metodo_pago?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string } | null;
@@ -453,12 +454,15 @@ function VistaSemanal({
                     <span className="text-red-500" title="El cliente pidió a este profesional en concreto">♥</span>
                   )}
                   {cita.estado === "completada" && <span className="text-emerald-600" title="Completada">✓</span>}
+                  {cita.estado === "completada" && cita.metodo_pago && (
+                    <span className="text-emerald-600" title="Pagada">$</span>
+                  )}
                   {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
                 </div>
                 <div className="text-stone-500">
                   {cita.servicio?.nombre} · {cita.profesional?.nombre ?? "Cualquiera"}
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-1">
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
                   <span
                     className={
                       "rounded-full px-1.5 py-0.5 " +
@@ -471,7 +475,7 @@ function VistaSemanal({
                   >
                     {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
                   </span>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap justify-end gap-1">
                     {(cita.estado === "confirmada" || cita.estado === "completada") && (
                       <button
                         onClick={() => onAvisarDisponible(cita.id)}

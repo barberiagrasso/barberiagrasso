@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   const { data: citas, error } = await supabase
     .from("citas")
     .select(
-      "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id)"
+      "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, metodo_pago, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id)"
     )
     .eq("sede_id", sedeId)
     .gte("inicio", inicioDia)

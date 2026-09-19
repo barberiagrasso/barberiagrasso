@@ -149,3 +149,12 @@ export function IconDots(props: IconProps) {
     </svg>
   );
 }
+
+export function IconTicket(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.8 1.8 0 0 0 0 3.6V15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.2a1.8 1.8 0 0 0 0-3.6Z" />
+      <path d="M14 7.5v9" strokeDasharray="2.2 2.2" />
+    </svg>
+  );
+}

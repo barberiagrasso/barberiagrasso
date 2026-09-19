@@ -5,7 +5,9 @@ import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
 import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
 import { CumpleanosForm } from "./CumpleanosForm";
+import { BonosSection } from "./BonosSection";
 import { precioCitaCentimos } from "@/lib/precios";
+import { bonosDelCliente } from "@/lib/bonos";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,7 @@ export default async function PerfilPage() {
   // después) — el acceso ya está comprobado arriba por requireCliente(),
   // y aquí solo se piden citas de ESE cliente, nunca de otro.
   const admin = createAdminClient();
+  const bonos = await bonosDelCliente(admin, cliente.id);
   const { data: citas } = await admin
     .from("citas")
     .select(
@@ -101,6 +104,8 @@ export default async function PerfilPage() {
         </Link>
 
         <CumpleanosForm fechaInicial={cliente.fecha_nacimiento ?? null} />
+
+        <BonosSection bonos={bonos} />
 
         <h2 className="mb-3 font-heading text-lg text-brand-white">Historial de citas</h2>
 
