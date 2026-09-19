@@ -6,7 +6,7 @@ import Link from "next/link";
 interface Cliente {
   id: string;
   nombre: string;
-  telefono: string;
+  telefono: string | null;
   email: string | null;
   saldo_fidelizacion_centimos: number;
   created_at: string;
@@ -63,7 +63,7 @@ export default function ClientesClient({ clientesIniciales }: { clientesIniciale
             {clientes.map((c) => (
               <tr key={c.id} className="hover:bg-stone-50">
                 <td className="p-3 font-medium text-stone-800">{c.nombre}</td>
-                <td className="p-3 text-stone-600">{c.telefono}</td>
+                <td className="p-3 text-stone-600">{c.telefono ?? <span className="italic text-stone-400">Oculto</span>}</td>
                 <td className="p-3 font-mono text-stone-700">{formatearPrecio(c.saldo_fidelizacion_centimos)}</td>
                 <td className="p-3 text-right">
                   <Link href={`/admin/clientes/${c.id}`} className="text-sm font-medium text-brand-yellow-dark hover:underline">

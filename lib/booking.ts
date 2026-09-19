@@ -57,6 +57,11 @@ interface CrearReservaParams {
   // saldo cubre el total exacto (ver lib/fidelizacion.ts) — no hay canje
   // parcial.
   pagarConSaldo?: boolean;
+  // true si quien reserva pidió expresamente este profesional (no
+  // "Cualquiera") — para el icono de corazón de la Agenda. No se puede
+  // deducir de profesionalId/slotElegido porque esos ya traen el barbero
+  // asignado en los dos casos.
+  profesionalElegidoPorCliente?: boolean;
 }
 
 export class ReservaError extends Error {}
@@ -223,6 +228,10 @@ async function asignarListaEsperaPorHueco(citaCancelada: { sede_id: string; inic
           aceptaComercial: false,
           canal: "app",
           origen: "lista_espera",
+          // Si al apuntarse pidió un profesional concreto (no
+          // "Cualquiera"), sigue siendo su elección aunque la reserva la
+          // haga el sistema en su nombre al liberarse el hueco.
+          profesionalElegidoPorCliente: candidato.profesional_id !== null,
         });
         cita = resultado.cita;
         profesionalNombre = resultado.profesionalNombre;
@@ -396,6 +405,7 @@ export async function crearReserva(params: CrearReservaParams) {
       origen: params.origen,
       notas: notaComplementos,
       saldo_canjeado_centimos: params.pagarConSaldo ? totalCentimos : 0,
+      profesional_elegido_por_cliente: params.profesionalElegidoPorCliente ?? false,
     })
     .select("*")
     .single();

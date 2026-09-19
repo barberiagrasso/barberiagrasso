@@ -6,7 +6,7 @@ import Link from "next/link";
 interface Cliente {
   id: string;
   nombre: string;
-  telefono: string;
+  telefono: string | null;
   email: string | null;
   saldo_fidelizacion_centimos: number;
   created_at: string;
@@ -122,7 +122,7 @@ export default function ClienteDetalleClient({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-stone-900">{cliente.nombre}</h1>
-            <p className="text-sm text-stone-500">{cliente.telefono}</p>
+            {cliente.telefono && <p className="text-sm text-stone-500">{cliente.telefono}</p>}
             {cliente.email && <p className="text-sm text-stone-500">{cliente.email}</p>}
             <p className="mt-1 text-xs text-stone-400">Cliente desde {formatoFecha(cliente.created_at)}</p>
           </div>

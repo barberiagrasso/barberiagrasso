@@ -26,6 +26,9 @@ export interface Servicio {
   // Orden dentro de su grupo (los 4 principales entre sí, o los
   // servicios de un mismo desplegable entre sí).
   orden?: number;
+  // Color (hex) con el que se pinta este servicio en la leyenda y en las
+  // citas de la Agenda — ver lib/coloresServicio.ts.
+  color?: string | null;
 }
 
 export interface Profesional {
@@ -75,7 +78,11 @@ export interface Consentimiento {
 }
 
 export type EstadoCita = "confirmada" | "cancelada" | "completada" | "no_presentada";
-export type OrigenCita = "app" | "panel" | "whatsapp";
+// "lista_espera": la crea sola el sistema al asignar automáticamente un
+// hueco liberado a quien estaba apuntado — ver asignarListaEsperaPorHueco
+// en lib/booking.ts. Faltaba en esta unión desde que se añadió esa
+// funcionalidad (el valor ya está permitido en la base de datos).
+export type OrigenCita = "app" | "panel" | "whatsapp" | "lista_espera";
 
 export interface Cita {
   id: string;
@@ -91,6 +98,10 @@ export interface Cita {
   // Se rellena cuando /api/cron/recordatorios ya mandó el recordatorio
   // automático de esta cita (evita mandarlo dos veces).
   recordatorio_enviado_at?: string | null;
+  // true si el cliente pidió expresamente este profesional al reservar
+  // (no "Cualquiera") — controla el icono de corazón de la Agenda
+  // (CalendarioDia.tsx).
+  profesional_elegido_por_cliente?: boolean;
   created_at: string;
 }
 

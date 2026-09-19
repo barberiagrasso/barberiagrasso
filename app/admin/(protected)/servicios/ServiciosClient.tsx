@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PALETA_COLORES_SERVICIO } from "@/lib/coloresServicio";
 
 interface Servicio {
   id: string;
@@ -11,6 +12,7 @@ interface Servicio {
   categoria: string | null;
   orden: number;
   activo: boolean;
+  color?: string | null;
 }
 
 // Los desplegables ya usados en la reserva, para que Diego pueda elegir
@@ -124,6 +126,7 @@ function FilaServicio({
   const [duracion, setDuracion] = useState(String(servicio.duracion_minutos));
   const [categoria, setCategoria] = useState(servicio.categoria ?? "");
   const [orden, setOrden] = useState(String(servicio.orden));
+  const [color, setColor] = useState(servicio.color ?? PALETA_COLORES_SERVICIO[0].valor);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,6 +140,7 @@ function FilaServicio({
       duracion_minutos: parseInt(duracion, 10),
       categoria: categoria || null,
       orden: parseInt(orden, 10) || 0,
+      color,
     });
     setGuardando(false);
     if (res.ok) {
@@ -155,7 +159,12 @@ function FilaServicio({
     return (
       <div className="flex flex-wrap items-center justify-between gap-2 p-3">
         <div>
-          <div className={"font-medium " + (servicio.activo ? "text-stone-900" : "text-stone-400 line-through")}>
+          <div className={"flex items-center gap-2 font-medium " + (servicio.activo ? "text-stone-900" : "text-stone-400 line-through")}>
+            <span
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: servicio.color ?? "#d6d3d1" }}
+              title="Color en la Agenda"
+            />
             {servicio.nombre}
           </div>
           <div className="text-sm text-stone-500">
@@ -197,6 +206,22 @@ function FilaServicio({
           </option>
         ))}
       </select>
+      <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-500">Color en la Agenda</p>
+        <div className="flex flex-wrap gap-1.5">
+          {PALETA_COLORES_SERVICIO.map((c) => (
+            <button
+              key={c.valor}
+              type="button"
+              onClick={() => setColor(c.valor)}
+              title={c.nombre}
+              aria-label={c.nombre}
+              className={"h-6 w-6 rounded-full border-2 " + (color === c.valor ? "border-stone-900" : "border-transparent")}
+              style={{ backgroundColor: c.valor }}
+            />
+          ))}
+        </div>
+      </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-3">
         <button disabled={guardando} onClick={guardar} className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">

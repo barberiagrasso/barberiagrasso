@@ -9,8 +9,9 @@ import { acumularPorCitaCompletada, reembolsarSaldoDeCita } from "@/lib/fideliza
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -55,8 +56,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ ok: true });
   }
 
-  // Mover la cita a otra hora / otro profesional
+  // Mover la cita a otra hora / otro profesional (arrastrar en la
+  // Agenda): solo el administrador, nunca una cuenta de equipo — ver
+  // requireRolAdminApi en lib/adminApiAuth.ts para el resto de secciones
+  // que aplican la misma restricción.
   if (body?.horaInicioISO) {
+    if (admin.rol !== "admin") {
+      return NextResponse.json({ error: "Solo un administrador puede mover una cita de hora." }, { status: 403 });
+    }
     const { data: citaActual } = await supabase
       .from("citas")
       .select("id, sede_id, servicio_id, profesional_id, servicios(duracion_minutos)")

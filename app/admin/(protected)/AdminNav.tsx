@@ -3,24 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// Estas 4 secciones son solo para rol "admin" (ver requireRolAdmin en
+// Estas secciones son solo para rol "admin" (ver requireRolAdmin en
 // lib/adminAuth.ts) — una cuenta de equipo (rol "barbero") ni las ve en
-// el menú ni puede entrar a la URL directamente.
-const SOLO_ADMIN = new Set(["/admin/profesionales", "/admin/campanas", "/admin/plantillas", "/admin/informes"]);
+// el menú ni puede entrar a la URL directamente. "Mi barbería" sí la ven
+// los dos roles: dentro, su propia pestaña "Equipo" es la que se oculta
+// para un barbero (ver MiBarberiaClient.tsx).
+const SOLO_ADMIN = new Set(["/admin/campanas", "/admin/plantillas", "/admin/informes"]);
 
+// Menú más corto que antes (pedido de Diego): Servicios, Productos y
+// Equipo se agruparon en una sola pestaña ("Mi barbería", con sus
+// propias pestañas internas — ver mi-barberia/MiBarberiaClient.tsx).
+// Lista de espera pasó a ser una pestaña dentro de la propia Agenda
+// (AgendaClient.tsx) en vez de una sección aparte, y WhatsApp pasó a ser
+// la burbuja flotante de todo el panel (WhatsAppFlotante.tsx) en vez de
+// una pestaña — las rutas /admin/servicios, /admin/productos,
+// /admin/profesionales, /admin/lista-espera y /admin/conversaciones
+// siguen existiendo por si hay algún enlace guardado, solo que ya no
+// aparecen aquí.
 const NAV = [
   { href: "/admin/dashboard", label: "Agenda" },
   { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/servicios", label: "Servicios" },
-  { href: "/admin/productos", label: "Productos" },
-  { href: "/admin/profesionales", label: "Equipo" },
+  { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
   { href: "/admin/vacaciones", label: "Vacaciones" },
-  { href: "/admin/lista-espera", label: "Lista de espera" },
   { href: "/admin/campanas", label: "Campañas" },
   { href: "/admin/plantillas", label: "Plantillas" },
   { href: "/admin/informes", label: "Informes" },
-  { href: "/admin/conversaciones", label: "WhatsApp" },
   { href: "/admin/errores", label: "Errores" },
 ];
 

@@ -5,6 +5,7 @@ import { GrassoMark } from "@/components/brand/GrassoMark";
 import AdminNav from "./AdminNav";
 import SignOutButton from "./SignOutButton";
 import NuevaCitaRapida from "./NuevaCitaRapida";
+import WhatsAppFlotante from "./WhatsAppFlotante";
 
 // Cuántos días hacia atrás se cuentan los fallos del asistente para el
 // aviso — lo suficiente para no perder de vista uno del fin de semana sin
@@ -114,6 +115,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
       )}
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       <NuevaCitaRapida sedes={sedes ?? []} servicios={servicios ?? []} />
+      <WhatsAppFlotante />
     </div>
   );
 }

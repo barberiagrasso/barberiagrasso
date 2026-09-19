@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/adminAuth";
+import { puedeVerTelefonos } from "@/lib/telefono";
 import ClienteDetalleClient from "./ClienteDetalleClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClienteDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const { admin } = await requireAdmin();
   const supabase = createAdminClient();
 
   const { data: cliente } = await supabase
@@ -15,6 +18,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
     .maybeSingle();
 
   if (!cliente) notFound();
+  if (!puedeVerTelefonos(admin.rol)) cliente.telefono = null;
 
   const [{ data: movimientos }, { data: citas }] = await Promise.all([
     supabase

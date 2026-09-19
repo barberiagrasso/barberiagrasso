@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizarTelefono } from "@/lib/clientes";
+import { puedeVerTelefonos } from "@/lib/telefono";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,9 @@ export const dynamic = "force-dynamic";
 // "612345678" encuentre al cliente aunque se guardara como "+34612345678").
 // Sin "q", enseña los últimos clientes dados de alta.
 export async function GET(request: NextRequest) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -19,6 +21,7 @@ export async function GET(request: NextRequest) {
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const supabase = createAdminClient();
+  const puedeVerTelefono = puedeVerTelefonos(admin.rol);
 
   let consulta = supabase
     .from("clientes")
@@ -27,7 +30,10 @@ export async function GET(request: NextRequest) {
     .limit(50);
 
   if (q) {
-    const pareceTelefono = /\d/.test(q);
+    // Un barbero no puede buscar por teléfono — le dejaría ir probando
+    // dígitos hasta encontrar a alguien sin conocer ya su número. Se
+    // trata siempre como búsqueda por nombre para esa cuenta.
+    const pareceTelefono = puedeVerTelefono && /\d/.test(q);
     if (pareceTelefono) {
       consulta = consulta.ilike("telefono", `%${normalizarTelefono(q).replace(/^\+/, "")}%`);
     } else {
@@ -38,5 +44,9 @@ export async function GET(request: NextRequest) {
   const { data: clientes, error } = await consulta;
   if (error) return NextResponse.json({ error: "No se pudo buscar clientes." }, { status: 500 });
 
-  return NextResponse.json({ clientes: clientes ?? [] });
+  const clientesParaElRol = puedeVerTelefono
+    ? clientes ?? []
+    : (clientes ?? []).map((c) => ({ ...c, telefono: null }));
+
+  return NextResponse.json({ clientes: clientesParaElRol });
 }

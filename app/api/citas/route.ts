@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       origen: "app",
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
       pagarConSaldo,
+      profesionalElegidoPorCliente: Boolean(body.profesionalElegidoPorCliente),
     });
 
     return NextResponse.json({ cita, profesionalNombre });

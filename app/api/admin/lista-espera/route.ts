@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { puedeVerTelefonos } from "@/lib/telefono";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,9 @@ export const dynamic = "force-dynamic";
 // sea, nunca llegaron a "reservado") de una sede, para pintarlas
 // agrupadas por día como una segunda agenda.
 export async function GET(request: NextRequest) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -32,5 +34,13 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: "No se pudo cargar la lista de espera." }, { status: 500 });
-  return NextResponse.json({ entradas: entradas ?? [] });
+
+  const entradasParaElRol = puedeVerTelefonos(admin.rol)
+    ? entradas
+    : (entradas ?? []).map((e) => {
+        const cliente = Array.isArray(e.cliente) ? e.cliente[0] : e.cliente;
+        return { ...e, cliente: cliente ? { ...cliente, telefono: null } : null };
+      });
+
+  return NextResponse.json({ entradas: entradasParaElRol ?? [] });
 }

@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { puedeVerTelefonos } from "@/lib/telefono";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -21,7 +23,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     supabase.from("mensajes").select("id, remitente, contenido, created_at").eq("conversacion_id", id).order("created_at"),
   ]);
 
-  return NextResponse.json({ conversacion, mensajes: mensajes ?? [] });
+  // El barbero puede responder por WhatsApp (el envío usa el teléfono
+  // guardado en el servidor, no el que vea en pantalla), pero no puede
+  // VER el número — solo el administrador.
+  const conversacionParaElRol =
+    conversacion && !puedeVerTelefonos(admin.rol) ? { ...conversacion, telefono: null } : conversacion;
+
+  return NextResponse.json({ conversacion: conversacionParaElRol, mensajes: mensajes ?? [] });
 }
 
 // El gestor responde manualmente: se envía por WhatsApp y la conversación

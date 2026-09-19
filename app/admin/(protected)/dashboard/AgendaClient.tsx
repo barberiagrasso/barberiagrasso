@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import FinalizarCitaModal from "./FinalizarCitaModal";
 import CalendarioDia from "./CalendarioDia";
+import ListaEsperaClient from "../lista-espera/ListaEsperaClient";
 
 interface Sede {
   id: string;
@@ -15,6 +16,7 @@ interface Servicio {
   duracion_minutos: number;
   precio_centimos: number;
   categoria: string | null;
+  color?: string | null;
 }
 interface Cita {
   id: string;
@@ -22,8 +24,9 @@ interface Cita {
   fin: string;
   estado: string;
   origen: string;
-  cliente: { id: string; nombre: string; telefono: string } | null;
-  servicio: { id: string; nombre: string } | null;
+  profesional_elegido_por_cliente?: boolean;
+  cliente: { id: string; nombre: string; telefono: string | null } | null;
+  servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string } | null;
   extras?: { servicio_id: string }[];
 }
@@ -90,6 +93,7 @@ export default function AgendaClient({
   servicios: Servicio[];
   esAdmin: boolean;
 }) {
+  const [pestana, setPestana] = useState<"citas" | "lista-espera">("citas");
   const [sedeId, setSedeId] = useState(sedes[0]?.id ?? "");
   const [fecha, setFecha] = useState(hoyISO());
   const [vista, setVista] = useState<"dia" | "semana">("dia");
@@ -146,6 +150,43 @@ export default function AgendaClient({
     cargarCitas();
   }
 
+  // Arrastrar una cita en el calendario de día para cambiarla de hora
+  // (solo admin — ver esAdmin en CalendarioDia.tsx). El backend
+  // (PATCH /api/admin/citas/[id]) comprueba que el profesional no tenga
+  // ya otra cita a esa hora antes de moverla.
+  async function moverCita(id: string, nuevoInicioISO: string) {
+    const res = await fetch(`/api/admin/citas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ horaInicioISO: nuevoInicioISO }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(json.error || "No se pudo mover la cita.");
+    }
+    cargarCitas();
+  }
+
+  // Leyenda de colores por servicio: uno por cada servicio con color que
+  // tenga al menos una cita cargada ahora mismo, en vez de todo el
+  // catálogo — así no sale un servicio irrelevante que nunca se usa en
+  // esta sede.
+  const leyendaServicios = useMemo(() => {
+    const vistos = new Map<string, { nombre: string; color: string }>();
+    for (const c of citas) {
+      const s = c.servicio;
+      if (s?.color && !vistos.has(s.id)) vistos.set(s.id, { nombre: s.nombre, color: s.color });
+    }
+    if (vistos.size === 0) {
+      // Nada cargado todavía (agenda vacía): se enseña el catálogo
+      // completo para que la leyenda no aparezca en blanco.
+      for (const s of servicios) {
+        if (s.color) vistos.set(s.id, { nombre: s.nombre, color: s.color });
+      }
+    }
+    return Array.from(vistos.values());
+  }, [citas, servicios]);
+
   const [avisando, setAvisando] = useState<string | null>(null);
 
   // Avisa por WhatsApp al siguiente cliente de este mismo profesional de
@@ -167,6 +208,31 @@ export default function AgendaClient({
 
   return (
     <div className="space-y-4">
+      <div className="flex gap-1 rounded-lg border border-stone-300 p-1 w-fit">
+        <button
+          onClick={() => setPestana("citas")}
+          className={
+            "rounded-md px-3 py-1.5 text-sm " +
+            (pestana === "citas" ? "bg-stone-900 text-white" : "text-stone-600 hover:text-stone-900")
+          }
+        >
+          Citas
+        </button>
+        <button
+          onClick={() => setPestana("lista-espera")}
+          className={
+            "rounded-md px-3 py-1.5 text-sm " +
+            (pestana === "lista-espera" ? "bg-stone-900 text-white" : "text-stone-600 hover:text-stone-900")
+          }
+        >
+          Lista de espera
+        </button>
+      </div>
+
+      {pestana === "lista-espera" && <ListaEsperaClient sedes={sedes} />}
+
+      {pestana === "citas" && (
+        <>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-2">
           {sedes.map((s) => (
@@ -254,6 +320,17 @@ export default function AgendaClient({
         />
       )}
 
+      {leyendaServicios.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-stone-600">
+          {leyendaServicios.map((s) => (
+            <span key={s.nombre} className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+              {s.nombre}
+            </span>
+          ))}
+        </div>
+      )}
+
       {vista === "dia" ? (
         <CalendarioDia
           sedeId={sedeId}
@@ -268,6 +345,7 @@ export default function AgendaClient({
           onCambiarEstado={cambiarEstado}
           onAvisarDisponible={avisarDisponible}
           onDescansoMovido={cargarCitas}
+          onMoverCita={moverCita}
           avisando={avisando}
         />
       ) : (
@@ -293,6 +371,8 @@ export default function AgendaClient({
             cargarCitas();
           }}
         />
+      )}
+        </>
       )}
     </div>
   );
@@ -346,8 +426,16 @@ function VistaSemanal({
               <p className="text-xs text-stone-400">Sin citas</p>
             )}
             {(citasPorDia.get(dia) ?? []).map((cita) => (
-              <div key={cita.id} className="rounded-lg border border-stone-200 p-2 text-xs">
-                <div className="font-medium text-stone-900">
+              <div
+                key={cita.id}
+                className="rounded-lg border border-l-4 border-stone-200 p-2 text-xs"
+                style={cita.servicio?.color && cita.estado !== "cancelada" ? { borderLeftColor: cita.servicio.color } : undefined}
+              >
+                <div className="flex items-center gap-1 font-medium text-stone-900">
+                  {cita.profesional_elegido_por_cliente && (
+                    <span className="text-red-500" title="El cliente pidió a este profesional en concreto">♥</span>
+                  )}
+                  {cita.estado === "completada" && <span className="text-emerald-600" title="Completada">✓</span>}
                   {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
                 </div>
                 <div className="text-stone-500">

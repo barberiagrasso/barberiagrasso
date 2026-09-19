@@ -14,7 +14,7 @@ interface Entrada {
   flexibilidad_dias: number;
   estado: Estado;
   created_at: string;
-  cliente: { nombre: string; telefono: string } | { nombre: string; telefono: string }[] | null;
+  cliente: { nombre: string; telefono: string | null } | { nombre: string; telefono: string | null }[] | null;
   servicio: { nombre: string } | { nombre: string }[] | null;
   profesional: { nombre: string } | { nombre: string }[] | null;
 }
@@ -121,7 +121,8 @@ export default function ListaEsperaClient({ sedes }: { sedes: Sede[] }) {
                     <div>
                       <p className="font-medium text-stone-900">{cliente?.nombre ?? "Cliente"}</p>
                       <p className="text-xs text-stone-500">
-                        {cliente?.telefono} · {servicio?.nombre ?? "Servicio"} · {profesional?.nombre ?? "Cualquiera"}
+                        {cliente?.telefono && `${cliente.telefono} · `}
+                        {servicio?.nombre ?? "Servicio"} · {profesional?.nombre ?? "Cualquiera"}
                       </p>
                       <p className="text-xs text-stone-400">
                         Le vale {etiquetaFlexibilidad(e.flexibilidad_dias)} · apuntado el {formatoFechaAlta(e.created_at)}

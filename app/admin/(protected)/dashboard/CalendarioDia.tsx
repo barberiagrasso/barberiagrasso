@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { fechaEnMadrid, minutosEnMadrid, minutosDeHora } from "@/lib/horarioLocal";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { fechaEnMadrid, minutosEnMadrid, minutosDeHora, isoDesdeMadrid } from "@/lib/horarioLocal";
 import { columnasVisibles, rangoHorario, resolverDescansosDia, ID_SIN_ASIGNAR } from "@/lib/calendarioDia";
 
 interface Cita {
@@ -10,8 +10,9 @@ interface Cita {
   fin: string;
   estado: string;
   origen: string;
-  cliente: { id: string; nombre: string; telefono: string } | null;
-  servicio: { id: string; nombre: string } | null;
+  profesional_elegido_por_cliente?: boolean;
+  cliente: { id: string; nombre: string; telefono: string | null } | null;
+  servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string } | null;
 }
 interface Profesional {
@@ -57,17 +58,31 @@ function formatoHora(iso: string) {
   });
 }
 
+// Color por defecto para una cita cuyo servicio no tiene color asignado
+// (no debería pasar con servicios dados de alta desde ahora, pero cubre
+// datos antiguos o un color vacío a mano).
+const COLOR_SERVICIO_POR_DEFECTO = "#a8a29e"; // stone-400
+
+/**
+ * Clases fijas del bloque de una cita según su estado — el color de
+ * fondo/borde ya no depende del estado (eso ahora lo indican los iconos
+ * de tick verde y "!"), sino del servicio (ver `estiloColorServicio`),
+ * para que la Agenda funcione como una leyenda de colores por servicio.
+ * "cancelada" es la única excepción: se tacha y se apaga del todo, da
+ * igual el servicio, porque esa cita ya no representa nada que vaya a
+ * pasar.
+ */
 function claseBloque(estado: string) {
-  switch (estado) {
-    case "completada":
-      return "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100";
-    case "no_presentada":
-      return "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100";
-    case "cancelada":
-      return "border-red-200 bg-red-50 text-red-400 line-through opacity-70 hover:opacity-100";
-    default:
-      return "border-brand-yellow/50 bg-brand-yellow/15 text-stone-900 hover:bg-brand-yellow/25";
+  if (estado === "cancelada") {
+    return "border-red-200 bg-red-50 text-red-400 line-through opacity-70 hover:opacity-100";
   }
+  return "text-stone-900 hover:brightness-95";
+}
+
+/** Fondo/borde de una cita a partir del color hex de su servicio. */
+function estiloColorServicio(color: string | null | undefined): React.CSSProperties {
+  const hex = color || COLOR_SERVICIO_POR_DEFECTO;
+  return { backgroundColor: `${hex}26`, borderColor: `${hex}80` };
 }
 
 /**
@@ -92,6 +107,7 @@ export default function CalendarioDia({
   onCambiarEstado,
   onAvisarDisponible,
   onDescansoMovido,
+  onMoverCita,
   avisando,
 }: {
   sedeId: string;
@@ -106,6 +122,7 @@ export default function CalendarioDia({
   onCambiarEstado: (id: string, estado: string) => void;
   onAvisarDisponible: (id: string) => void;
   onDescansoMovido: () => void;
+  onMoverCita: (id: string, nuevoInicioISO: string) => Promise<void> | void;
   avisando: string | null;
 }) {
   const [seleccionada, setSeleccionada] = useState<Cita | null>(null);
@@ -188,6 +205,65 @@ export default function CalendarioDia({
         onDescansoMovido();
       } finally {
         setGuardandoDescanso(false);
+      }
+    }
+
+    window.addEventListener("mousemove", alMover);
+    window.addEventListener("mouseup", alSoltar);
+  }
+
+  // Arrastre de una cita para cambiarla de hora (solo admin, y solo
+  // dentro de la misma columna/profesional — mover de barbero no es lo
+  // que pidió Diego, solo la hora). Mismo patrón que el arrastre del
+  // descanso de arriba: mientras se arrastra se guarda una vista previa
+  // en minutos, y al soltar se llama a onMoverCita (PATCH
+  // /api/admin/citas/[id] con horaInicioISO), que ya comprueba que no
+  // choque con otra cita de ese profesional.
+  //
+  // Distinguir "fue un click" de "fue un arrastre": un mousedown seguido
+  // de un mouseup sin apenas movimiento debe abrir el panel de detalle
+  // (el onClick normal del botón), no disparar una llamada a mover la
+  // cita de 0 minutos. Se guarda en un ref (no en estado) si hubo
+  // movimiento real, y el onClick de la cita lo consulta antes de abrir
+  // el panel — el click llega justo después del mouseup, así que el ref
+  // ya está actualizado para cuando se lee.
+  const [arrastrandoCita, setArrastrandoCita] = useState<{ citaId: string; profesionalId: string; inicioMin: number; duracionMin: number } | null>(null);
+  const [moviendoCitaId, setMoviendoCitaId] = useState<string | null>(null);
+  const ultimoArrastreCitaRef = useRef(false);
+  const UMBRAL_ARRASTRE_PX = 4;
+
+  function iniciarArrastreCita(e: React.MouseEvent, cita: Cita, limiteInicio: number, limiteFin: number) {
+    if (!esAdmin || cita.estado !== "confirmada" || moviendoCitaId) return;
+    if (!cita.profesional?.id) return; // "Sin asignar": no tiene sentido arrastrarla dentro de esa columna
+    const profesionalId: string = cita.profesional.id; // ya con tipo no-opcional, para que las funciones anidadas de más abajo no lo vuelvan a ver como "string | undefined"
+    e.preventDefault();
+    e.stopPropagation();
+    ultimoArrastreCitaRef.current = false;
+    const inicioMinOriginal = minutosEnMadrid(cita.inicio);
+    const duracionMin = minutosEnMadrid(cita.fin) - inicioMinOriginal;
+    const yInicial = e.clientY;
+
+    function alMover(ev: MouseEvent) {
+      if (Math.abs(ev.clientY - yInicial) > UMBRAL_ARRASTRE_PX) ultimoArrastreCitaRef.current = true;
+      const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
+      const snapMin = Math.round(deltaMin / 15) * 15;
+      const nuevoInicio = Math.min(Math.max(inicioMinOriginal + snapMin, limiteInicio), limiteFin - duracionMin);
+      setArrastrandoCita({ citaId: cita.id, profesionalId, inicioMin: nuevoInicio, duracionMin });
+    }
+    async function alSoltar(ev: MouseEvent) {
+      window.removeEventListener("mousemove", alMover);
+      window.removeEventListener("mouseup", alSoltar);
+      setArrastrandoCita(null);
+      if (!ultimoArrastreCitaRef.current) return; // fue un click, no un arrastre
+      const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
+      const snapMin = Math.round(deltaMin / 15) * 15;
+      const nuevoInicioMin = Math.min(Math.max(inicioMinOriginal + snapMin, limiteInicio), limiteFin - duracionMin);
+      if (nuevoInicioMin === inicioMinOriginal) return; // soltada en el mismo sitio
+      setMoviendoCitaId(cita.id);
+      try {
+        await onMoverCita(cita.id, isoDesdeMadrid(fecha, horaDeMinutos(nuevoInicioMin)));
+      } finally {
+        setMoviendoCitaId(null);
       }
     }
 
@@ -305,19 +381,41 @@ export default function CalendarioDia({
                   })()}
 
                   {(citasPorColumna.get(col.id) ?? []).map((cita) => {
-                    const desde = minutosEnMadrid(cita.inicio);
-                    const hasta = minutosEnMadrid(cita.fin);
+                    const enArrastreCita = arrastrandoCita?.citaId === cita.id;
+                    const desde = enArrastreCita ? arrastrandoCita!.inicioMin : minutosEnMadrid(cita.inicio);
+                    const hasta = enArrastreCita
+                      ? arrastrandoCita!.inicioMin + arrastrandoCita!.duracionMin
+                      : minutosEnMadrid(cita.fin);
                     const top = (desde - minInicio) * PX_POR_MINUTO;
                     const alto = Math.max(ALTURA_MINIMA_BLOQUE, (hasta - desde) * PX_POR_MINUTO);
+                    const sePuedeArrastrar = esAdmin && cita.estado === "confirmada" && Boolean(cita.profesional?.id);
                     return (
                       <button
                         key={cita.id}
-                        onClick={() => setSeleccionada(cita)}
-                        className={"absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md " + claseBloque(cita.estado)}
-                        style={{ top, height: alto }}
+                        onMouseDown={(e) => iniciarArrastreCita(e, cita, minInicio, maxFin)}
+                        onClick={() => {
+                          if (ultimoArrastreCitaRef.current) return; // fue un arrastre, no un click
+                          setSeleccionada(cita);
+                        }}
+                        disabled={moviendoCitaId === cita.id}
+                        className={
+                          "absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md disabled:opacity-60 " +
+                          claseBloque(cita.estado) +
+                          (sePuedeArrastrar ? " cursor-grab active:cursor-grabbing" : "") +
+                          (enArrastreCita ? " z-30 shadow-lg" : "")
+                        }
+                        style={{ top, height: alto, ...(cita.estado !== "cancelada" ? estiloColorServicio(cita.servicio?.color) : {}) }}
+                        title={sePuedeArrastrar ? "Arrástrala para cambiarla de hora" : undefined}
                       >
-                        <div className="truncate font-medium">
-                          {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
+                        <div className="flex items-center gap-1">
+                          {cita.profesional_elegido_por_cliente && (
+                            <span className="text-red-500" title="El cliente pidió a este profesional en concreto">♥</span>
+                          )}
+                          {cita.estado === "completada" && <span className="text-emerald-600" title="Completada">✓</span>}
+                          {cita.estado === "no_presentada" && <span className="text-amber-600" title="No presentada">!</span>}
+                          <div className="truncate font-medium">
+                            {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
+                          </div>
                         </div>
                         {alto >= 34 && <div className="truncate text-stone-500">{cita.servicio?.nombre}</div>}
                       </button>
@@ -399,6 +497,11 @@ function DetalleCitaPanel({
           <div>
             <span className="text-stone-400">Barbero: </span>
             {cita.profesional?.nombre ?? "Sin asignar"}
+            {cita.profesional_elegido_por_cliente && (
+              <span className="ml-1 text-red-500" title="El cliente pidió a este profesional en concreto">
+                ♥
+              </span>
+            )}
           </div>
           {cita.cliente?.telefono && (
             <div>

@@ -20,7 +20,7 @@ interface Cita {
   id: string;
   inicio: string;
   fin: string;
-  cliente: { id: string; nombre: string; telefono: string } | null;
+  cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string } | null;
   profesional: { id: string; nombre: string } | null;
   extras?: { servicio_id: string }[];

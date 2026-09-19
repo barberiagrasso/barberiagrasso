@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { crearReserva, ReservaError } from "@/lib/booking";
+import { puedeVerTelefonos } from "@/lib/telefono";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
   const { data: citas, error } = await supabase
     .from("citas")
     .select(
-      "id, inicio, fin, estado, origen, notas, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id)"
+      "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id)"
     )
     .eq("sede_id", sedeId)
     .gte("inicio", inicioDia)
@@ -41,6 +43,17 @@ export async function GET(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: "No se pudieron cargar las citas." }, { status: 500 });
   }
+
+  // Un barbero puede ver la Agenda, pero nunca el teléfono de un cliente
+  // — solo un administrador (ver lib/telefono.ts). Se enmascara aquí, no
+  // solo en la pantalla, para que no quede expuesto ni mirando la
+  // respuesta de la petición.
+  const citasParaElRol = puedeVerTelefonos(admin.rol)
+    ? citas
+    : (citas ?? []).map((c) => ({
+        ...c,
+        cliente: c.cliente ? { ...c.cliente, telefono: null } : null,
+      }));
 
   // Profesionales de la sede y su horario del día de "fecha" — lo usa el
   // calendario de la vista de día (columnas por barbero + rango de
@@ -81,7 +94,7 @@ export async function GET(request: NextRequest) {
     .eq("fecha", fecha);
 
   return NextResponse.json({
-    citas,
+    citas: citasParaElRol,
     profesionales,
     horarios: horarios ?? [],
     descansosExcepciones: descansosExcepciones ?? [],

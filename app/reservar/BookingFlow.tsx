@@ -565,6 +565,10 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
           aceptaComercial,
           complementoIds,
           pagarConSaldo: pagarConSaldo && saldoCubreTotal,
+          // Si profesionalId sigue siendo null aquí es que se quedó en
+          // "Cualquiera": el barbero de arriba es el que tocó al buscar
+          // hueco, no uno que el cliente pidiera a propósito.
+          profesionalElegidoPorCliente: profesionalId !== null,
         }),
       });
       const json = await res.json();

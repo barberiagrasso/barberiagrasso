@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { colorPorRotacion } from "@/lib/coloresServicio";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,17 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
+
+  // Color por rotación de la paleta si no se especifica uno a mano —
+  // así ningún servicio nuevo se queda sin color en la leyenda de la
+  // Agenda. Se basa en cuántos servicios hay ya dados de alta (activos o
+  // no) para que dos altas seguidas no elijan siempre el mismo color.
+  let colorAsignado = body.color || null;
+  if (!colorAsignado) {
+    const { count } = await supabase.from("servicios").select("id", { count: "exact", head: true });
+    colorAsignado = colorPorRotacion(count ?? 0);
+  }
+
   const { data: servicio, error } = await supabase
     .from("servicios")
     .insert({
@@ -49,6 +61,7 @@ export async function POST(request: NextRequest) {
       categoria: body.categoria || null,
       orden: body.orden ?? 0,
       activo: body.activo ?? true,
+      color: colorAsignado,
     })
     .select("*")
     .single();
