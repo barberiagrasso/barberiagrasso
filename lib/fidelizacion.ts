@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { registrarError } from "@/lib/errorLog";
+import { precioCitaCentimos } from "@/lib/precios";
 
 // =====================================================================
 // Programa de fidelización: 10% de lo gastado en cada cita se acumula
@@ -54,21 +55,24 @@ interface ExtraConPrecio {
 
 /**
  * Total pagado en una cita ya guardada: precio del servicio + sus
- * complementos. Es el mismo cálculo que ya usa app/perfil/page.tsx para
- * enseñar el historial al cliente — aquí centralizado para que el saldo
- * que se acumula use exactamente el mismo número.
+ * complementos, salvo que el barbero haya corregido el precio final a
+ * mano al cerrarla (precio_final_centimos, ver lib/precios.ts) — en ese
+ * caso manda ese número. Es el mismo cálculo que ya usa app/perfil/page.tsx
+ * para enseñar el historial al cliente — aquí centralizado para que el
+ * saldo que se acumula use exactamente el mismo número.
  */
 export async function totalCitaCentimos(supabase: SupabaseClient, citaId: string): Promise<number> {
   const { data: cita } = await supabase
     .from("citas")
-    .select("servicio:servicios(precio_centimos), extras:cita_extras(precio_centimos)")
+    .select("precio_final_centimos, servicio:servicios(precio_centimos), extras:cita_extras(precio_centimos)")
     .eq("id", citaId)
     .single();
   if (!cita) return 0;
   const servicioCrudo = (cita as { servicio: ServicioConPrecio | ServicioConPrecio[] | null }).servicio;
   const servicio = Array.isArray(servicioCrudo) ? servicioCrudo[0] : servicioCrudo;
   const extras = ((cita as { extras: ExtraConPrecio[] | null }).extras ?? []) as ExtraConPrecio[];
-  return (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+  const automatico = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+  return precioCitaCentimos((cita as { precio_final_centimos: number | null }).precio_final_centimos, automatico);
 }
 
 /**

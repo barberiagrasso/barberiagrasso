@@ -511,32 +511,41 @@ function DetalleCitaPanel({
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-2">
           {(cita.estado === "confirmada" || cita.estado === "completada") && (
             <button
               onClick={onAvisarDisponible}
               disabled={avisando === cita.id}
-              className="text-sm text-blue-700 underline disabled:opacity-50"
+              className="rounded-full bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {avisando === cita.id ? "Avisando…" : "Avisar disponible"}
+              {avisando === cita.id ? "Avisando…" : "📲 Avisar disponible"}
             </button>
           )}
           {cita.estado === "confirmada" && (
             <>
-              <button onClick={onFinalizar} className="text-sm text-green-700 underline">
-                Completada
+              <button
+                onClick={onFinalizar}
+                className="rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                ✓ Completada
               </button>
-              <button onClick={() => onCambiarEstado("no_presentada")} className="text-sm text-amber-700 underline">
-                No presentada
+              <button
+                onClick={() => onCambiarEstado("no_presentada")}
+                className="rounded-full bg-amber-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-amber-600"
+              >
+                ! No presentada
               </button>
-              <button onClick={() => onCambiarEstado("cancelada")} className="text-sm text-red-700 underline">
-                Cancelar
+              <button
+                onClick={() => onCambiarEstado("cancelada")}
+                className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700"
+              >
+                ✕ Cancelar
               </button>
             </>
           )}
         </div>
 
-        <button onClick={onCerrar} className="mt-4 text-sm text-stone-500 underline">
+        <button onClick={onCerrar} className="mt-4 rounded-full bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200">
           Cerrar
         </button>
       </div>

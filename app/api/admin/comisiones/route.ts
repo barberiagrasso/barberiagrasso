@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { parseRango } from "@/lib/informes";
 import { calcularComision, calcularRanking, rangoDelMes, siguienteTramo, mesActualStr, type TramoComision } from "@/lib/comisiones";
 import { calcularComisionProductos } from "@/lib/productos";
+import { precioCitaCentimos } from "@/lib/precios";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ interface CitaFila {
   id: string;
   profesional_id: string | null;
   saldo_canjeado_centimos: number;
+  precio_final_centimos: number | null;
   profesional: { nombre: string } | { nombre: string }[] | null;
   servicio: { precio_centimos: number } | { precio_centimos: number }[] | null;
 }
@@ -20,13 +22,15 @@ function uno<T>(v: T | T[] | null): T | null {
 }
 
 // Mismo criterio que /api/admin/informes/resumen: el precio del servicio
-// más sus complementos, salvo que se haya pagado con saldo de
-// fidelización (ahí no entró dinero real, así que tampoco debe generar
-// comisión — ya se contó como gasto real cuando se generó ese saldo).
+// más sus complementos (o el precio final corregido a mano al cerrar la
+// cita, si lo hay — ver lib/precios.ts), salvo que se haya pagado con
+// saldo de fidelización (ahí no entró dinero real, así que tampoco debe
+// generar comisión — ya se contó como gasto real cuando se generó ese saldo).
 function ingresoCitaCentimos(c: CitaFila, extrasPorCita: Map<string, number>): number {
   if (c.saldo_canjeado_centimos > 0) return 0;
   const servicio = uno(c.servicio);
-  return (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
+  const automatico = (servicio?.precio_centimos ?? 0) + (extrasPorCita.get(c.id) ?? 0);
+  return precioCitaCentimos(c.precio_final_centimos, automatico);
 }
 
 interface FilaComision {
@@ -95,7 +99,7 @@ export async function GET(request: NextRequest) {
   // aunque luego solo se le devuelva a él su propia fila.
   const { data: citasCrudas } = await supabase
     .from("citas")
-    .select("id, profesional_id, saldo_canjeado_centimos, profesional:profesionales(nombre), servicio:servicios(precio_centimos)")
+    .select("id, profesional_id, saldo_canjeado_centimos, precio_final_centimos, profesional:profesionales(nombre), servicio:servicios(precio_centimos)")
     .eq("estado", "completada")
     .gte("inicio", rango.desdeUTC.toISOString())
     .lte("inicio", rango.hastaUTC.toISOString())

@@ -12,6 +12,8 @@ interface ProductoElegido {
   cantidad: number;
 }
 
+const METODOS_PAGO_VALIDOS = new Set(["efectivo", "tarjeta", "bizum", "otro"]);
+
 /**
  * Cierra una cita "de verdad": a diferencia del PATCH normal (que solo
  * cambia el estado, o mueve hora/profesional para un reagendado), este
@@ -25,6 +27,12 @@ interface ProductoElegido {
  *  - cambiar qué profesional la realizó de verdad,
  *  - corregir la hora de inicio y de fin (no se recalculan a partir de
  *    la duración del servicio: las pone el barbero a mano),
+ *  - anotar el método de pago (efectivo, tarjeta, bizum, otro),
+ *  - y, si hace falta, corregir a mano el precio final (precioFinalCentimos)
+ *    cuando lo cobrado de verdad no coincide con el cálculo automático de
+ *    servicio + complementos — ese número pasa a ser el que cuenta en
+ *    comisiones, fidelización, HubSpot y el historial del cliente (ver
+ *    lib/precios.ts).
  *
  * y deja la cita como "completada". Todo o nada: si algo falla a medio
  * camino no se ha movido nada (ver el try/catch de más abajo).
@@ -57,6 +65,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .filter((p: unknown): p is ProductoElegido => Boolean(p && typeof (p as ProductoElegido).productoId === "string"))
         .map((p: ProductoElegido) => ({ productoId: p.productoId, cantidad: Math.max(1, Math.round(Number(p.cantidad) || 1)) }))
     : [];
+  const metodoPago: string | null = typeof body?.metodoPago === "string" && METODOS_PAGO_VALIDOS.has(body.metodoPago) ? body.metodoPago : null;
+  // undefined = "no se tocó el precio, usa el automático"; number = override a mano.
+  const precioFinalCentimos: number | undefined =
+    typeof body?.precioFinalCentimos === "number" && Number.isFinite(body.precioFinalCentimos)
+      ? Math.max(0, Math.round(body.precioFinalCentimos))
+      : undefined;
 
   if (!servicioId || !profesionalId || !inicioISO || !finISO) {
     return NextResponse.json({ error: "Faltan datos obligatorios (servicio, profesional u horario)." }, { status: 400 });
@@ -135,6 +149,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
       estado: "completada",
+      metodo_pago: metodoPago,
+      ...(precioFinalCentimos !== undefined ? { precio_final_centimos: precioFinalCentimos } : {}),
     })
     .eq("id", id);
 

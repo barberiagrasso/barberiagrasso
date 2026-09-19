@@ -5,6 +5,7 @@ import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
 import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
 import { CumpleanosForm } from "./CumpleanosForm";
+import { precioCitaCentimos } from "@/lib/precios";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ interface CitaCruda {
   id: string;
   inicio: string;
   estado: string;
+  precio_final_centimos: number | null;
   sede: { nombre: string } | { nombre: string }[] | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
   profesional: { nombre: string } | { nombre: string }[] | null;
@@ -41,7 +43,7 @@ export default async function PerfilPage() {
   const { data: citas } = await admin
     .from("citas")
     .select(
-      "id, inicio, estado, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
+      "id, inicio, estado, precio_final_centimos, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
     )
     .eq("cliente_id", cliente.id)
     .order("inicio", { ascending: false });
@@ -49,7 +51,8 @@ export default async function PerfilPage() {
   const historial: CitaNormalizada[] = ((citas ?? []) as unknown as CitaCruda[]).map((cita) => {
     const servicio = uno(cita.servicio);
     const extras = cita.extras ?? [];
-    const total = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+    const totalAutomatico = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+    const total = precioCitaCentimos(cita.precio_final_centimos, totalAutomatico);
 
     return {
       id: cita.id,

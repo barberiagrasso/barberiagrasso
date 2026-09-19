@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { precioCitaCentimos } from "@/lib/precios";
 
 // =====================================================================
 // Sincronización con HubSpot (CRM externo de Diego)
@@ -294,6 +295,7 @@ async function buscarContactoPorClienteId(clienteId: string): Promise<string | n
 export interface HistoricoFila {
   estado: string;
   inicio: string;
+  precio_final_centimos?: number | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
   profesional: { nombre: string } | { nombre: string }[] | null;
   extras: { precio_centimos: number }[] | null;
@@ -318,7 +320,8 @@ export function calcularEstadisticasCliente(historico: HistoricoFila[]) {
   const gastoTotalCentimos = completadas.reduce((acc, c) => {
     const servicio = uno(c.servicio);
     const extras = c.extras ?? [];
-    return acc + (servicio?.precio_centimos ?? 0) + extras.reduce((a, e) => a + e.precio_centimos, 0);
+    const automatico = (servicio?.precio_centimos ?? 0) + extras.reduce((a, e) => a + e.precio_centimos, 0);
+    return acc + precioCitaCentimos(c.precio_final_centimos, automatico);
   }, 0);
 
   const ultimaVisitaISO = completadas[0]?.inicio ?? null; // historico viene ordenado por inicio desc
@@ -389,7 +392,7 @@ export async function sincronizarClienteHubSpot(
 
     const { data: historico } = await supabase
       .from("citas")
-      .select("estado, inicio, servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos)")
+      .select("estado, inicio, precio_final_centimos, servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos)")
       .eq("cliente_id", clienteId)
       .order("inicio", { ascending: false });
 
@@ -491,7 +494,7 @@ export async function sincronizarCitaHubSpot(supabase: SupabaseClient, citaId: s
     const { data: cita } = await supabase
       .from("citas")
       .select(
-        "id, inicio, estado, origen, cliente_id, hubspot_deal_id, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
+        "id, inicio, estado, origen, cliente_id, hubspot_deal_id, precio_final_centimos, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
       )
       .eq("id", citaId)
       .maybeSingle();
@@ -503,7 +506,8 @@ export async function sincronizarCitaHubSpot(supabase: SupabaseClient, citaId: s
     const sede = uno(cita.sede);
     const profesional = uno(cita.profesional);
     const extras = cita.extras ?? [];
-    const totalCentimos = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+    const totalAutomaticoCentimos = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
+    const totalCentimos = precioCitaCentimos(cita.precio_final_centimos, totalAutomaticoCentimos);
     const nombresExtras = extras.map((e) => uno(e.servicio)?.nombre).filter(Boolean).join(", ");
 
     const propiedades: Record<string, string | number> = {

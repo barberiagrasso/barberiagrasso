@@ -102,6 +102,11 @@ export interface Cita {
   // (no "Cualquiera") — controla el icono de corazón de la Agenda
   // (CalendarioDia.tsx).
   profesional_elegido_por_cliente?: boolean;
+  // Se rellenan al cerrar la cita desde el checkout de "Finalizar cita"
+  // (ver lib/precios.ts) — null/undefined en cualquier cita todavía no
+  // completada, o completada antes de que existiera este campo.
+  metodo_pago?: string | null;
+  precio_final_centimos?: number | null;
   created_at: string;
 }
 

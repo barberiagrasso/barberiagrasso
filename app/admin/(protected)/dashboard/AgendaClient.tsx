@@ -272,12 +272,28 @@ export default function AgendaClient({
         </div>
 
         {vista === "dia" ? (
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="rounded-lg border border-stone-300 p-2 text-sm"
-          />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => moverFecha(-1)}
+              className="rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-600 hover:border-stone-400"
+              aria-label="Día anterior"
+            >
+              ‹
+            </button>
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="rounded-lg border border-stone-300 p-2 text-sm"
+            />
+            <button
+              onClick={() => moverFecha(1)}
+              className="rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-600 hover:border-stone-400"
+              aria-label="Día siguiente"
+            >
+              ›
+            </button>
+          </div>
         ) : (
           <div className="flex items-center gap-2 text-sm text-stone-700">
             <button
@@ -320,17 +336,6 @@ export default function AgendaClient({
         />
       )}
 
-      {leyendaServicios.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-stone-600">
-          {leyendaServicios.map((s) => (
-            <span key={s.nombre} className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-              {s.nombre}
-            </span>
-          ))}
-        </div>
-      )}
-
       {vista === "dia" ? (
         <CalendarioDia
           sedeId={sedeId}
@@ -358,6 +363,17 @@ export default function AgendaClient({
           onAvisarDisponible={avisarDisponible}
           avisando={avisando}
         />
+      )}
+
+      {leyendaServicios.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-600">
+          {leyendaServicios.map((s) => (
+            <span key={s.nombre} className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+              {s.nombre}
+            </span>
+          ))}
+        </div>
       )}
 
       {finalizando && (
@@ -454,12 +470,12 @@ function VistaSemanal({
                   >
                     {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
                   </span>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1">
                     {(cita.estado === "confirmada" || cita.estado === "completada") && (
                       <button
                         onClick={() => onAvisarDisponible(cita.id)}
                         disabled={avisando === cita.id}
-                        className="text-blue-700 underline disabled:opacity-50"
+                        className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] text-white disabled:opacity-50"
                         title="Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible"
                       >
                         📲
@@ -469,21 +485,21 @@ function VistaSemanal({
                       <>
                         <button
                           onClick={() => onFinalizar(cita)}
-                          className="text-green-700 underline"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white"
                           title="Marcar como completada"
                         >
                           ✓
                         </button>
                         <button
                           onClick={() => onCambiarEstado(cita.id, "no_presentada")}
-                          className="text-amber-700 underline"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] text-white"
                           title="Marcar como no presentada"
                         >
                           !
                         </button>
                         <button
                           onClick={() => onCambiarEstado(cita.id, "cancelada")}
-                          className="text-red-700 underline"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] text-white"
                           title="Cancelar"
                         >
                           ✕
