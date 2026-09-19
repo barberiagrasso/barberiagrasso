@@ -295,13 +295,26 @@ export async function crearReserva(params: CrearReservaParams) {
     }
   }
 
-  const slots = await getAvailableSlots({
-    sedeId: params.sedeId,
-    servicioId: params.servicioId,
-    fecha: params.fecha,
-    profesionalId: params.profesionalId,
-    duracionExtraMinutos,
-  });
+  // Estas tres consultas no dependen entre sí (ninguna necesita el
+  // resultado de otra), así que se lanzan a la vez en vez de en cadena
+  // — la disponibilidad y estas dos consultas de servicio/sede eran tres
+  // idas y vueltas seguidas a la base de datos en cada reserva.
+  const [slots, { data: servicio }, { data: override }] = await Promise.all([
+    getAvailableSlots({
+      sedeId: params.sedeId,
+      servicioId: params.servicioId,
+      fecha: params.fecha,
+      profesionalId: params.profesionalId,
+      duracionExtraMinutos,
+    }),
+    supabase.from("servicios").select("duracion_minutos, precio_centimos").eq("id", params.servicioId).single(),
+    supabase
+      .from("sede_servicios")
+      .select("duracion_minutos")
+      .eq("sede_id", params.sedeId)
+      .eq("servicio_id", params.servicioId)
+      .maybeSingle(),
+  ]);
 
   const slotElegido = slots.find((s) => s.hora_inicio === params.horaInicioISO);
   if (!slotElegido) {
@@ -309,18 +322,6 @@ export async function crearReserva(params: CrearReservaParams) {
       "Ese horario ya no está disponible. Por favor, elige otra hora."
     );
   }
-
-  const { data: servicio } = await supabase
-    .from("servicios")
-    .select("duracion_minutos, precio_centimos")
-    .eq("id", params.servicioId)
-    .single();
-  const { data: override } = await supabase
-    .from("sede_servicios")
-    .select("duracion_minutos")
-    .eq("sede_id", params.sedeId)
-    .eq("servicio_id", params.servicioId)
-    .maybeSingle();
   const duracionMinutos = (override?.duracion_minutos ?? servicio?.duracion_minutos ?? 30) + duracionExtraMinutos;
 
   // Total de la cita (servicio + complementos) — el mismo número que ve

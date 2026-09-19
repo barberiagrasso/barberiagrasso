@@ -89,41 +89,47 @@ export async function getAvailableSlots({
   const inicioDiaUTC = fromZonedTime(startOfDay(fechaLocal), TZ);
   const finDiaUTC = fromZonedTime(endOfDay(fechaLocal), TZ);
 
-  const { data: horarios } = await supabase
-    .from("horarios")
-    .select("profesional_id, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
-    .eq("sede_id", sedeId)
-    .eq("dia_semana", diaSemana)
-    .in("profesional_id", candidatoIds);
-
-  const { data: excepciones } = await supabase
-    .from("descansos_excepciones")
-    .select("profesional_id, hora_inicio, hora_fin")
-    .eq("fecha", fecha)
-    .in("profesional_id", candidatoIds);
-
-  const { data: bloqueos } = await supabase
-    .from("bloqueos")
-    .select("profesional_id, fecha_inicio, fecha_fin")
-    .eq("sede_id", sedeId)
-    .lt("fecha_inicio", finDiaUTC.toISOString())
-    .gt("fecha_fin", inicioDiaUTC.toISOString());
-
-  const { data: vacaciones } = await supabase
-    .from("solicitudes_vacaciones")
-    .select("profesional_id, fecha_inicio, fecha_fin")
-    .eq("estado", "aprobada")
-    .in("profesional_id", candidatoIds)
-    .lte("fecha_inicio", fecha)
-    .gte("fecha_fin", fecha);
-
-  const { data: citas } = await supabase
-    .from("citas")
-    .select("profesional_id, inicio, fin")
-    .eq("sede_id", sedeId)
-    .neq("estado", "cancelada")
-    .lt("inicio", finDiaUTC.toISOString())
-    .gt("fin", inicioDiaUTC.toISOString());
+  // Las cinco consultas de aquí abajo no dependen unas de otras (todas
+  // solo necesitan sedeId/fecha/candidatoIds, ya conocidos), así que se
+  // lanzan todas a la vez en vez de esperarlas una detrás de otra —
+  // sobre todo en la vista de calendario, hacerlo en serie multiplicaba
+  // por 5 la latencia de ida y vuelta a Supabase (decisión de Diego,
+  // 19/09/2026: la disponibilidad del cliente tardaba tanto en cargar
+  // que parecía que no había huecos).
+  const [{ data: horarios }, { data: excepciones }, { data: bloqueos }, { data: vacaciones }, { data: citas }] =
+    await Promise.all([
+      supabase
+        .from("horarios")
+        .select("profesional_id, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
+        .eq("sede_id", sedeId)
+        .eq("dia_semana", diaSemana)
+        .in("profesional_id", candidatoIds),
+      supabase
+        .from("descansos_excepciones")
+        .select("profesional_id, hora_inicio, hora_fin")
+        .eq("fecha", fecha)
+        .in("profesional_id", candidatoIds),
+      supabase
+        .from("bloqueos")
+        .select("profesional_id, fecha_inicio, fecha_fin")
+        .eq("sede_id", sedeId)
+        .lt("fecha_inicio", finDiaUTC.toISOString())
+        .gt("fecha_fin", inicioDiaUTC.toISOString()),
+      supabase
+        .from("solicitudes_vacaciones")
+        .select("profesional_id, fecha_inicio, fecha_fin")
+        .eq("estado", "aprobada")
+        .in("profesional_id", candidatoIds)
+        .lte("fecha_inicio", fecha)
+        .gte("fecha_fin", fecha),
+      supabase
+        .from("citas")
+        .select("profesional_id, inicio, fin")
+        .eq("sede_id", sedeId)
+        .neq("estado", "cancelada")
+        .lt("inicio", finDiaUTC.toISOString())
+        .gt("fin", inicioDiaUTC.toISOString()),
+    ]);
 
   const bloqueosDelDia = [
     ...(bloqueos ?? []),
@@ -179,11 +185,43 @@ export async function getMonthAvailabilitySummary({
   const primerDiaStr = `${anio}-${pad(mes)}-01`;
   const ultimoDiaStr = `${anio}-${pad(mes)}-${pad(totalDias)}`;
 
-  const { data: horarios } = await supabase
-    .from("horarios")
-    .select("profesional_id, dia_semana, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
-    .eq("sede_id", sedeId)
-    .in("profesional_id", candidatoIds);
+  // Mismo motivo que en getAvailableSlots: estas cinco consultas son
+  // independientes entre sí, así que se lanzan en paralelo en vez de en
+  // cadena.
+  const [{ data: horarios }, { data: excepciones }, { data: bloqueos }, { data: vacaciones }, { data: citas }] =
+    await Promise.all([
+      supabase
+        .from("horarios")
+        .select("profesional_id, dia_semana, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
+        .eq("sede_id", sedeId)
+        .in("profesional_id", candidatoIds),
+      supabase
+        .from("descansos_excepciones")
+        .select("profesional_id, fecha, hora_inicio, hora_fin")
+        .in("profesional_id", candidatoIds)
+        .gte("fecha", primerDiaStr)
+        .lte("fecha", ultimoDiaStr),
+      supabase
+        .from("bloqueos")
+        .select("profesional_id, fecha_inicio, fecha_fin")
+        .eq("sede_id", sedeId)
+        .lt("fecha_inicio", finMesUTC.toISOString())
+        .gt("fecha_fin", inicioMesUTC.toISOString()),
+      supabase
+        .from("solicitudes_vacaciones")
+        .select("profesional_id, fecha_inicio, fecha_fin")
+        .eq("estado", "aprobada")
+        .in("profesional_id", candidatoIds)
+        .lte("fecha_inicio", ultimoDiaStr)
+        .gte("fecha_fin", primerDiaStr),
+      supabase
+        .from("citas")
+        .select("profesional_id, inicio, fin")
+        .eq("sede_id", sedeId)
+        .neq("estado", "cancelada")
+        .lt("inicio", finMesUTC.toISOString())
+        .gt("fin", inicioMesUTC.toISOString()),
+    ]);
 
   const horariosPorDiaSemana = new Map<number, (HorarioFila & { descanso_inicio: string | null; descanso_fin: string | null })[]>();
   for (const h of horarios ?? []) {
@@ -191,40 +229,11 @@ export async function getMonthAvailabilitySummary({
     horariosPorDiaSemana.get(h.dia_semana)!.push(h);
   }
 
-  const { data: excepciones } = await supabase
-    .from("descansos_excepciones")
-    .select("profesional_id, fecha, hora_inicio, hora_fin")
-    .in("profesional_id", candidatoIds)
-    .gte("fecha", primerDiaStr)
-    .lte("fecha", ultimoDiaStr);
   const excepcionesPorFecha = new Map<string, DescansoFila[]>();
   for (const e of excepciones ?? []) {
     if (!excepcionesPorFecha.has(e.fecha)) excepcionesPorFecha.set(e.fecha, []);
     excepcionesPorFecha.get(e.fecha)!.push(e);
   }
-
-  const { data: bloqueos } = await supabase
-    .from("bloqueos")
-    .select("profesional_id, fecha_inicio, fecha_fin")
-    .eq("sede_id", sedeId)
-    .lt("fecha_inicio", finMesUTC.toISOString())
-    .gt("fecha_fin", inicioMesUTC.toISOString());
-
-  const { data: vacaciones } = await supabase
-    .from("solicitudes_vacaciones")
-    .select("profesional_id, fecha_inicio, fecha_fin")
-    .eq("estado", "aprobada")
-    .in("profesional_id", candidatoIds)
-    .lte("fecha_inicio", ultimoDiaStr)
-    .gte("fecha_fin", primerDiaStr);
-
-  const { data: citas } = await supabase
-    .from("citas")
-    .select("profesional_id, inicio, fin")
-    .eq("sede_id", sedeId)
-    .neq("estado", "cancelada")
-    .lt("inicio", finMesUTC.toISOString())
-    .gt("fin", inicioMesUTC.toISOString());
 
   const ahora = new Date();
   const resumen: ResumenDiaDisponibilidad[] = [];
@@ -335,22 +344,6 @@ async function cargarDatosBase(
   profesionalId?: string | null,
   duracionExtraMinutos?: number
 ): Promise<{ candidatos: CandidatoInfo[]; duracionMinutos: number } | null> {
-  const { data: servicio } = await supabase
-    .from("servicios")
-    .select("duracion_minutos")
-    .eq("id", servicioId)
-    .single();
-  if (!servicio) return null;
-
-  const { data: override } = await supabase
-    .from("sede_servicios")
-    .select("duracion_minutos, activo")
-    .eq("sede_id", sedeId)
-    .eq("servicio_id", servicioId)
-    .maybeSingle();
-
-  if (override && override.activo === false) return null; // servicio desactivado en esa sede
-
   let profesionalesQuery = supabase
     .from("profesional_sedes")
     .select("profesional_id, profesionales!inner(id, nombre, activo)")
@@ -359,13 +352,32 @@ async function cargarDatosBase(
   if (profesionalId) {
     profesionalesQuery = profesionalesQuery.eq("profesional_id", profesionalId);
   }
-  const { data: sedeProfesionales } = await profesionalesQuery;
+
+  // Las cuatro consultas de aquí abajo no dependen unas de otras (ninguna
+  // necesita el resultado de otra, solo los parámetros de entrada), así
+  // que se piden todas a la vez. Antes se pedían en cadena y encima con
+  // "cortes" tempranos (si el servicio no existe o está desactivado, no
+  // sigas); eso ahorraba consultas en el caso raro de un servicio
+  // desactivado, pero penalizaba con más ida y vuelta el caso normal
+  // (que es casi siempre). Se valida todo igual, solo que después de
+  // tener los cuatro resultados en mano.
+  const [{ data: servicio }, { data: override }, { data: sedeProfesionales }, { data: profesionalServicios }] =
+    await Promise.all([
+      supabase.from("servicios").select("duracion_minutos").eq("id", servicioId).single(),
+      supabase
+        .from("sede_servicios")
+        .select("duracion_minutos, activo")
+        .eq("sede_id", sedeId)
+        .eq("servicio_id", servicioId)
+        .maybeSingle(),
+      profesionalesQuery,
+      supabase.from("profesional_servicios").select("profesional_id").eq("servicio_id", servicioId),
+    ]);
+
+  if (!servicio) return null;
+  if (override && override.activo === false) return null; // servicio desactivado en esa sede
   if (!sedeProfesionales || sedeProfesionales.length === 0) return null;
 
-  const { data: profesionalServicios } = await supabase
-    .from("profesional_servicios")
-    .select("profesional_id")
-    .eq("servicio_id", servicioId);
   const idsQueHacenServicio = new Set((profesionalServicios ?? []).map((p) => p.profesional_id));
 
   const candidatos = sedeProfesionales
