@@ -7,6 +7,7 @@ import { calcularComision, etiquetaMes, etiquetaTramo, type TramoComision } from
 interface FilaComision {
   profesionalId: string;
   nombre: string;
+  fotoUrl: string | null;
   facturacionCentimos: number;
   citasCompletadas: number;
   comisionCentimos: number;

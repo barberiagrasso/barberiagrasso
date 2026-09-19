@@ -96,7 +96,19 @@ export async function GET(request: NextRequest) {
     }));
   }
 
-  const profesionales = candidatos.filter((c) => !idsConServicio || idsConServicio.has(c.id));
+  const profesionalesSinFoto = candidatos.filter((c) => !idsConServicio || idsConServicio.has(c.id));
+
+  // Foto de perfil (pedido de Diego, 19/09/2026): se añade aparte, en vez
+  // de meterla en los selects de arriba, para no tener que tocar el
+  // tipado de resolverCandidatosConDestinosPuntuales (compartido con el
+  // cálculo real de disponibilidad en lib/availability.ts).
+  const ids = profesionalesSinFoto.map((p) => p.id);
+  const { data: fotos } =
+    ids.length > 0
+      ? await supabase.from("profesionales").select("id, foto_url").in("id", ids)
+      : { data: [] as { id: string; foto_url: string | null }[] };
+  const fotoPorId = new Map((fotos ?? []).map((f) => [f.id, f.foto_url]));
+  const profesionales = profesionalesSinFoto.map((p) => ({ ...p, foto_url: fotoPorId.get(p.id) ?? null }));
 
   return NextResponse.json({ profesionales });
 }

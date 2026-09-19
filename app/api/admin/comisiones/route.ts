@@ -15,7 +15,7 @@ interface CitaFila {
   precio_final_centimos: number | null;
   bono_id: string | null;
   descuento_porcentaje: number | null;
-  profesional: { nombre: string } | { nombre: string }[] | null;
+  profesional: { nombre: string; foto_url?: string | null } | { nombre: string; foto_url?: string | null }[] | null;
   servicio: { precio_centimos: number } | { precio_centimos: number }[] | null;
 }
 
@@ -74,6 +74,7 @@ function ingresoCitaCentimos(
 interface FilaComision {
   profesionalId: string;
   nombre: string;
+  fotoUrl: string | null;
   facturacionCentimos: number;
   citasCompletadas: number;
   comisionCentimos: number;
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
   const { data: citasCrudas } = await supabase
     .from("citas")
     .select(
-      "id, profesional_id, saldo_canjeado_centimos, precio_final_centimos, bono_id, descuento_porcentaje, profesional:profesionales(nombre), servicio:servicios(precio_centimos)"
+      "id, profesional_id, saldo_canjeado_centimos, precio_final_centimos, bono_id, descuento_porcentaje, profesional:profesionales(nombre, foto_url), servicio:servicios(precio_centimos)"
     )
     .eq("estado", "completada")
     .gte("inicio", rango.desdeUTC.toISOString())
@@ -189,12 +190,15 @@ export async function GET(request: NextRequest) {
   // abajo, pero su comisión de ese mes sigue siendo un dato real).
   const porProfesional = new Map<
     string,
-    { nombre: string; facturacionCentimos: number; citasCompletadas: number; productosCentimos: number }
+    { nombre: string; fotoUrl: string | null; facturacionCentimos: number; citasCompletadas: number; productosCentimos: number }
   >();
   for (const c of citas) {
     if (!c.profesional_id) continue;
-    const nombre = uno(c.profesional)?.nombre ?? "Sin nombre";
-    const actual = porProfesional.get(c.profesional_id) ?? { nombre, facturacionCentimos: 0, citasCompletadas: 0, productosCentimos: 0 };
+    const prof = uno(c.profesional);
+    const nombre = prof?.nombre ?? "Sin nombre";
+    const actual =
+      porProfesional.get(c.profesional_id) ??
+      { nombre, fotoUrl: prof?.foto_url ?? null, facturacionCentimos: 0, citasCompletadas: 0, productosCentimos: 0 };
     actual.facturacionCentimos += ingresoCitaCentimos(c, extrasPorCita, bonosPorId);
     actual.citasCompletadas += 1;
     actual.productosCentimos += productosPorCita.get(c.id) ?? 0;
@@ -204,10 +208,10 @@ export async function GET(request: NextRequest) {
   // Añade con 0€ a cualquier profesional activo que no haya facturado
   // nada este mes, para que el roster completo del equipo (y por tanto
   // el ranking) sea real de verdad, incluidos los que están a 0.
-  const { data: activos } = await supabase.from("profesionales").select("id, nombre").eq("activo", true);
+  const { data: activos } = await supabase.from("profesionales").select("id, nombre, foto_url").eq("activo", true);
   for (const p of activos ?? []) {
     if (!porProfesional.has(p.id)) {
-      porProfesional.set(p.id, { nombre: p.nombre, facturacionCentimos: 0, citasCompletadas: 0, productosCentimos: 0 });
+      porProfesional.set(p.id, { nombre: p.nombre, fotoUrl: p.foto_url ?? null, facturacionCentimos: 0, citasCompletadas: 0, productosCentimos: 0 });
     }
   }
 
@@ -216,6 +220,7 @@ export async function GET(request: NextRequest) {
     return {
       profesionalId,
       nombre: datos.nombre,
+      fotoUrl: datos.fotoUrl,
       facturacionCentimos: datos.facturacionCentimos,
       citasCompletadas: datos.citasCompletadas,
       comisionCentimos,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaFlexibilidad } from "@/lib/listaEspera";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 
 interface Sede {
   id: string;
@@ -16,7 +17,7 @@ interface Entrada {
   created_at: string;
   cliente: { nombre: string; telefono: string | null } | { nombre: string; telefono: string | null }[] | null;
   servicio: { nombre: string } | { nombre: string }[] | null;
-  profesional: { nombre: string } | { nombre: string }[] | null;
+  profesional: { nombre: string; foto_url?: string | null } | { nombre: string; foto_url?: string | null }[] | null;
 }
 
 function uno<T>(v: T | T[] | null): T | null {
@@ -120,9 +121,12 @@ export default function ListaEsperaClient({ sedes }: { sedes: Sede[] }) {
                   <div key={e.id} className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-2.5 text-sm">
                     <div>
                       <p className="font-medium text-stone-900">{cliente?.nombre ?? "Cliente"}</p>
-                      <p className="text-xs text-stone-500">
-                        {cliente?.telefono && `${cliente.telefono} · `}
-                        {servicio?.nombre ?? "Servicio"} · {profesional?.nombre ?? "Cualquiera"}
+                      <p className="flex items-center gap-1 text-xs text-stone-500">
+                        {profesional && <AvatarProfesional fotoUrl={profesional.foto_url} nombre={profesional.nombre} className="h-4 w-4" />}
+                        <span>
+                          {cliente?.telefono && `${cliente.telefono} · `}
+                          {servicio?.nombre ?? "Servicio"} · {profesional?.nombre ?? "Cualquiera"}
+                        </span>
                       </p>
                       <p className="text-xs text-stone-400">
                         Le vale {etiquetaFlexibilidad(e.flexibilidad_dias)} · apuntado el {formatoFechaAlta(e.created_at)}

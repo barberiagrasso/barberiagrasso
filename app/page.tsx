@@ -57,7 +57,7 @@ export default async function Home() {
         </Link>
         <Link
           href="/perfil"
-          className="mt-4 font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          className="mt-4 rounded-full border border-brand-yellow/50 px-6 py-2.5 font-body text-sm font-semibold text-brand-yellow transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"
         >
           Mi perfil y mis citas
         </Link>

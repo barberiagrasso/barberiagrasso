@@ -87,14 +87,10 @@ function AdminLoginForm() {
             {cargando ? "Entrando…" : "Entrar"}
           </button>
         </form>
-        <p className="mt-6 text-center font-body text-xs text-brand-white-dim">
-          ¿No tienes acceso todavía? Créalo desde Supabase Authentication y añádete a la tabla
-          `admins` (ver README, sección &quot;Crea tu usuario administrador&quot;).
-        </p>
-        <div className="mt-4 text-center">
+        <div className="mt-6 text-center">
           <Link
             href="/acceso"
-            className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+            className="font-body text-sm font-semibold text-brand-yellow underline decoration-brand-yellow/50 underline-offset-4 hover:text-brand-yellow-dark"
           >
             ¿Eres cliente? Entra por aquí
           </Link>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { euros } from "@/lib/formato";
 import { descargarCSV } from "@/lib/csvExport";
 import { mesActualStr, sumarMeses, etiquetaMes, validarTramos, type TramoComision } from "@/lib/comisiones";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 import VistaBarbero from "./VistaBarbero";
 
 interface TramoConId extends TramoComision {
@@ -13,6 +14,7 @@ interface TramoConId extends TramoComision {
 interface FilaComision {
   profesionalId: string;
   nombre: string;
+  fotoUrl: string | null;
   facturacionCentimos: number;
   citasCompletadas: number;
   comisionCentimos: number;
@@ -285,7 +287,12 @@ export default function ComisionesClient({ rol }: { rol: string }) {
                   <tbody className="divide-y divide-stone-100">
                     {datos?.filas.map((f) => (
                       <tr key={f.profesionalId}>
-                        <td className="py-2 pr-3 text-stone-800">{f.nombre}</td>
+                        <td className="py-2 pr-3 text-stone-800">
+                          <div className="flex items-center gap-2">
+                            <AvatarProfesional fotoUrl={f.fotoUrl} nombre={f.nombre} className="h-6 w-6" />
+                            {f.nombre}
+                          </div>
+                        </td>
                         <td className="py-2 pr-3 text-stone-500">{f.citasCompletadas}</td>
                         <td className="py-2 pr-3 font-mono text-stone-900">{euros(f.facturacionCentimos)}</td>
                         <td className="py-2 pr-3">

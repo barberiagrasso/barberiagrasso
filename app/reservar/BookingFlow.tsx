@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Sede, Servicio, FranjaDisponible, ResumenDiaDisponibilidad } from "@/lib/types";
 import { GrassoMark } from "@/components/brand/GrassoMark";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 
 // Cuántos meses hacia delante del actual se puede navegar en el
 // calendario de reserva (0 = solo el mes en curso).
@@ -59,6 +60,7 @@ function agruparServicios(servicios: Servicio[]) {
 interface ProfesionalOpcion {
   id: string;
   nombre: string;
+  foto_url?: string | null;
 }
 
 interface ClienteInicial {
@@ -739,12 +741,13 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
                   key={p.id}
                   onClick={() => elegirProfesional(p.id)}
                   className={
-                    "rounded-full border px-3 py-2 font-mono text-xs transition-colors " +
+                    "flex items-center gap-1.5 rounded-full border py-1.5 pl-1.5 pr-3 font-mono text-xs transition-colors " +
                     (profesionalId === p.id
                       ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
                       : "border-brand-line text-brand-white hover:border-brand-yellow/60")
                   }
                 >
+                  <AvatarProfesional fotoUrl={p.foto_url} nombre={p.nombre} className="h-6 w-6" />
                   {p.nombre}
                 </button>
               ))}

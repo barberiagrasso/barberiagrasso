@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   let consulta = supabase
     .from("solicitudes_vacaciones")
-    .select("id, profesional_id, fecha_inicio, fecha_fin, estado, motivo, solicitado_por, resuelto_en, created_at, profesional:profesionales(nombre)")
+    .select("id, profesional_id, fecha_inicio, fecha_fin, estado, motivo, solicitado_por, resuelto_en, created_at, profesional:profesionales(nombre, foto_url)")
     .order("fecha_inicio");
   if (desde) consulta = consulta.gte("fecha_fin", desde);
   if (hasta) consulta = consulta.lte("fecha_inicio", hasta);
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   // el filtro "quitar y poner barberos" del calendario del admin los
   // muestre a todos desde el principio, aunque uno aún no haya pedido
   // nada — cruza las dos sedes, como pidió Diego.
-  const { data: profesionales } = await supabase.from("profesionales").select("id, nombre").eq("activo", true).order("nombre");
+  const { data: profesionales } = await supabase.from("profesionales").select("id, nombre, foto_url").eq("activo", true).order("nombre");
 
   return NextResponse.json({ solicitudes, profesionales });
 }

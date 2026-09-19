@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { data: bloqueos, error } = await supabase
     .from("bloqueos")
-    .select("id, profesional_id, fecha_inicio, fecha_fin, motivo, profesional:profesionales(nombre)")
+    .select("id, profesional_id, fecha_inicio, fecha_fin, motivo, profesional:profesionales(nombre, foto_url)")
     .eq("sede_id", sedeId)
     .gte("fecha_fin", new Date().toISOString())
     .order("fecha_inicio");

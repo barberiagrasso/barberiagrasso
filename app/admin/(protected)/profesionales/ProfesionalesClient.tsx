@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 
 interface Sede {
   id: string;
@@ -15,6 +16,7 @@ interface Profesional {
   id: string;
   nombre: string;
   activo: boolean;
+  foto_url?: string | null;
   sede_ids: string[];
   servicio_ids: string[];
   usuario: string | null;
@@ -149,8 +151,11 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
         {profesionales.map((p) => (
           <div key={p.id} className="rounded-lg border border-stone-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-              <span className={"font-medium " + (p.activo ? "text-stone-900" : "text-stone-400 line-through")}>
-                {p.nombre}
+              <span className="flex items-center gap-2">
+                <AvatarProfesional fotoUrl={p.foto_url} nombre={p.nombre} className="h-7 w-7" />
+                <span className={"font-medium " + (p.activo ? "text-stone-900" : "text-stone-400 line-through")}>
+                  {p.nombre}
+                </span>
               </span>
               <div className="flex items-center gap-3 text-xs">
                 <button onClick={() => setExpandidoId(expandidoId === p.id ? null : p.id)} className="text-brand-yellow-dark underline">

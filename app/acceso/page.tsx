@@ -155,7 +155,7 @@ function AccesoForm() {
             {modo === "recuperar-telefono" && "Recuperar contraseña"}
             {modo === "recuperar-codigo" && "Escribe el código"}
           </h1>
-          <p className="font-mono text-xs uppercase tracking-widest text-brand-white-dim">Barbería Grasso</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-brand-white-dim">Cuidamos de tu imagen</p>
         </div>
 
         <InstalarApp />

@@ -18,6 +18,7 @@ import {
   IconDots,
   IconTicket,
 } from "@/components/ui/Icons";
+import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
 
 interface Servicio {
   id: string;
@@ -39,7 +40,7 @@ interface Cita {
   fin: string;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string } | null;
-  profesional: { id: string; nombre: string } | null;
+  profesional: { id: string; nombre: string; foto_url?: string | null } | null;
   extras?: { servicio_id: string }[];
 }
 interface BonoTipo {
@@ -121,7 +122,7 @@ export default function FinalizarCitaModal({
 
   const [servicioId, setServicioId] = useState(cita.servicio?.id ?? serviciosPrincipales[0]?.id ?? "");
   const [profesionalId, setProfesionalId] = useState(cita.profesional?.id ?? "");
-  const [profesionales, setProfesionales] = useState<{ id: string; nombre: string }[]>([]);
+  const [profesionales, setProfesionales] = useState<{ id: string; nombre: string; foto_url?: string | null }[]>([]);
   const [extrasIds, setExtrasIds] = useState<string[]>(() => (cita.extras ?? []).map((e) => e.servicio_id));
   const [complementoParaAnadir, setComplementoParaAnadir] = useState("");
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -437,20 +438,17 @@ export default function FinalizarCitaModal({
 
           <div className="py-4">
             <Etiqueta icono={IconUser} texto="Quién la hizo" />
-            <select
+            <SelectorProfesionalConFoto
               value={profesionalId}
-              onChange={(e) => setProfesionalId(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 p-2.5 text-sm"
-            >
-              {cita.profesional && !profesionales.some((p) => p.id === cita.profesional!.id) && (
-                <option value={cita.profesional.id}>{cita.profesional.nombre}</option>
-              )}
-              {profesionales.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
+              onChange={setProfesionalId}
+              opciones={
+                cita.profesional && !profesionales.some((p) => p.id === cita.profesional!.id)
+                  ? [cita.profesional, ...profesionales]
+                  : profesionales
+              }
+              etiquetaVacio="Elige un barbero…"
+              ocultarOpcionVacia
+            />
           </div>
 
           <div className="py-4">

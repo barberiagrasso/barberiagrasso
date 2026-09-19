@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 
 export interface CitaNormalizada {
   id: string;
@@ -10,6 +11,7 @@ export interface CitaNormalizada {
   servicioNombre: string;
   precioTotalCentimos: number;
   profesionalNombre: string;
+  profesionalFotoUrl?: string | null;
   extrasNombres: string[];
 }
 
@@ -24,16 +26,22 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   no_presentada: "No presentada",
 };
 
-function colorEstado(estado: string): string {
-  switch (estado) {
-    case "completada":
-      return "text-emerald-400";
-    case "cancelada":
-    case "no_presentada":
-      return "text-red-400";
-    default:
-      return "text-brand-yellow";
+function colorEstado(estado: string, activa: boolean): string {
+  if (!activa) {
+    switch (estado) {
+      case "completada":
+        return "text-emerald-400";
+      case "cancelada":
+      case "no_presentada":
+        return "text-red-400";
+      default:
+        return "text-brand-white-dim";
+    }
   }
+  // Cita activa: fondo blanco (ver estilo de la tarjeta más abajo), así
+  // que la etiqueta de estado necesita un contraste oscuro, no los
+  // colores pensados para fondo negro.
+  return "text-brand-yellow-dark";
 }
 
 export function HistorialCitas({ historialInicial }: { historialInicial: CitaNormalizada[] }) {
@@ -75,42 +83,61 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
   return (
     <div className="space-y-3">
       {historial.map((cita) => {
-        const puedeCancelar = cita.estado === "confirmada" && new Date(cita.inicio).getTime() > ahora;
+        // "Activa" (pedido de Diego, 19/09/2026): una cita confirmada que
+        // todavía no ha pasado — fondo blanco y texto negro. Cualquier
+        // otra (completada, cancelada, no presentada, o una confirmada
+        // cuya hora ya pasó) se ve apagada: fondo negro y letra blanca.
+        const activa = cita.estado === "confirmada" && new Date(cita.inicio).getTime() > ahora;
+        const puedeCancelar = activa;
 
         return (
-          <div key={cita.id} className="rounded-xl border border-brand-line bg-brand-black-soft/60 p-4">
+          <div
+            key={cita.id}
+            className={
+              "rounded-xl border p-4 transition-colors " +
+              (activa ? "border-brand-white bg-brand-white text-brand-black" : "border-brand-line bg-brand-black text-brand-white")
+            }
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-heading text-base text-brand-white">{cita.servicioNombre}</p>
-                <p className="mt-0.5 font-body text-sm text-brand-white-dim">
+                <p className="font-heading text-base">{cita.servicioNombre}</p>
+                <p className={"mt-0.5 font-body text-sm " + (activa ? "text-brand-black/70" : "text-brand-white-dim")}>
                   {new Date(cita.inicio).toLocaleString("es-ES", {
                     dateStyle: "full",
                     timeStyle: "short",
                     timeZone: "Europe/Madrid",
                   })}
                 </p>
-                <p className="mt-0.5 font-mono text-xs uppercase tracking-wider text-brand-white-dim">
+                <p
+                  className={
+                    "mt-0.5 flex items-center gap-1.5 font-mono text-xs uppercase tracking-wider " +
+                    (activa ? "text-brand-black/70" : "text-brand-white-dim")
+                  }
+                >
+                  <AvatarProfesional fotoUrl={cita.profesionalFotoUrl} nombre={cita.profesionalNombre} className="h-4 w-4" />
                   {cita.sedeNombre} · {cita.profesionalNombre}
                 </p>
                 {cita.extrasNombres.length > 0 && (
-                  <p className="mt-1 font-body text-xs text-brand-white-dim">+ {cita.extrasNombres.join(", ")}</p>
+                  <p className={"mt-1 font-body text-xs " + (activa ? "text-brand-black/70" : "text-brand-white-dim")}>
+                    + {cita.extrasNombres.join(", ")}
+                  </p>
                 )}
               </div>
               <div className="shrink-0 text-right">
-                <p className={"font-mono text-xs uppercase tracking-wider " + colorEstado(cita.estado)}>
+                <p className={"font-mono text-xs uppercase tracking-wider " + colorEstado(cita.estado, activa)}>
                   {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
                 </p>
-                <p className="mt-1 font-mono text-base tabular-nums text-brand-white">
-                  {formatearPrecio(cita.precioTotalCentimos)}
-                </p>
+                <p className="mt-1 font-mono text-base tabular-nums">{formatearPrecio(cita.precioTotalCentimos)}</p>
               </div>
             </div>
 
             {puedeCancelar && (
-              <div className="mt-3 border-t border-brand-line pt-3">
+              <div className={"mt-3 border-t pt-3 " + (activa ? "border-brand-black/15" : "border-brand-line")}>
                 {confirmandoId === cita.id ? (
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-body text-sm text-brand-white-dim">¿Seguro que quieres cancelarla?</span>
+                    <span className={"font-body text-sm " + (activa ? "text-brand-black/70" : "text-brand-white-dim")}>
+                      ¿Seguro que quieres cancelarla?
+                    </span>
                     <button
                       onClick={() => cancelar(cita.id)}
                       disabled={cancelandoId === cita.id}
@@ -120,7 +147,10 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
                     </button>
                     <button
                       onClick={() => setConfirmandoId(null)}
-                      className="font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+                      className={
+                        "font-body text-xs underline decoration-brand-line underline-offset-4 " +
+                        (activa ? "text-brand-black/70 hover:text-brand-black" : "text-brand-white-dim hover:text-brand-yellow")
+                      }
                     >
                       No, mantener
                     </button>
@@ -128,7 +158,10 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
                 ) : (
                   <button
                     onClick={() => setConfirmandoId(cita.id)}
-                    className="font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-red-400"
+                    className={
+                      "font-body text-xs underline decoration-brand-line underline-offset-4 " +
+                      (activa ? "text-brand-black/70 hover:text-red-600" : "text-brand-white-dim hover:text-red-400")
+                    }
                   >
                     Cancelar cita
                   </button>

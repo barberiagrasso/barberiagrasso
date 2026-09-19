@@ -34,7 +34,7 @@ export default async function ReservarPage() {
 
       <div className="relative mx-auto max-w-xl">
         <div className="mb-10 flex flex-col items-center text-center">
-          <GrassoLogo className="h-auto w-56 text-brand-white sm:w-64" />
+          <GrassoLogo className="h-auto w-28 text-brand-white sm:w-32" />
           <p className="mt-4 font-heading text-lg italic text-brand-white-dim">
             Reserva tu cita
           </p>

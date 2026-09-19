@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
 
 interface Sede {
   id: string;
@@ -9,6 +11,7 @@ interface Sede {
 interface Profesional {
   id: string;
   nombre: string;
+  foto_url?: string | null;
 }
 interface Bloqueo {
   id: string;
@@ -16,7 +19,7 @@ interface Bloqueo {
   fecha_inicio: string;
   fecha_fin: string;
   motivo: string | null;
-  profesional: { nombre: string } | null;
+  profesional: { nombre: string; foto_url?: string | null } | null;
 }
 
 function hoyISO() {
@@ -109,18 +112,12 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
       <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
         <h2 className="font-medium text-stone-800">Nuevo bloqueo</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <select
+          <SelectorProfesionalConFoto
             value={profesionalId}
-            onChange={(e) => setProfesionalId(e.target.value)}
-            className="rounded-lg border border-stone-300 p-2 text-sm"
-          >
-            <option value="">Toda la sede (festivo, cierre...)</option>
-            {profesionales.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+            onChange={setProfesionalId}
+            opciones={profesionales}
+            etiquetaVacio="Toda la sede (festivo, cierre...)"
+          />
           <input
             placeholder="Motivo (opcional): vacaciones, médico…"
             value={motivo}
@@ -167,7 +164,10 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
           {bloqueos.map((b) => (
             <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
               <div>
-                <div className="font-medium text-stone-900">
+                <div className="flex items-center gap-1.5 font-medium text-stone-900">
+                  {b.profesional && (
+                    <AvatarProfesional fotoUrl={b.profesional.foto_url} nombre={b.profesional.nombre} className="h-5 w-5" />
+                  )}
                   {b.profesional?.nombre ?? "Toda la sede"}
                 </div>
                 <div className="text-sm text-stone-500">

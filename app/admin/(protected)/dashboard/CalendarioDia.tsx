@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fechaEnMadrid, minutosEnMadrid, minutosDeHora, isoDesdeMadrid } from "@/lib/horarioLocal";
 import { columnasVisibles, rangoHorario, resolverDescansosDia, ID_SIN_ASIGNAR } from "@/lib/calendarioDia";
 import { IconBell, IconCheck, IconAlertCircle, IconX } from "@/components/ui/Icons";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 
 interface Cita {
   id: string;
@@ -15,11 +16,12 @@ interface Cita {
   metodo_pago?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
-  profesional: { id: string; nombre: string } | null;
+  profesional: { id: string; nombre: string; foto_url?: string | null } | null;
 }
 interface Profesional {
   id: string;
   nombre: string;
+  foto_url?: string | null;
 }
 interface Horario {
   profesional_id: string;
@@ -338,7 +340,8 @@ export default function CalendarioDia({
           <div className="sticky top-0 z-20 flex border-b border-stone-200 bg-white">
             <div className="w-16 shrink-0" />
             {columnas.map((col) => (
-              <div key={col.id} className="flex-1 border-l border-stone-100 p-2 text-center text-sm font-medium text-stone-900">
+              <div key={col.id} className="flex flex-1 items-center justify-center gap-1.5 border-l border-stone-100 p-2 text-center text-sm font-medium text-stone-900">
+                {col.id !== ID_SIN_ASIGNAR && <AvatarProfesional fotoUrl={col.foto_url} nombre={col.nombre} className="h-5 w-5" />}
                 {col.nombre}
               </div>
             ))}
@@ -544,8 +547,11 @@ function DetalleCitaPanel({
             <span className="text-stone-400">Servicio: </span>
             {cita.servicio?.nombre ?? "—"}
           </div>
-          <div>
+          <div className="flex items-center gap-1.5">
             <span className="text-stone-400">Barbero: </span>
+            {cita.profesional && (
+              <AvatarProfesional fotoUrl={cita.profesional.foto_url} nombre={cita.profesional.nombre} className="h-5 w-5" />
+            )}
             {cita.profesional?.nombre ?? "Sin asignar"}
             {cita.profesional_elegido_por_cliente && (
               <span className="ml-1 text-red-500" title="El cliente pidió a este profesional en concreto">

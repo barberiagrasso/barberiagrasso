@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { colorDeProfesional, fechasDelRango } from "@/lib/vacaciones";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
 
 interface Profesional {
   id: string;
   nombre: string;
+  foto_url?: string | null;
 }
 type EstadoSolicitud = "pendiente" | "aprobada" | "rechazada";
 interface Solicitud {
@@ -18,7 +21,10 @@ interface Solicitud {
   motivo: string | null;
   solicitado_por: string | null;
   resuelto_en: string | null;
-  profesional: { nombre: string } | { nombre: string }[] | null;
+  profesional:
+    | { nombre: string; foto_url?: string | null }
+    | { nombre: string; foto_url?: string | null }[]
+    | null;
 }
 interface DiaBloqueado {
   id: string;
@@ -27,9 +33,11 @@ interface DiaBloqueado {
   motivo: string | null;
 }
 
+function unoProfesional(p: Solicitud["profesional"]): { nombre: string; foto_url?: string | null } | null {
+  return Array.isArray(p) ? (p[0] ?? null) : p;
+}
 function nombreDe(p: Solicitud["profesional"]): string {
-  const prof = Array.isArray(p) ? p[0] : p;
-  return prof?.nombre ?? "";
+  return unoProfesional(p)?.nombre ?? "";
 }
 
 function pad2(n: number) {
@@ -271,6 +279,7 @@ export default function VacacionesClient({
                     (visible ? "border-stone-300 bg-white text-stone-700" : "border-stone-200 bg-stone-100 text-stone-400")
                   }
                 >
+                  <AvatarProfesional fotoUrl={p.foto_url} nombre={p.nombre} className="h-5 w-5" />
                   <span className={"h-2 w-2 rounded-full " + (visible ? color.bg : "bg-stone-300")} />
                   {p.nombre}
                 </button>
@@ -385,18 +394,13 @@ export default function VacacionesClient({
             </div>
             {esAdmin && (
               <div className="flex flex-wrap items-center gap-2">
-                <select
+                <SelectorProfesionalConFoto
                   value={barberoElegido}
-                  onChange={(e) => setBarberoElegido(e.target.value)}
-                  className="rounded-lg border border-stone-300 p-1.5 text-sm"
-                >
-                  <option value="">Elige un barbero…</option>
-                  {profesionales.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setBarberoElegido}
+                  opciones={profesionales}
+                  etiquetaVacio="Elige un barbero…"
+                  className="min-w-[180px]"
+                />
                 <label className="flex items-center gap-1.5 text-xs text-stone-600">
                   <input type="checkbox" checked={aprobarDirectamente} onChange={(e) => setAprobarDirectamente(e.target.checked)} />
                   Dar de alta ya aprobada
@@ -442,7 +446,10 @@ export default function VacacionesClient({
               {pendientes.length === 0 && <p className="text-sm text-stone-400">No hay ninguna pendiente.</p>}
               {pendientes.map((s) => (
                 <div key={s.id} className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm">
-                  <p className="font-medium text-stone-900">{nombreDe(s.profesional)}</p>
+                  <p className="flex items-center gap-1.5 font-medium text-stone-900">
+                    <AvatarProfesional fotoUrl={unoProfesional(s.profesional)?.foto_url} nombre={nombreDe(s.profesional)} className="h-5 w-5" />
+                    {nombreDe(s.profesional)}
+                  </p>
                   <p className="text-xs text-stone-500">
                     {s.fecha_inicio === s.fecha_fin ? s.fecha_inicio : `${s.fecha_inicio} — ${s.fecha_fin}`}
                     {s.motivo ? ` · ${s.motivo}` : ""}

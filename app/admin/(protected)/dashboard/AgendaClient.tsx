@@ -5,6 +5,8 @@ import FinalizarCitaModal from "./FinalizarCitaModal";
 import CalendarioDia from "./CalendarioDia";
 import ListaEsperaClient from "../lista-espera/ListaEsperaClient";
 import { IconBell, IconCheck, IconAlertCircle, IconX } from "@/components/ui/Icons";
+import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
 
 interface Sede {
   id: string;
@@ -29,7 +31,7 @@ interface Cita {
   metodo_pago?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
-  profesional: { id: string; nombre: string } | null;
+  profesional: { id: string; nombre: string; foto_url?: string | null } | null;
   extras?: { servicio_id: string }[];
 }
 
@@ -88,7 +90,7 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 
 interface DatosAgendaIniciales {
   citas: Cita[];
-  profesionales: { id: string; nombre: string }[];
+  profesionales: { id: string; nombre: string; foto_url?: string | null }[];
   horarios: { profesional_id: string; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }[];
   descansosExcepciones: { profesional_id: string; hora_inicio: string; hora_fin: string }[];
 }
@@ -112,7 +114,7 @@ export default function AgendaClient({
   const [fecha, setFecha] = useState(hoyISO());
   const [vista, setVista] = useState<"dia" | "semana">("dia");
   const [citas, setCitas] = useState<Cita[]>(datosIniciales?.citas ?? []);
-  const [profesionalesDia, setProfesionalesDia] = useState<{ id: string; nombre: string }[]>(
+  const [profesionalesDia, setProfesionalesDia] = useState<{ id: string; nombre: string; foto_url?: string | null }[]>(
     datosIniciales?.profesionales ?? []
   );
   const [horariosDia, setHorariosDia] = useState<
@@ -485,8 +487,13 @@ function VistaSemanal({
                   )}
                   {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
                 </div>
-                <div className="text-stone-500">
-                  {cita.servicio?.nombre} · {cita.profesional?.nombre ?? "Cualquiera"}
+                <div className="flex items-center gap-1 text-stone-500">
+                  {cita.profesional && (
+                    <AvatarProfesional fotoUrl={cita.profesional.foto_url} nombre={cita.profesional.nombre} className="h-4 w-4" />
+                  )}
+                  <span>
+                    {cita.servicio?.nombre} · {cita.profesional?.nombre ?? "Cualquiera"}
+                  </span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
                   <span
@@ -560,7 +567,7 @@ function NuevaCitaForm({
   onCreada: () => void;
 }) {
   const [servicioId, setServicioId] = useState(servicios[0]?.id ?? "");
-  const [profesionales, setProfesionales] = useState<{ id: string; nombre: string }[]>([]);
+  const [profesionales, setProfesionales] = useState<{ id: string; nombre: string; foto_url?: string | null }[]>([]);
   const [profesionalId, setProfesionalId] = useState("");
   const [slots, setSlots] = useState<{ hora_inicio: string; profesional_id: string; profesional_nombre: string }[]>(
     []
@@ -628,14 +635,12 @@ function NuevaCitaForm({
             </option>
           ))}
         </select>
-        <select value={profesionalId} onChange={(e) => setProfesionalId(e.target.value)} className="rounded-lg border border-stone-300 p-2 text-sm">
-          <option value="">Cualquier profesional</option>
-          {profesionales.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-        </select>
+        <SelectorProfesionalConFoto
+          value={profesionalId}
+          onChange={setProfesionalId}
+          opciones={profesionales}
+          etiquetaVacio="Cualquier profesional"
+        />
       </div>
 
       <div className="flex flex-wrap gap-2">

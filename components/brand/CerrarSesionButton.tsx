@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function CerrarSesionButton({ className }: { className?: string }) {
+export function CerrarSesionButton({ className, children }: { className?: string; children?: React.ReactNode }) {
   const router = useRouter();
   const [saliendo, setSaliendo] = useState(false);
 
@@ -15,8 +15,8 @@ export function CerrarSesionButton({ className }: { className?: string }) {
   }
 
   return (
-    <button onClick={cerrarSesion} disabled={saliendo} className={className}>
-      {saliendo ? "Saliendo…" : "Cerrar sesión"}
+    <button onClick={cerrarSesion} disabled={saliendo} className={className} title="Cerrar sesión" aria-label="Cerrar sesión">
+      {children ?? (saliendo ? "Saliendo…" : "Cerrar sesión")}
     </button>
   );
 }

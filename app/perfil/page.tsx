@@ -2,9 +2,8 @@ import Link from "next/link";
 import { requireCliente } from "@/lib/clienteAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
-import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
+import { EditarPerfilHeader } from "./EditarPerfilHeader";
 import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
-import { CumpleanosForm } from "./CumpleanosForm";
 import { BonosSection } from "./BonosSection";
 import { precioCitaCentimos } from "@/lib/precios";
 import { bonosDelCliente } from "@/lib/bonos";
@@ -18,7 +17,7 @@ interface CitaCruda {
   precio_final_centimos: number | null;
   sede: { nombre: string } | { nombre: string }[] | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
-  profesional: { nombre: string } | { nombre: string }[] | null;
+  profesional: { nombre: string; foto_url?: string | null } | { nombre: string; foto_url?: string | null }[] | null;
   extras: { precio_centimos: number; servicio: { nombre: string } | { nombre: string }[] | null }[] | null;
 }
 
@@ -46,7 +45,7 @@ export default async function PerfilPage() {
   const { data: citas } = await admin
     .from("citas")
     .select(
-      "id, inicio, estado, precio_final_centimos, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
+      "id, inicio, estado, precio_final_centimos, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
     )
     .eq("cliente_id", cliente.id)
     .order("inicio", { ascending: false });
@@ -65,6 +64,7 @@ export default async function PerfilPage() {
       servicioNombre: servicio?.nombre ?? "Servicio",
       precioTotalCentimos: total,
       profesionalNombre: uno(cita.profesional)?.nombre ?? "Cualquiera",
+      profesionalFotoUrl: uno(cita.profesional)?.foto_url ?? null,
       extrasNombres: extras.map((e) => uno(e.servicio)?.nombre).filter((n): n is string => Boolean(n)),
     };
   });
@@ -87,7 +87,14 @@ export default async function PerfilPage() {
           >
             ← Volver
           </Link>
-          <CerrarSesionButton className="font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow" />
+          <EditarPerfilHeader
+            cliente={{
+              nombre: cliente.nombre,
+              telefono: cliente.telefono,
+              email: cliente.email ?? null,
+              fechaNacimiento: cliente.fecha_nacimiento ?? null,
+            }}
+          />
         </div>
 
         <Link
@@ -102,8 +109,6 @@ export default async function PerfilPage() {
           </div>
           <span className="font-body text-sm text-brand-white-dim">Ver tarjeta →</span>
         </Link>
-
-        <CumpleanosForm fechaInicial={cliente.fecha_nacimiento ?? null} />
 
         <BonosSection bonos={bonos} />
 

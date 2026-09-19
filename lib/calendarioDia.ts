@@ -10,6 +10,7 @@ import { minutosDeHora } from "@/lib/horarioLocal";
 export interface Profesional {
   id: string;
   nombre: string;
+  foto_url?: string | null;
 }
 export interface Horario {
   profesional_id: string;
@@ -19,7 +20,7 @@ export interface Horario {
   descanso_fin?: string | null;
 }
 export interface CitaParaColumna {
-  profesional: { id: string; nombre: string } | null;
+  profesional: { id: string; nombre: string; foto_url?: string | null } | null;
 }
 export interface DescansoExcepcion {
   profesional_id: string;

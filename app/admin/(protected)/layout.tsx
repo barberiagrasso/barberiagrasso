@@ -57,6 +57,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           </div>
           <div className="flex items-center gap-3 font-body text-sm text-brand-white-dim">
             <span>{admin.nombre || "Administrador"}</span>
+            <Link href="/admin/mi-perfil" className="underline decoration-brand-line hover:text-brand-yellow">
+              Mi perfil
+            </Link>
             <Link href="/admin/cambiar-password" className="underline decoration-brand-line hover:text-brand-yellow">
               Cambiar contraseña
             </Link>

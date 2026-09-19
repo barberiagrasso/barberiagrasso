@@ -28,7 +28,7 @@ import { puedeVerTelefonos } from "@/lib/telefono";
 export interface DatosAgenda {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   citas: any[];
-  profesionales: { id: string; nombre: string }[];
+  profesionales: { id: string; nombre: string; foto_url?: string | null }[];
   horarios: { profesional_id: string; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }[];
   descansosExcepciones: { profesional_id: string; hora_inicio: string; hora_fin: string }[];
 }
@@ -142,15 +142,41 @@ export async function cargarDatosAgenda(
     // puntual a esta sede hoy.
     idsQueHacenServicio: new Set(destinosDelDia.map((d) => d.profesional_id)),
   });
-  const profesionales = profesionalesConDestinos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const profesionalesSinFoto = profesionalesConDestinos.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   // Quita el turno habitual de quien hoy está redirigido a otra sede, y
   // añade el turno sintético de quien ha llegado puntualmente a esta.
   const idsRedirigidosFuera = new Set(destinosDelDia.filter((d) => d.sede_id !== sedeId).map((d) => d.profesional_id));
   const horarios = [...(horariosSede ?? []).filter((h) => !idsRedirigidosFuera.has(h.profesional_id)), ...horariosExtra];
 
+  // Foto de perfil de cada barbero (pedido de Diego, 19/09/2026): se
+  // añade aquí, en una única consulta aparte, en vez de meterla en el
+  // select de arriba de "citas" y "profesional_sedes" — así no hay que
+  // tocar el tipado de resolverCandidatosConDestinosPuntuales (que no
+  // conoce el concepto de foto) para algo puramente decorativo.
+  const idProfesionalDeCita = (c: { profesional: unknown }): string | null => {
+    const p = Array.isArray(c.profesional) ? c.profesional[0] : c.profesional;
+    return (p as { id?: string } | null)?.id ?? null;
+  };
+  const idsConFoto = new Set<string>([
+    ...profesionalesSinFoto.map((p) => p.id),
+    ...citasParaElRol.map((c) => idProfesionalDeCita(c)).filter((id): id is string => Boolean(id)),
+  ]);
+  const { data: fotos } =
+    idsConFoto.size > 0
+      ? await supabase.from("profesionales").select("id, foto_url").in("id", [...idsConFoto])
+      : { data: [] as { id: string; foto_url: string | null }[] };
+  const fotoPorId = new Map((fotos ?? []).map((f) => [f.id, f.foto_url]));
+
+  const profesionales = profesionalesSinFoto.map((p) => ({ ...p, foto_url: fotoPorId.get(p.id) ?? null }));
+  const citasConFoto = citasParaElRol.map((c) => {
+    const p = Array.isArray(c.profesional) ? c.profesional[0] : c.profesional;
+    if (!p) return c;
+    return { ...c, profesional: { ...p, foto_url: fotoPorId.get(p.id) ?? null } };
+  });
+
   return {
-    citas: citasParaElRol,
+    citas: citasConFoto,
     profesionales,
     horarios,
     descansosExcepciones: descansosExcepciones ?? [],

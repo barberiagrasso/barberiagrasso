@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ResumenDiaDisponibilidad } from "@/lib/types";
+import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
 
 // =====================================================================
 // Botón flotante "+" (siempre visible en el espacio del equipo) para
@@ -25,6 +26,7 @@ interface Servicio {
 interface Profesional {
   id: string;
   nombre: string;
+  foto_url?: string | null;
 }
 
 const MESES_ADELANTE_MAX = 3;
@@ -328,21 +330,14 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
                   </div>
                   <div>
                     <p className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-500">Profesional</p>
-                    <select
+                    <SelectorProfesionalConFoto
                       value={profesionalId}
-                      onChange={(e) => {
-                        setProfesionalId(e.target.value);
+                      onChange={(id) => {
+                        setProfesionalId(id);
                         setHoraInicioISO("");
                       }}
-                      className="w-full rounded-lg border border-stone-300 p-2 text-sm"
-                    >
-                      <option value="">Cualquiera</option>
-                      {profesionales.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre}
-                        </option>
-                      ))}
-                    </select>
+                      opciones={profesionales}
+                    />
                   </div>
                 </div>
 

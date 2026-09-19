@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const { data: entradas, error } = await supabase
     .from("lista_espera")
     .select(
-      "id, fecha, flexibilidad_dias, estado, created_at, cliente:clientes(nombre, telefono), servicio:servicios(nombre), profesional:profesionales(nombre)"
+      "id, fecha, flexibilidad_dias, estado, created_at, cliente:clientes(nombre, telefono), servicio:servicios(nombre), profesional:profesionales(nombre, foto_url)"
     )
     .eq("sede_id", sedeId)
     .in("estado", ["pendiente", "notificado"])

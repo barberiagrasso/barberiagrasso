@@ -41,6 +41,10 @@ export interface Profesional {
   id: string;
   nombre: string;
   activo: boolean;
+  // Foto de perfil (Supabase Storage, bucket público "fotos-profesionales").
+  // null = no ha subido ninguna todavía → se muestra el logo por defecto
+  // (ver AvatarProfesional en components/brand/).
+  foto_url?: string | null;
 }
 
 export interface Horario {
