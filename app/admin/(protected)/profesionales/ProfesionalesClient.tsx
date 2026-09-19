@@ -279,6 +279,179 @@ function DetalleProfesional({
           )}
         </div>
       )}
+
+      <DestinosPuntuales profesionalId={profesional.id} sedes={sedes} />
+    </div>
+  );
+}
+
+interface DestinoPuntual {
+  id: string;
+  fecha: string;
+  sede_id: string;
+  hora_inicio: string;
+  hora_fin: string;
+  notas: string | null;
+  sede: { nombre: string } | { nombre: string }[] | null;
+}
+
+function nombreSede(destino: DestinoPuntual): string {
+  const s = Array.isArray(destino.sede) ? destino.sede[0] : destino.sede;
+  return s?.nombre ?? "";
+}
+
+function formatoFecha(fechaISO: string): string {
+  return new Date(`${fechaISO}T12:00:00`).toLocaleDateString("es-ES", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * Destinos puntuales: días sueltos en los que un profesional trabaja en
+ * otra sede en vez de en la suya habitual (caso Juan: por defecto en
+ * Avenida de las Ciudades, algún día puntual en Los Molinos). No toca
+ * las sedes/servicios permanentes de arriba ni el horario semanal — es
+ * una excepción de un solo día que lib/availability.ts aplica sola, sin
+ * tener que deshacer nada después de que pase la fecha.
+ */
+function DestinosPuntuales({ profesionalId, sedes }: { profesionalId: string; sedes: Sede[] }) {
+  const [destinos, setDestinos] = useState<DestinoPuntual[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [creando, setCreando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fecha, setFecha] = useState("");
+  const [sedeId, setSedeId] = useState(sedes[0]?.id ?? "");
+  const [horaInicio, setHoraInicio] = useState("09:30");
+  const [horaFin, setHoraFin] = useState("20:30");
+  const [notas, setNotas] = useState("");
+
+  async function cargar() {
+    setCargando(true);
+    const res = await fetch(`/api/admin/profesionales/${profesionalId}/destinos-puntuales`);
+    const json = await res.json();
+    setDestinos(json.destinos ?? []);
+    setCargando(false);
+  }
+
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profesionalId]);
+
+  async function guardar() {
+    if (!fecha || !sedeId || !horaInicio || !horaFin) return;
+    setError(null);
+    setGuardando(true);
+    const res = await fetch(`/api/admin/profesionales/${profesionalId}/destinos-puntuales`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha, sedeId, horaInicio: `${horaInicio}:00`, horaFin: `${horaFin}:00`, notas: notas.trim() || undefined }),
+    });
+    const json = await res.json();
+    setGuardando(false);
+    if (!res.ok) {
+      setError(json.error || "No se pudo guardar el destino puntual.");
+      return;
+    }
+    setFecha("");
+    setNotas("");
+    setCreando(false);
+    cargar();
+  }
+
+  async function borrar(destino: DestinoPuntual) {
+    if (!confirm(`¿Quitar el destino puntual del ${formatoFecha(destino.fecha)} a ${nombreSede(destino)}?`)) return;
+    await fetch(`/api/admin/profesionales/${profesionalId}/destinos-puntuales/${destino.id}`, { method: "DELETE" });
+    cargar();
+  }
+
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="border-t border-stone-100 pt-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-stone-700">Destinos puntuales</h3>
+        <button onClick={() => setCreando((v) => !v)} className="text-xs text-brand-yellow-dark underline">
+          {creando ? "Cerrar" : "+ Nuevo destino puntual"}
+        </button>
+      </div>
+      <p className="mb-3 text-xs text-stone-400">
+        Para un día suelto en el que este profesional trabaja en otra sede en vez de en la suya habitual — no afecta a
+        ningún otro día, y no hace falta deshacerlo después.
+      </p>
+
+      {creando && (
+        <div className="mb-3 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={fecha}
+              min={hoy}
+              onChange={(e) => setFecha(e.target.value)}
+              className="rounded border border-stone-300 p-1.5 text-sm"
+            />
+            <select value={sedeId} onChange={(e) => setSedeId(e.target.value)} className="rounded border border-stone-300 p-1.5 text-sm">
+              {sedes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+            <input
+              type="time"
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              className="rounded border border-stone-300 p-1.5 text-sm"
+            />
+            <span className="text-stone-400">a</span>
+            <input
+              type="time"
+              value={horaFin}
+              onChange={(e) => setHoraFin(e.target.value)}
+              className="rounded border border-stone-300 p-1.5 text-sm"
+            />
+          </div>
+          <input
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            placeholder="Notas (opcional)"
+            className="w-full rounded border border-stone-300 p-1.5 text-sm"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button
+            disabled={guardando}
+            onClick={guardar}
+            className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+          >
+            {guardando ? "Guardando…" : "Guardar destino puntual"}
+          </button>
+        </div>
+      )}
+
+      {cargando ? (
+        <p className="text-sm text-stone-400">Cargando…</p>
+      ) : destinos.length === 0 ? (
+        <p className="text-sm text-stone-400">Sin destinos puntuales guardados.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {destinos.map((d) => (
+            <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white p-2 text-sm">
+              <span className="text-stone-700">
+                <span className="font-medium">{formatoFecha(d.fecha)}</span> → {nombreSede(d)} · {d.hora_inicio.slice(0, 5)}-
+                {d.hora_fin.slice(0, 5)}
+                {d.notas && <span className="text-stone-400"> · {d.notas}</span>}
+              </span>
+              <button onClick={() => borrar(d)} className="text-xs text-red-700 underline">
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

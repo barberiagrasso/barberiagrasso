@@ -53,6 +53,15 @@ interface CitaFila {
   fin: string;
 }
 
+interface DestinoPuntualFila {
+  profesional_id: string;
+  nombre: string;
+  sede_id: string;
+  fecha: string; // "YYYY-MM-DD"
+  hora_inicio: string;
+  hora_fin: string;
+}
+
 interface Params {
   sedeId: string;
   servicioId: string;
@@ -79,15 +88,37 @@ export async function getAvailableSlots({
 }: Params): Promise<FranjaDisponible[]> {
   const supabase = createAdminClient();
 
-  const datosBase = await cargarDatosBase(supabase, sedeId, servicioId, profesionalId, duracionExtraMinutos);
+  const datosBase = await cargarDatosBase(supabase, sedeId, servicioId, duracionExtraMinutos);
   if (!datosBase) return [];
-  const { candidatos, duracionMinutos } = datosBase;
-  const candidatoIds = candidatos.map((c) => c.id);
+  const { candidatosPermanentes, duracionMinutos, idsQueHacenServicio } = datosBase;
+  const candidatoIdsPermanentes = candidatosPermanentes.map((c) => c.id);
 
   const fechaLocal = parse(fecha, "yyyy-MM-dd", new Date());
   const diaSemana = toZonedTime(fechaLocal, TZ).getDay();
   const inicioDiaUTC = fromZonedTime(startOfDay(fechaLocal), TZ);
   const finDiaUTC = fromZonedTime(endOfDay(fechaLocal), TZ);
+
+  // Antes de pedir horarios/citas/etc. hace falta saber quién es
+  // candidato DE VERDAD ese día concreto: alguien con destino puntual a
+  // otra sede ese día deja de contar aquí, y alguien con destino puntual
+  // A esta sede pasa a contar aunque no trabaje aquí de forma habitual
+  // (ver resolverCandidatosConDestinosPuntuales). Los destinos puntuales
+  // de ese día son baratos de traer (como mucho una fila por
+  // profesional) y no dependen de nada más, así que se piden en paralelo
+  // con lo demás de cargarDatosBase — pero como determinan la lista de
+  // candidatos que usan las consultas siguientes, se resuelven antes.
+  const destinosDelDia = await cargarDestinosPuntualesDelDia(supabase, sedeId, candidatoIdsPermanentes, fecha);
+  const { candidatos: candidatosDelDia, horariosExtra } = resolverCandidatosConDestinosPuntuales({
+    candidatosPermanentes,
+    destinosDelDia,
+    sedeId,
+    idsQueHacenServicio,
+  });
+  const candidatos = profesionalId
+    ? candidatosDelDia.filter((c) => c.id === profesionalId)
+    : candidatosDelDia;
+  if (candidatos.length === 0) return [];
+  const candidatoIds = candidatos.map((c) => c.id);
 
   // Las cinco consultas de aquí abajo no dependen unas de otras (todas
   // solo necesitan sedeId/fecha/candidatoIds, ya conocidos), así que se
@@ -96,6 +127,13 @@ export async function getAvailableSlots({
   // por 5 la latencia de ida y vuelta a Supabase (decisión de Diego,
   // 19/09/2026: la disponibilidad del cliente tardaba tanto en cargar
   // que parecía que no había huecos).
+  //
+  // OJO con la de citas: se filtra por profesional (candidatoIds), NO
+  // por sede. Un profesional de varias sedes (David, o Juan cuando está
+  // puntualmente en Los Molinos) tiene que verse bloqueado aquí si ya
+  // tiene una cita en SU OTRA sede a la misma hora — si se filtrara por
+  // sede, esa cita quedaría invisible y se podría reservar dos veces a
+  // la vez en dos sedes distintas (bug corregido el 19/09/2026).
   const [{ data: horarios }, { data: excepciones }, { data: bloqueos }, { data: vacaciones }, { data: citas }] =
     await Promise.all([
       supabase
@@ -125,7 +163,7 @@ export async function getAvailableSlots({
       supabase
         .from("citas")
         .select("profesional_id, inicio, fin")
-        .eq("sede_id", sedeId)
+        .in("profesional_id", candidatoIds)
         .neq("estado", "cancelada")
         .lt("inicio", finDiaUTC.toISOString())
         .gt("fin", inicioDiaUTC.toISOString()),
@@ -135,12 +173,13 @@ export async function getAvailableSlots({
     ...(bloqueos ?? []),
     ...vacacionesComoBloqueos(vacaciones ?? [], inicioDiaUTC, finDiaUTC),
   ];
+  const horariosDelDiaConDestinos = [...(horarios ?? []), ...horariosExtra];
 
   return generarSlotsParaDia({
     fecha,
     candidatos,
-    horariosDelDia: horarios ?? [],
-    descansosDelDia: resolverDescansos(horarios ?? [], excepciones ?? []),
+    horariosDelDia: horariosDelDiaConDestinos,
+    descansosDelDia: resolverDescansos(horariosDelDiaConDestinos, excepciones ?? []),
     bloqueos: bloqueosDelDia,
     citas: citas ?? [],
     duracionMinutos,
@@ -172,10 +211,10 @@ export async function getMonthAvailabilitySummary({
 }): Promise<ResumenDiaDisponibilidad[]> {
   const supabase = createAdminClient();
 
-  const datosBase = await cargarDatosBase(supabase, sedeId, servicioId, profesionalId, duracionExtraMinutos);
+  const datosBase = await cargarDatosBase(supabase, sedeId, servicioId, duracionExtraMinutos);
   if (!datosBase) return [];
-  const { candidatos, duracionMinutos } = datosBase;
-  const candidatoIds = candidatos.map((c) => c.id);
+  const { candidatosPermanentes, duracionMinutos, idsQueHacenServicio } = datosBase;
+  const candidatoIdsPermanentes = candidatosPermanentes.map((c) => c.id);
 
   const totalDias = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
   const primerDiaLocal = parse(`${anio}-${pad(mes)}-01`, "yyyy-MM-dd", new Date());
@@ -185,9 +224,34 @@ export async function getMonthAvailabilitySummary({
   const primerDiaStr = `${anio}-${pad(mes)}-01`;
   const ultimoDiaStr = `${anio}-${pad(mes)}-${pad(totalDias)}`;
 
+  // Destinos puntuales de todo el mes (a esta sede, o de alguno de los
+  // permanentes hacia otra), traídos de una sola vez — igual que el
+  // resto de datos del mes — y agrupados por fecha para aplicarlos día a
+  // día más abajo (ver resolverCandidatosConDestinosPuntuales).
+  const destinosDelMes = await cargarDestinosPuntualesEnRango(
+    supabase,
+    sedeId,
+    candidatoIdsPermanentes,
+    primerDiaStr,
+    ultimoDiaStr
+  );
+  const destinosPorFecha = new Map<string, DestinoPuntualFila[]>();
+  for (const d of destinosDelMes) {
+    if (!destinosPorFecha.has(d.fecha)) destinosPorFecha.set(d.fecha, []);
+    destinosPorFecha.get(d.fecha)!.push(d);
+  }
+  // Alguien con un destino puntual a ESTA sede en algún día del mes
+  // también necesita que se traigan sus citas/vacaciones (para poder
+  // detectar solapes), aunque no sea de aquí de forma permanente.
+  const idsLlegadasPuntuales = destinosDelMes.filter((d) => d.sede_id === sedeId).map((d) => d.profesional_id);
+  const candidatoIds = [...new Set([...candidatoIdsPermanentes, ...idsLlegadasPuntuales])];
+
   // Mismo motivo que en getAvailableSlots: estas cinco consultas son
   // independientes entre sí, así que se lanzan en paralelo en vez de en
-  // cadena.
+  // cadena. La de citas se filtra por profesional (candidatoIds), NO por
+  // sede — mismo motivo que en getAvailableSlots: un profesional de
+  // varias sedes tiene que verse bloqueado si ya tiene cita en la otra a
+  // la misma hora (bug corregido el 19/09/2026).
   const [{ data: horarios }, { data: excepciones }, { data: bloqueos }, { data: vacaciones }, { data: citas }] =
     await Promise.all([
       supabase
@@ -217,7 +281,7 @@ export async function getMonthAvailabilitySummary({
       supabase
         .from("citas")
         .select("profesional_id, inicio, fin")
-        .eq("sede_id", sedeId)
+        .in("profesional_id", candidatoIds)
         .neq("estado", "cancelada")
         .lt("inicio", finMesUTC.toISOString())
         .gt("fin", inicioMesUTC.toISOString()),
@@ -242,10 +306,22 @@ export async function getMonthAvailabilitySummary({
     const fechaStr = `${anio}-${pad(mes)}-${pad(dia)}`;
     const fechaLocal = parse(fechaStr, "yyyy-MM-dd", new Date());
     const diaSemana = toZonedTime(fechaLocal, TZ).getDay();
-    const horariosDelDia = horariosPorDiaSemana.get(diaSemana) ?? [];
 
-    if (horariosDelDia.length === 0) {
-      // Negocio cerrado ese día de la semana para estos candidatos.
+    const { candidatos: candidatosDelDia, horariosExtra } = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes,
+      destinosDelDia: destinosPorFecha.get(fechaStr) ?? [],
+      sedeId,
+      idsQueHacenServicio,
+    });
+    const candidatosFiltrados = profesionalId
+      ? candidatosDelDia.filter((c) => c.id === profesionalId)
+      : candidatosDelDia;
+    const horariosDelDia = [...(horariosPorDiaSemana.get(diaSemana) ?? []), ...horariosExtra];
+
+    if (candidatosFiltrados.length === 0 || horariosDelDia.length === 0) {
+      // Negocio cerrado ese día de la semana para estos candidatos (o ya
+      // no queda ningún candidato tras aplicar destinos puntuales / el
+      // filtro de profesional pedido).
       resumen.push({ fecha: fechaStr, huecos: 0, nivel: "ninguna", seleccionable: false });
       continue;
     }
@@ -262,7 +338,7 @@ export async function getMonthAvailabilitySummary({
 
     const slots = generarSlotsParaDia({
       fecha: fechaStr,
-      candidatos,
+      candidatos: candidatosFiltrados,
       horariosDelDia,
       descansosDelDia: resolverDescansos(horariosDelDia, excepcionesPorFecha.get(fechaStr) ?? []),
       bloqueos: [...bloqueosDelDia, ...vacacionesComoBloqueos(vacacionesDelDia, inicioDiaUTC, finDiaUTC)],
@@ -335,24 +411,22 @@ export async function buscarProximoDiaConHueco({
 // ---------------------------------------------------------------------
 
 /** Duración real del servicio en esta sede + profesionales candidatos
- * (trabajan en la sede y realizan el servicio). Devuelve null si el
- * servicio está desactivado en esa sede o si no hay ningún candidato. */
+ * PERMANENTES de esa sede (trabajan ahí de forma habitual y realizan el
+ * servicio) — sin tener en cuenta destinos puntuales de un día concreto,
+ * que se resuelven aparte por día (ver resolverCandidatosConDestinosPuntuales)
+ * porque dependen de la fecha y esta función se reutiliza para un mes
+ * entero. Ya NO filtra por profesionalId: siempre devuelve el equipo
+ * permanente completo de la sede, y es quien llama quien se queda solo
+ * con el profesional pedido una vez fusionados los destinos puntuales
+ * del día (si no, alguien puntual que no es de la sede nunca podría
+ * salir como candidato al pedirlo explícitamente). Devuelve null solo si
+ * el servicio no existe o está desactivado en esa sede. */
 async function cargarDatosBase(
   supabase: ReturnType<typeof createAdminClient>,
   sedeId: string,
   servicioId: string,
-  profesionalId?: string | null,
   duracionExtraMinutos?: number
-): Promise<{ candidatos: CandidatoInfo[]; duracionMinutos: number } | null> {
-  let profesionalesQuery = supabase
-    .from("profesional_sedes")
-    .select("profesional_id, profesionales!inner(id, nombre, activo)")
-    .eq("sede_id", sedeId)
-    .eq("profesionales.activo", true);
-  if (profesionalId) {
-    profesionalesQuery = profesionalesQuery.eq("profesional_id", profesionalId);
-  }
-
+): Promise<{ candidatosPermanentes: CandidatoInfo[]; duracionMinutos: number; idsQueHacenServicio: Set<string> } | null> {
   // Las cuatro consultas de aquí abajo no dependen unas de otras (ninguna
   // necesita el resultado de otra, solo los parámetros de entrada), así
   // que se piden todas a la vez. Antes se pedían en cadena y encima con
@@ -370,28 +444,148 @@ async function cargarDatosBase(
         .eq("sede_id", sedeId)
         .eq("servicio_id", servicioId)
         .maybeSingle(),
-      profesionalesQuery,
+      supabase
+        .from("profesional_sedes")
+        .select("profesional_id, profesionales!inner(id, nombre, activo)")
+        .eq("sede_id", sedeId)
+        .eq("profesionales.activo", true),
       supabase.from("profesional_servicios").select("profesional_id").eq("servicio_id", servicioId),
     ]);
 
   if (!servicio) return null;
   if (override && override.activo === false) return null; // servicio desactivado en esa sede
-  if (!sedeProfesionales || sedeProfesionales.length === 0) return null;
 
   const idsQueHacenServicio = new Set((profesionalServicios ?? []).map((p) => p.profesional_id));
 
-  const candidatos = sedeProfesionales
+  const candidatosPermanentes = (sedeProfesionales ?? [])
     .filter((sp) => idsQueHacenServicio.has(sp.profesional_id))
     .map((sp) => {
       const prof = Array.isArray(sp.profesionales) ? sp.profesionales[0] : sp.profesionales;
       return { id: sp.profesional_id as string, nombre: (prof as { nombre: string })?.nombre ?? "" };
     });
-  if (candidatos.length === 0) return null;
 
   return {
-    candidatos,
+    candidatosPermanentes,
     duracionMinutos: (override?.duracion_minutos ?? servicio.duracion_minutos) + (duracionExtraMinutos ?? 0),
+    idsQueHacenServicio,
   };
+}
+
+/** Trae los destinos puntuales relevantes para UN día concreto de una
+ * sede: los que redirigen a alguien HACIA esta sede ese día (para
+ * añadirlo como candidato aunque no sea de aquí habitualmente) y los que
+ * redirigen a algún permanente de esta sede HACIA OTRA (para quitarlo
+ * ese día). Se hace con dos consultas simples en vez de un .or() con la
+ * lista de ids interpolada a mano. */
+async function cargarDestinosPuntualesDelDia(
+  supabase: ReturnType<typeof createAdminClient>,
+  sedeId: string,
+  candidatoIdsPermanentes: string[],
+  fecha: string
+): Promise<DestinoPuntualFila[]> {
+  return cargarDestinosPuntualesEnRango(supabase, sedeId, candidatoIdsPermanentes, fecha, fecha);
+}
+
+/** Misma idea que cargarDestinosPuntualesDelDia pero para un rango de
+ * fechas (usado por getMonthAvailabilitySummary para traerlos todos de
+ * una vez, en vez de una consulta por día). */
+async function cargarDestinosPuntualesEnRango(
+  supabase: ReturnType<typeof createAdminClient>,
+  sedeId: string,
+  candidatoIdsPermanentes: string[],
+  fechaInicio: string,
+  fechaFin: string
+): Promise<DestinoPuntualFila[]> {
+  const consultas = [
+    supabase
+      .from("destinos_puntuales")
+      .select("profesional_id, fecha, sede_id, hora_inicio, hora_fin, profesionales!inner(nombre)")
+      .eq("sede_id", sedeId)
+      .gte("fecha", fechaInicio)
+      .lte("fecha", fechaFin),
+  ];
+  if (candidatoIdsPermanentes.length > 0) {
+    consultas.push(
+      supabase
+        .from("destinos_puntuales")
+        .select("profesional_id, fecha, sede_id, hora_inicio, hora_fin, profesionales!inner(nombre)")
+        .in("profesional_id", candidatoIdsPermanentes)
+        .gte("fecha", fechaInicio)
+        .lte("fecha", fechaFin)
+    );
+  }
+
+  const resultados = await Promise.all(consultas);
+  const porId = new Map<string, DestinoPuntualFila>();
+  for (const { data } of resultados) {
+    for (const fila of data ?? []) {
+      const prof = Array.isArray(fila.profesionales) ? fila.profesionales[0] : fila.profesionales;
+      // Clave por profesional+fecha: la tabla ya garantiza como mucho una
+      // fila por combinación (unique(profesional_id, fecha)), así que
+      // esto solo deduplica cuando la misma fila la traen las dos
+      // consultas a la vez (alguien permanente de esta sede con destino
+      // puntual... a esta misma sede, caso borde sin sentido práctico).
+      porId.set(`${fila.profesional_id}_${fila.fecha}`, {
+        profesional_id: fila.profesional_id,
+        nombre: (prof as { nombre: string } | null)?.nombre ?? "",
+        sede_id: fila.sede_id,
+        fecha: fila.fecha,
+        hora_inicio: fila.hora_inicio,
+        hora_fin: fila.hora_fin,
+      });
+    }
+  }
+  return [...porId.values()];
+}
+
+/** Ajusta la lista de candidatos PERMANENTES de una sede para reflejar
+ * los destinos puntuales de un día concreto (ya filtrados a esa fecha
+ * exacta, cualquier sede): quita de la sede consultada a quien ese día
+ * está destinado a otra, y añade a quien ese día está destinado A esta
+ * sede (si realiza el servicio pedido), con un turno sintético construido
+ * a partir de las horas del destino — se concatena con los horarios
+ * normales antes de generarSlotsParaDia, que no necesita saber nada de
+ * esto. Función pura (sin red) para poder probarla a fondo en
+ * availability.test.ts. */
+export function resolverCandidatosConDestinosPuntuales({
+  candidatosPermanentes,
+  destinosDelDia,
+  sedeId,
+  idsQueHacenServicio,
+}: {
+  candidatosPermanentes: CandidatoInfo[];
+  destinosDelDia: DestinoPuntualFila[];
+  sedeId: string;
+  idsQueHacenServicio: Set<string>;
+}): { candidatos: CandidatoInfo[]; horariosExtra: HorarioFila[] } {
+  const destinoPorProfesional = new Map(destinosDelDia.map((d) => [d.profesional_id, d]));
+
+  // 1. Quita a quien ese día tiene un destino puntual A OTRA sede.
+  const candidatos = candidatosPermanentes.filter((c) => {
+    const destino = destinoPorProfesional.get(c.id);
+    return !destino || destino.sede_id === sedeId;
+  });
+  const idsYaIncluidos = new Set(candidatos.map((c) => c.id));
+
+  // 2. Añade (si realiza el servicio) a quien ese día tiene un destino
+  //    puntual A ESTA sede y no era ya candidato permanente aquí, y en
+  //    cualquier caso construye su turno sintético de ese día.
+  const horariosExtra: HorarioFila[] = [];
+  for (const destino of destinosDelDia) {
+    if (destino.sede_id !== sedeId) continue;
+    if (!idsYaIncluidos.has(destino.profesional_id)) {
+      if (!idsQueHacenServicio.has(destino.profesional_id)) continue;
+      candidatos.push({ id: destino.profesional_id, nombre: destino.nombre });
+      idsYaIncluidos.add(destino.profesional_id);
+    }
+    horariosExtra.push({
+      profesional_id: destino.profesional_id,
+      hora_inicio: destino.hora_inicio,
+      hora_fin: destino.hora_fin,
+    });
+  }
+
+  return { candidatos, horariosExtra };
 }
 
 /** Convierte solicitudes de vacaciones aprobadas (rango de fechas) en

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { generarSlotsParaDia, resolverDescansos, vacacionesComoBloqueos } from "./availability";
+import {
+  generarSlotsParaDia,
+  resolverCandidatosConDestinosPuntuales,
+  resolverDescansos,
+  vacacionesComoBloqueos,
+} from "./availability";
 
 // generarSlotsParaDia es el corazón del motor de disponibilidad: decide
 // qué huecos puede reservar un cliente (desde la app, el panel o
@@ -265,6 +270,88 @@ describe("resolverDescansos", () => {
   it("un profesional sin descanso general ni excepción no aparece en el resultado", () => {
     const resultado = resolverDescansos(horariosDelDia, []);
     expect(resultado.some((d) => d.profesional_id === CANDIDATO_B.id)).toBe(false);
+  });
+});
+
+describe("resolverCandidatosConDestinosPuntuales", () => {
+  // Caso real que motivó esta función (19/09/2026): Juan trabaja por
+  // defecto en Avenida de las Ciudades ("ciudades") pero algunos días
+  // puntuales se le destina a Los Molinos ("molinos"). Ese día, la
+  // agenda de Ciudades no debe ofrecerlo, y la de Molinos sí, con el
+  // turno que Diego le haya puesto ese día concreto — sin tocar su
+  // horario habitual ni su sede permanente.
+  const JUAN = { id: "juan", nombre: "Juan" };
+  const ARTHUR = { id: "arthur", nombre: "Arthur" };
+  const CIUDADES = "sede-ciudades";
+  const MOLINOS = "sede-molinos";
+  const TODOS_HACEN_EL_SERVICIO = new Set([JUAN.id, ARTHUR.id]);
+
+  it("sin ningún destino puntual ese día, deja la lista de candidatos permanentes tal cual", () => {
+    const resultado = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: [JUAN],
+      destinosDelDia: [],
+      sedeId: CIUDADES,
+      idsQueHacenServicio: TODOS_HACEN_EL_SERVICIO,
+    });
+    expect(resultado).toEqual({ candidatos: [JUAN], horariosExtra: [] });
+  });
+
+  it("quita de su sede habitual a quien ese día está destinado a otra", () => {
+    const resultado = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: [JUAN, ARTHUR],
+      destinosDelDia: [
+        { profesional_id: JUAN.id, nombre: JUAN.nombre, sede_id: MOLINOS, fecha: "2026-09-25", hora_inicio: "09:30:00", hora_fin: "20:30:00" },
+      ],
+      sedeId: CIUDADES,
+      idsQueHacenServicio: TODOS_HACEN_EL_SERVICIO,
+    });
+    expect(resultado.candidatos).toEqual([ARTHUR]);
+    expect(resultado.horariosExtra).toEqual([]);
+  });
+
+  it("añade a la sede de destino a quien tiene un destino puntual ahí, con su turno sintético, aunque no sea de esa sede habitualmente", () => {
+    const resultado = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: [ARTHUR], // Juan no es permanente de Los Molinos
+      destinosDelDia: [
+        { profesional_id: JUAN.id, nombre: JUAN.nombre, sede_id: MOLINOS, fecha: "2026-09-25", hora_inicio: "09:30:00", hora_fin: "14:00:00" },
+      ],
+      sedeId: MOLINOS,
+      idsQueHacenServicio: TODOS_HACEN_EL_SERVICIO,
+    });
+    expect(resultado.candidatos).toEqual([ARTHUR, JUAN]);
+    expect(resultado.horariosExtra).toEqual([
+      { profesional_id: JUAN.id, hora_inicio: "09:30:00", hora_fin: "14:00:00" },
+    ]);
+  });
+
+  it("no añade al destino puntual si no realiza el servicio pedido", () => {
+    const resultado = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: [ARTHUR],
+      destinosDelDia: [
+        { profesional_id: JUAN.id, nombre: JUAN.nombre, sede_id: MOLINOS, fecha: "2026-09-25", hora_inicio: "09:30:00", hora_fin: "14:00:00" },
+      ],
+      sedeId: MOLINOS,
+      idsQueHacenServicio: new Set([ARTHUR.id]), // Juan no está en el set
+    });
+    expect(resultado.candidatos).toEqual([ARTHUR]);
+    expect(resultado.horariosExtra).toEqual([]);
+  });
+
+  it("por defecto (sin ningún destino puntual ese día) Juan sigue contando en Ciudades y nunca en Molinos", () => {
+    const enCiudades = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: [JUAN],
+      destinosDelDia: [],
+      sedeId: CIUDADES,
+      idsQueHacenServicio: TODOS_HACEN_EL_SERVICIO,
+    });
+    const enMolinos = resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: [ARTHUR],
+      destinosDelDia: [],
+      sedeId: MOLINOS,
+      idsQueHacenServicio: TODOS_HACEN_EL_SERVICIO,
+    });
+    expect(enCiudades.candidatos.map((c) => c.id)).toContain(JUAN.id);
+    expect(enMolinos.candidatos.map((c) => c.id)).not.toContain(JUAN.id);
   });
 });
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fechaEnMadrid, minutosEnMadrid, minutosDeHora, isoDesdeMadrid } from "@/lib/horarioLocal";
 import { columnasVisibles, rangoHorario, resolverDescansosDia, ID_SIN_ASIGNAR } from "@/lib/calendarioDia";
+import { IconBell, IconCheck, IconAlertCircle, IconX } from "@/components/ui/Icons";
 
 interface Cita {
   id: string;
@@ -516,36 +517,40 @@ function DetalleCitaPanel({
             <button
               onClick={onAvisarDisponible}
               disabled={avisando === cita.id}
-              className="rounded-full bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {avisando === cita.id ? "Avisando…" : "📲 Avisar disponible"}
+              <IconBell className="h-4 w-4" />
+              {avisando === cita.id ? "Avisando…" : "Avisar disponible"}
             </button>
           )}
           {cita.estado === "confirmada" && (
             <>
               <button
                 onClick={onFinalizar}
-                className="rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700"
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700"
               >
-                ✓ Completada
+                <IconCheck className="h-4 w-4" />
+                Completada
               </button>
               <button
                 onClick={() => onCambiarEstado("no_presentada")}
-                className="rounded-full bg-amber-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-amber-600"
+                className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-600"
               >
-                ! No presentada
+                <IconAlertCircle className="h-4 w-4" />
+                No presentada
               </button>
               <button
                 onClick={() => onCambiarEstado("cancelada")}
-                className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700"
+                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700"
               >
-                ✕ Cancelar
+                <IconX className="h-4 w-4" />
+                Cancelar
               </button>
             </>
           )}
         </div>
 
-        <button onClick={onCerrar} className="mt-4 rounded-full bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200">
+        <button onClick={onCerrar} className="mt-4 rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200">
           Cerrar
         </button>
       </div>

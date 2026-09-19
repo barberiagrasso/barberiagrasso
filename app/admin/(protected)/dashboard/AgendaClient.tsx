@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import FinalizarCitaModal from "./FinalizarCitaModal";
 import CalendarioDia from "./CalendarioDia";
 import ListaEsperaClient from "../lista-espera/ListaEsperaClient";
+import { IconBell, IconCheck, IconAlertCircle, IconX } from "@/components/ui/Icons";
 
 interface Sede {
   id: string;
@@ -475,34 +476,34 @@ function VistaSemanal({
                       <button
                         onClick={() => onAvisarDisponible(cita.id)}
                         disabled={avisando === cita.id}
-                        className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] text-white disabled:opacity-50"
+                        className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white disabled:opacity-50"
                         title="Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible"
                       >
-                        📲
+                        <IconBell className="h-3 w-3" />
                       </button>
                     )}
                     {cita.estado === "confirmada" && (
                       <>
                         <button
                           onClick={() => onFinalizar(cita)}
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white"
                           title="Marcar como completada"
                         >
-                          ✓
+                          <IconCheck className="h-3 w-3" />
                         </button>
                         <button
                           onClick={() => onCambiarEstado(cita.id, "no_presentada")}
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] text-white"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white"
                           title="Marcar como no presentada"
                         >
-                          !
+                          <IconAlertCircle className="h-3 w-3" />
                         </button>
                         <button
                           onClick={() => onCambiarEstado(cita.id, "cancelada")}
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] text-white"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white"
                           title="Cancelar"
                         >
-                          ✕
+                          <IconX className="h-3 w-3" />
                         </button>
                       </>
                     )}
@@ -542,10 +543,13 @@ function NuevaCitaForm({
 
   useEffect(() => {
     if (!servicioId || !sedeId) return;
-    fetch(`/api/profesionales?sedeId=${sedeId}&servicioId=${servicioId}`)
+    // Se pasa "fecha" para que, si ese día concreto hay un profesional
+    // puntualmente destinado a esta sede (p.ej. Juan en Los Molinos),
+    // aparezca en el desplegable aunque no sea de aquí de forma habitual.
+    fetch(`/api/profesionales?sedeId=${sedeId}&servicioId=${servicioId}&fecha=${fecha}`)
       .then((r) => r.json())
       .then((j) => setProfesionales(j.profesionales ?? []));
-  }, [servicioId, sedeId]);
+  }, [servicioId, sedeId, fecha]);
 
   useEffect(() => {
     if (!servicioId || !sedeId || !fecha) return;

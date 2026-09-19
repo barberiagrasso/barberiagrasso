@@ -2,7 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fechaEnMadrid, horaEnMadrid, isoDesdeMadrid } from "@/lib/horarioLocal";
-import { colorPorRotacion } from "@/lib/coloresServicio";
+import {
+  IconScissors,
+  IconUser,
+  IconClock,
+  IconPlus,
+  IconBag,
+  IconCard,
+  IconCoin,
+  IconPencil,
+  IconCheck,
+  IconX,
+  IconBanknote,
+  IconSmartphone,
+  IconDots,
+} from "@/components/ui/Icons";
 
 interface Servicio {
   id: string;
@@ -28,35 +42,23 @@ interface Cita {
   extras?: { servicio_id: string }[];
 }
 
-const METODOS_PAGO: { id: string; etiqueta: string; icono: string }[] = [
-  { id: "efectivo", etiqueta: "Efectivo", icono: "💵" },
-  { id: "tarjeta", etiqueta: "Tarjeta", icono: "💳" },
-  { id: "bizum", etiqueta: "Bizum", icono: "📱" },
-  { id: "otro", etiqueta: "Otro", icono: "✏️" },
+const METODOS_PAGO: { id: string; etiqueta: string; Icono: typeof IconCard }[] = [
+  { id: "efectivo", etiqueta: "Efectivo", Icono: IconBanknote },
+  { id: "tarjeta", etiqueta: "Tarjeta", Icono: IconCard },
+  { id: "bizum", etiqueta: "Bizum", Icono: IconSmartphone },
+  { id: "otro", etiqueta: "Otro", Icono: IconDots },
 ];
 
 function euros(centimos: number) {
   return (centimos / 100).toFixed(2);
 }
 
-function iniciales(nombre: string) {
-  return nombre
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
-}
-
-/** Cabecera de sección: icono + título, siempre con el mismo estilo. */
-function Seccion({ icono, titulo, children }: { icono: string; titulo: string; children: React.ReactNode }) {
+/** Cabecera de sección: icono pequeño + etiqueta en mayúsculas, sin tarjeta ni sombra. */
+function Etiqueta({ icono: Icono, texto }: { icono: typeof IconCard; texto: string }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-800">
-        <span className="text-base">{icono}</span>
-        {titulo}
-      </div>
-      {children}
+    <div className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-stone-400">
+      <Icono className="h-3.5 w-3.5" />
+      {texto}
     </div>
   );
 }
@@ -67,8 +69,9 @@ function Seccion({ icono, titulo, children }: { icono: string; titulo: string; c
  * falta de la reserva original — el servicio, quién la hizo, el horario
  * real, los complementos y productos vendidos, el método de pago, y si
  * hace falta, el precio final a mano — y cierra la cita como completada.
- * Diseñado para tocarse con el dedo desde el móvil del barbero: tarjetas
- * de colores en vez de desplegables y enlaces subrayados.
+ * Diseño minimalista con desplegables (no tarjetas ni emoji): un
+ * desplegable "añadir" para complementos y productos, con la lista de lo
+ * ya añadido debajo y un botón para quitar cada línea.
  */
 export default function FinalizarCitaModal({
   cita,
@@ -90,8 +93,10 @@ export default function FinalizarCitaModal({
   const [profesionalId, setProfesionalId] = useState(cita.profesional?.id ?? "");
   const [profesionales, setProfesionales] = useState<{ id: string; nombre: string }[]>([]);
   const [extrasIds, setExtrasIds] = useState<string[]>(() => (cita.extras ?? []).map((e) => e.servicio_id));
+  const [complementoParaAnadir, setComplementoParaAnadir] = useState("");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [productosElegidos, setProductosElegidos] = useState<Map<string, number>>(new Map());
+  const [productoParaAnadir, setProductoParaAnadir] = useState("");
   const [metodoPago, setMetodoPago] = useState<string | null>(null);
 
   const fechaOriginal = fechaEnMadrid(cita.inicio);
@@ -102,16 +107,26 @@ export default function FinalizarCitaModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/profesionales?sedeId=${sedeId}`)
+    // Se pasa la fecha de la cita para que, si ese día hay un profesional
+    // puntualmente destinado a esta sede (p.ej. Juan en Los Molinos),
+    // también aparezca como opción en "Quién la hizo" aunque no sea de
+    // aquí de forma habitual.
+    fetch(`/api/profesionales?sedeId=${sedeId}&fecha=${fechaOriginal}`)
       .then((r) => r.json())
       .then((j) => setProfesionales(j.profesionales ?? []));
     fetch("/api/admin/productos")
       .then((r) => r.json())
       .then((j) => setProductos((j.productos ?? []).filter((p: Producto) => p.activo)));
-  }, [sedeId]);
+  }, [sedeId, fechaOriginal]);
 
-  function alternarExtra(id: string) {
-    setExtrasIds((prev) => (prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]));
+  function anadirComplemento() {
+    if (!complementoParaAnadir) return;
+    setExtrasIds((prev) => (prev.includes(complementoParaAnadir) ? prev : [...prev, complementoParaAnadir]));
+    setComplementoParaAnadir("");
+  }
+
+  function quitarComplemento(id: string) {
+    setExtrasIds((prev) => prev.filter((e) => e !== id));
   }
 
   function cambiarCantidadProducto(id: string, cantidad: number) {
@@ -121,6 +136,12 @@ export default function FinalizarCitaModal({
       else copia.set(id, cantidad);
       return copia;
     });
+  }
+
+  function anadirProducto() {
+    if (!productoParaAnadir) return;
+    cambiarCantidadProducto(productoParaAnadir, (productosElegidos.get(productoParaAnadir) ?? 0) + 1);
+    setProductoParaAnadir("");
   }
 
   // "Servicio" = precio del servicio principal + complementos: es el
@@ -210,185 +231,216 @@ export default function FinalizarCitaModal({
     return grupos;
   }, [productos]);
 
+  const colorServicioSeleccionado = servicios.find((s) => s.id === servicioId)?.color || "#a8a29e";
   const totalACobrarCentimos = totalServicioCentimos + totalProductosCentimos;
   const precioTocado = precioManualCentimos !== null && precioManualCentimos !== totalServicioAutomaticoCentimos;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-3 pt-8 sm:p-4 sm:pt-10">
-      <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-stone-50 shadow-2xl">
-        {/* Cabecera con degradado — es "el checkout", así que se nota */}
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 px-5 py-4 text-white">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-emerald-100">Finalizar cita</div>
-              <h2 className="text-xl font-bold">{cita.cliente?.nombre ?? "Cliente"}</h2>
-            </div>
-            <button
-              onClick={onCerrar}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
-              aria-label="Cerrar"
-            >
-              ✕
-            </button>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 pt-8 sm:p-4 sm:pt-10">
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-stone-100 px-5 py-4">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wide text-stone-400">Finalizar cita</div>
+            <h2 className="text-lg font-bold text-stone-900">{cita.cliente?.nombre ?? "Cliente"}</h2>
           </div>
+          <button
+            onClick={onCerrar}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+            aria-label="Cerrar"
+          >
+            <IconX className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="max-h-[75vh] space-y-3 overflow-y-auto p-4">
-          <Seccion icono="✂️" titulo="Servicio realizado">
-            <div className="flex flex-wrap gap-2">
-              {serviciosPrincipales.map((s) => {
-                const activo = servicioId === s.id;
-                const color = s.color || "#a8a29e";
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setServicioId(s.id)}
-                    className={
-                      "flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-medium transition " +
-                      (activo ? "text-stone-900 shadow-sm" : "border-stone-200 bg-white text-stone-600 hover:border-stone-300")
-                    }
-                    style={activo ? { borderColor: color, backgroundColor: color + "1a" } : undefined}
-                  >
-                    <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                    {s.nombre}
-                    <span className="text-xs text-stone-400">{euros(s.precio_centimos)}€</span>
-                  </button>
-                );
-              })}
+        <div className="max-h-[75vh] divide-y divide-stone-100 overflow-y-auto px-5">
+          <div className="py-4">
+            <Etiqueta icono={IconScissors} texto="Servicio realizado" />
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorServicioSeleccionado }} />
+              <select
+                value={servicioId}
+                onChange={(e) => setServicioId(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2.5 text-sm"
+              >
+                {serviciosPrincipales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre} · {euros(s.precio_centimos)}€
+                  </option>
+                ))}
+              </select>
             </div>
-          </Seccion>
+          </div>
 
-          <Seccion icono="🧑‍🔧" titulo="Quién la hizo">
-            <div className="flex flex-wrap gap-2">
-              {(cita.profesional && !profesionales.some((p) => p.id === cita.profesional!.id)
-                ? [cita.profesional, ...profesionales]
-                : profesionales
-              ).map((p, i) => {
-                const activo = profesionalId === p.id;
-                const color = colorPorRotacion(i);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setProfesionalId(p.id)}
-                    className={
-                      "flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-medium transition " +
-                      (activo ? "text-stone-900 shadow-sm" : "border-stone-200 bg-white text-stone-600 hover:border-stone-300")
-                    }
-                    style={activo ? { borderColor: color, backgroundColor: color + "1a" } : undefined}
-                  >
-                    <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                      style={{ backgroundColor: color }}
-                    >
-                      {iniciales(p.nombre)}
-                    </span>
-                    {p.nombre}
-                  </button>
-                );
-              })}
-            </div>
-          </Seccion>
+          <div className="py-4">
+            <Etiqueta icono={IconUser} texto="Quién la hizo" />
+            <select
+              value={profesionalId}
+              onChange={(e) => setProfesionalId(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 p-2.5 text-sm"
+            >
+              {cita.profesional && !profesionales.some((p) => p.id === cita.profesional!.id) && (
+                <option value={cita.profesional.id}>{cita.profesional.nombre}</option>
+              )}
+              {profesionales.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <Seccion icono="🕐" titulo="Horario real">
+          <div className="py-4">
+            <Etiqueta icono={IconClock} texto="Horario real" />
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-400">Inicio</label>
-                <input
-                  type="time"
-                  value={horaInicio}
-                  onChange={(e) => setHoraInicio(e.target.value)}
-                  className="w-full rounded-xl border border-stone-300 p-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-400">Fin</label>
-                <input
-                  type="time"
-                  value={horaFin}
-                  onChange={(e) => setHoraFin(e.target.value)}
-                  className="w-full rounded-xl border border-stone-300 p-2.5 text-sm"
-                />
-              </div>
+              <input
+                type="time"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2.5 text-sm"
+              />
+              <input
+                type="time"
+                value={horaFin}
+                onChange={(e) => setHoraFin(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2.5 text-sm"
+              />
             </div>
-          </Seccion>
+          </div>
 
           {serviciosComplemento.length > 0 && (
-            <Seccion icono="➕" titulo="Complementos añadidos">
-              <div className="flex flex-wrap gap-2">
-                {serviciosComplemento.map((s) => {
-                  const activo = extrasIds.includes(s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => alternarExtra(s.id)}
-                      className={
-                        "flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium transition " +
-                        (activo
-                          ? "border-brand-yellow bg-brand-yellow/20 text-brand-yellow-dark"
-                          : "border-stone-200 bg-white text-stone-600 hover:border-stone-300")
-                      }
-                    >
-                      {activo && "✓ "}
-                      {s.nombre} · {euros(s.precio_centimos)}€
-                    </button>
-                  );
-                })}
+            <div className="py-4">
+              <Etiqueta icono={IconPlus} texto="Complementos" />
+              <div className="flex gap-2">
+                <select
+                  value={complementoParaAnadir}
+                  onChange={(e) => setComplementoParaAnadir(e.target.value)}
+                  className="w-full rounded-lg border border-stone-300 p-2.5 text-sm text-stone-700"
+                >
+                  <option value="">Selecciona un complemento…</option>
+                  {serviciosComplemento
+                    .filter((s) => !extrasIds.includes(s.id))
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nombre} · {euros(s.precio_centimos)}€
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={anadirComplemento}
+                  disabled={!complementoParaAnadir}
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-stone-300 px-3 text-sm font-medium text-stone-600 hover:border-stone-400 disabled:opacity-40"
+                >
+                  <IconPlus className="h-4 w-4" />
+                  Añadir
+                </button>
               </div>
-            </Seccion>
+              {extrasIds.length > 0 ? (
+                <ul className="mt-2 space-y-1.5">
+                  {extrasIds.map((id) => {
+                    const s = servicios.find((x) => x.id === id);
+                    if (!s) return null;
+                    return (
+                      <li key={id} className="flex items-center justify-between rounded-lg bg-stone-50 px-3 py-1.5 text-sm text-stone-700">
+                        <span>
+                          {s.nombre} · {euros(s.precio_centimos)}€
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => quitarComplemento(id)}
+                          className="text-stone-400 hover:text-red-600"
+                          aria-label={`Quitar ${s.nombre}`}
+                        >
+                          <IconX className="h-4 w-4" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="mt-1.5 text-xs text-stone-400">Sin complementos añadidos.</p>
+              )}
+            </div>
           )}
 
-          <Seccion icono="🛍️" titulo="Productos vendidos">
-            <p className="mb-2 -mt-1 text-xs text-stone-400">No se ven ni se venden desde la app del cliente.</p>
-            {productos.length === 0 && <p className="text-sm text-stone-400">Sin productos en el catálogo todavía.</p>}
-            <div className="max-h-44 space-y-3 overflow-y-auto">
-              {Array.from(productosPorCategoria.entries()).map(([categoria, items]) => (
-                <div key={categoria}>
-                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-stone-400">{categoria}</div>
-                  <div className="space-y-1">
-                    {items.map((p) => {
-                      const cantidad = productosElegidos.get(p.id) ?? 0;
-                      return (
-                        <div
-                          key={p.id}
-                          className={
-                            "flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-sm " +
-                            (cantidad > 0 ? "border-brand-yellow/50 bg-brand-yellow/10" : "border-stone-100")
-                          }
-                        >
-                          <span className="text-stone-700">
-                            {p.nombre} · {euros(p.precio_centimos)}€
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => cambiarCantidadProducto(p.id, cantidad - 1)}
-                              disabled={cantidad === 0}
-                              className="flex h-6 w-6 items-center justify-center rounded-full border border-stone-300 text-stone-600 disabled:opacity-30"
-                            >
-                              −
-                            </button>
-                            <span className="w-4 text-center font-medium">{cantidad}</span>
-                            <button
-                              type="button"
-                              onClick={() => cambiarCantidadProducto(p.id, cantidad + 1)}
-                              className="flex h-6 w-6 items-center justify-center rounded-full border border-stone-300 text-stone-600"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+          <div className="py-4">
+            <Etiqueta icono={IconBag} texto="Productos vendidos" />
+            <div className="flex gap-2">
+              <select
+                value={productoParaAnadir}
+                onChange={(e) => setProductoParaAnadir(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2.5 text-sm text-stone-700"
+              >
+                <option value="">Selecciona un producto…</option>
+                {Array.from(productosPorCategoria.entries()).map(([categoria, items]) => {
+                  const disponibles = items.filter((p) => !productosElegidos.has(p.id));
+                  if (disponibles.length === 0) return null;
+                  return (
+                    <optgroup key={categoria} label={categoria}>
+                      {disponibles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre} · {euros(p.precio_centimos)}€
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+              <button
+                type="button"
+                onClick={anadirProducto}
+                disabled={!productoParaAnadir}
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-stone-300 px-3 text-sm font-medium text-stone-600 hover:border-stone-400 disabled:opacity-40"
+              >
+                <IconPlus className="h-4 w-4" />
+                Añadir
+              </button>
             </div>
-          </Seccion>
+            <p className="mt-1.5 text-xs text-stone-400">No se ven ni se venden desde la app del cliente.</p>
+            {productosElegidos.size > 0 && (
+              <ul className="mt-2 space-y-1.5">
+                {Array.from(productosElegidos.entries()).map(([id, cantidad]) => {
+                  const p = productos.find((x) => x.id === id);
+                  if (!p) return null;
+                  return (
+                    <li key={id} className="flex items-center justify-between rounded-lg bg-stone-50 px-3 py-1.5 text-sm text-stone-700">
+                      <span>
+                        {p.nombre} · {euros(p.precio_centimos)}€
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => cambiarCantidadProducto(id, cantidad - 1)}
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-stone-300 text-stone-600"
+                        >
+                          −
+                        </button>
+                        <span className="w-4 text-center font-medium">{cantidad}</span>
+                        <button
+                          type="button"
+                          onClick={() => cambiarCantidadProducto(id, cantidad + 1)}
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-stone-300 text-stone-600"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => cambiarCantidadProducto(id, 0)}
+                          className="ml-1 text-stone-400 hover:text-red-600"
+                          aria-label={`Quitar ${p.nombre}`}
+                        >
+                          <IconX className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
 
-          <Seccion icono="💳" titulo="Método de pago">
+          <div className="py-4">
+            <Etiqueta icono={IconCard} texto="Método de pago" />
             <div className="flex flex-wrap gap-2">
               {METODOS_PAGO.map((m) => {
                 const activo = metodoPago === m.id;
@@ -398,21 +450,22 @@ export default function FinalizarCitaModal({
                     type="button"
                     onClick={() => setMetodoPago(activo ? null : m.id)}
                     className={
-                      "flex items-center gap-1.5 rounded-xl border-2 px-3 py-2 text-sm font-medium transition " +
+                      "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition " +
                       (activo
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                        : "border-stone-200 bg-white text-stone-600 hover:border-stone-300")
+                        : "border-stone-200 text-stone-600 hover:border-stone-300")
                     }
                   >
-                    <span>{m.icono}</span>
+                    <m.Icono className="h-4 w-4" />
                     {m.etiqueta}
                   </button>
                 );
               })}
             </div>
-          </Seccion>
+          </div>
 
-          <Seccion icono="💰" titulo="Precio final">
+          <div className="py-4">
+            <Etiqueta icono={IconCoin} texto="Precio final" />
             <div className="space-y-2 text-sm text-stone-700">
               <div className="flex items-center justify-between">
                 <span>Servicio + complementos</span>
@@ -430,16 +483,17 @@ export default function FinalizarCitaModal({
                     <span>€</span>
                     <button
                       onClick={confirmarPrecioManual}
-                      className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+                      aria-label="Confirmar precio"
                     >
-                      OK
+                      <IconCheck className="h-4 w-4" />
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{euros(totalServicioCentimos)}€</span>
                     <button onClick={empezarAEditarPrecio} className="text-stone-400 hover:text-stone-600" title="Editar precio a mano" aria-label="Editar precio">
-                      ✏️
+                      <IconPencil className="h-4 w-4" />
                     </button>
                   </div>
                 )}
@@ -463,23 +517,21 @@ export default function FinalizarCitaModal({
                 <span className="text-lg font-bold text-emerald-700">{euros(totalACobrarCentimos)}€</span>
               </div>
             </div>
-          </Seccion>
+          </div>
 
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          {error && <p className="py-3 text-sm font-medium text-red-600">{error}</p>}
         </div>
 
-        <div className="flex gap-2 border-t border-stone-200 bg-white p-4">
+        <div className="flex gap-2 border-t border-stone-100 p-4">
           <button
             disabled={guardando}
             onClick={guardar}
-            className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-center text-sm font-bold text-white shadow-md transition hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            {guardando ? "Guardando…" : "✓ Marcar como completada"}
+            <IconCheck className="h-4 w-4" />
+            {guardando ? "Guardando…" : "Marcar como completada"}
           </button>
-          <button
-            onClick={onCerrar}
-            className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-medium text-stone-600 hover:bg-stone-200"
-          >
+          <button onClick={onCerrar} className="rounded-xl px-4 py-2.5 text-sm font-medium text-stone-500 hover:bg-stone-100">
             Cancelar
           </button>
         </div>
