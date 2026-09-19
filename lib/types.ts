@@ -29,6 +29,12 @@ export interface Servicio {
   // Color (hex) con el que se pinta este servicio en la leyenda y en las
   // citas de la Agenda — ver lib/coloresServicio.ts.
   color?: string | null;
+  // true = precio_centimos es solo un mínimo orientativo ("Rastas",
+  // tintes...): se muestra como "Desde X€" en vez de un precio fijo (ver
+  // BookingFlow.tsx). No cambia ningún cálculo — el barbero sigue
+  // pudiendo corregir el precio final a mano al cerrar la cita, igual
+  // que con cualquier otro servicio.
+  precio_variable?: boolean;
 }
 
 export interface Profesional {

@@ -13,6 +13,7 @@ interface Servicio {
   orden: number;
   activo: boolean;
   color?: string | null;
+  precio_variable?: boolean;
 }
 
 // Los desplegables ya usados en la reserva, para que Diego pueda elegir
@@ -127,6 +128,7 @@ function FilaServicio({
   const [categoria, setCategoria] = useState(servicio.categoria ?? "");
   const [orden, setOrden] = useState(String(servicio.orden));
   const [color, setColor] = useState(servicio.color ?? PALETA_COLORES_SERVICIO[0].valor);
+  const [precioVariable, setPrecioVariable] = useState(servicio.precio_variable ?? false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,6 +143,7 @@ function FilaServicio({
       categoria: categoria || null,
       orden: parseInt(orden, 10) || 0,
       color,
+      precio_variable: precioVariable,
     });
     setGuardando(false);
     if (res.ok) {
@@ -168,6 +171,7 @@ function FilaServicio({
             {servicio.nombre}
           </div>
           <div className="text-sm text-stone-500">
+            {servicio.precio_variable ? "Desde " : ""}
             {euros(servicio.precio_centimos)}€ · {servicio.duracion_minutos} min
             {servicio.descripcion ? ` · ${servicio.descripcion}` : ""}
           </div>
@@ -192,6 +196,10 @@ function FilaServicio({
         <input value={duracion} onChange={(e) => setDuracion(e.target.value)} placeholder="Minutos" className="rounded border border-stone-300 p-2 text-sm" />
         <input value={orden} onChange={(e) => setOrden(e.target.value)} placeholder="Orden" className="rounded border border-stone-300 p-2 text-sm" />
       </div>
+      <label className="flex items-center gap-2 text-sm text-stone-600">
+        <input type="checkbox" checked={precioVariable} onChange={(e) => setPrecioVariable(e.target.checked)} className="accent-brand-yellow" />
+        Precio variable: mostrar &ldquo;Desde {precio || "0"}€&rdquo; en vez de un precio fijo (para servicios impredecibles, como Rastas o tintes)
+      </label>
       <input
         value={descripcion}
         onChange={(e) => setDescripcion(e.target.value)}
@@ -242,6 +250,7 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
   const [duracion, setDuracion] = useState("30");
   const [categoria, setCategoria] = useState("");
   const [orden, setOrden] = useState("0");
+  const [precioVariable, setPrecioVariable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -262,6 +271,7 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
         duracion_minutos: parseInt(duracion, 10) || 30,
         categoria: categoria || null,
         orden: parseInt(orden, 10) || 0,
+        precio_variable: precioVariable,
       }),
     });
     setEnviando(false);
@@ -295,6 +305,10 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
           </option>
         ))}
       </select>
+      <label className="flex items-center gap-2 text-sm text-stone-600">
+        <input type="checkbox" checked={precioVariable} onChange={(e) => setPrecioVariable(e.target.checked)} className="accent-brand-yellow" />
+        Precio variable: mostrar &ldquo;Desde {precio || "0"}€&rdquo; en vez de un precio fijo (para servicios impredecibles, como Rastas o tintes)
+      </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button disabled={enviando} onClick={crear} className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">
         {enviando ? "Creando…" : "Crear servicio"}

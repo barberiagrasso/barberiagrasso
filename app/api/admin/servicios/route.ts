@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       orden: body.orden ?? 0,
       activo: body.activo ?? true,
       color: colorAsignado,
+      precio_variable: Boolean(body.precio_variable),
     })
     .select("*")
     .single();

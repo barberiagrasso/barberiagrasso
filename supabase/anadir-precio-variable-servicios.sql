@@ -1,0 +1,11 @@
+-- =====================================================================
+-- Precio variable ("A partir de X€") para servicios impredecibles o
+-- cerrados (Rastas, tintes...). Pedido de Diego (19/09/2026). No cambia
+-- ningún cálculo: servicios.precio_centimos se sigue usando tal cual como
+-- base/mínimo en todos los sitios que ya lo usaban (reserva pública,
+-- checkout del panel, comisiones, fidelización...) — precio_variable es
+-- puramente una bandera de PRESENTACIÓN: donde se muestra el precio de
+-- catálogo al cliente, se antepone "Desde " en vez de mostrarlo como
+-- precio fijo (ver BookingFlow.tsx). El barbero sigue pudiendo corregir a
+-- mano el precio final al cerrar la cita, exactamente igual que hoy.
+alter table servicios add column if not exists precio_variable boolean not null default false;

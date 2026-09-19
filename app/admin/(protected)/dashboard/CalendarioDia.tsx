@@ -52,6 +52,16 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 const PX_POR_MINUTO = 1.6;
 const ALTURA_MINIMA_BLOQUE = 24;
 
+// Franja rayada antes de la apertura y después del cierre: solo para que
+// se note visualmente dónde no hay turno mientras se navega la Agenda
+// (pedido de Diego, 19/09/2026) — nunca se puede arrastrar una cita o un
+// descanso hasta ahí (los límites de arrastre siguen siendo minInicio y
+// maxFin, sin tocar). 60 minutos de margen a cada lado, recortado a un
+// día real (0-1440) para no salirse del eje en un turno que ya empiece a
+// las 00:00 o termine a las 23:xx.
+const BUFFER_VISUAL_MIN = 60;
+const MINUTOS_POR_DIA = 24 * 60;
+
 function formatoHora(iso: string) {
   return new Date(iso).toLocaleTimeString("es-ES", {
     hour: "2-digit",
@@ -285,13 +295,21 @@ export default function CalendarioDia({
     );
   }, [horarios, citas, columnas]);
 
-  const alturaTotal = (maxFin - minInicio) * PX_POR_MINUTO;
+  // Rango VISUAL: igual que minInicio/maxFin pero con un margen a cada
+  // lado, solo para saber dónde pintar (altura, marcas de hora, línea de
+  // "ahora", franjas rayadas). minInicio/maxFin en sí no cambian — siguen
+  // siendo los límites de arrastre de citas y descansos, se pasan tal
+  // cual a iniciarArrastreCita/iniciarArrastreDescanso más abajo.
+  const minInicioVisual = Math.max(0, minInicio - BUFFER_VISUAL_MIN);
+  const maxFinVisual = Math.min(MINUTOS_POR_DIA, maxFin + BUFFER_VISUAL_MIN);
+
+  const alturaTotal = (maxFinVisual - minInicioVisual) * PX_POR_MINUTO;
 
   const marcas = useMemo(() => {
     const lista: number[] = [];
-    for (let m = minInicio; m <= maxFin; m += 30) lista.push(m);
+    for (let m = minInicioVisual; m <= maxFinVisual; m += 30) lista.push(m);
     return lista;
-  }, [minInicio, maxFin]);
+  }, [minInicioVisual, maxFinVisual]);
 
   // Línea de "ahora": solo si se está mirando el día de hoy (comparado
   // en hora de Madrid, no en la del servidor, para que no se desajuste
@@ -303,7 +321,7 @@ export default function CalendarioDia({
     return () => clearInterval(id);
   }, []);
   const ahoraMin = minutosEnMadrid(ahoraISO);
-  const posicionAhora = Math.min(Math.max(ahoraMin, minInicio), maxFin);
+  const posicionAhora = Math.min(Math.max(ahoraMin, minInicioVisual), maxFinVisual);
 
   if (cargando && citas.length === 0) {
     return <p className="text-sm text-stone-500">Cargando…</p>;
@@ -334,7 +352,7 @@ export default function CalendarioDia({
                   <div
                     key={m}
                     className="absolute right-2 -translate-y-1/2 text-[11px] text-stone-400"
-                    style={{ top: (m - minInicio) * PX_POR_MINUTO }}
+                    style={{ top: (m - minInicioVisual) * PX_POR_MINUTO }}
                   >
                     {String(Math.floor(m / 60)).padStart(2, "0")}:{String(m % 60).padStart(2, "0")}
                   </div>
@@ -343,16 +361,43 @@ export default function CalendarioDia({
 
               {columnas.map((col) => (
                 <div key={col.id} className="relative flex-1 border-l border-stone-100">
+                  {/* Franjas "cerrado" (antes de abrir / después de cerrar): puramente
+                      visuales, con rayado, para orientarse — nunca se puede arrastrar
+                      nada hasta aquí (los límites de arrastre siguen siendo minInicio
+                      y maxFin, no minInicioVisual/maxFinVisual). */}
+                  {minInicioVisual < minInicio && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 z-0"
+                      style={{
+                        top: 0,
+                        height: (minInicio - minInicioVisual) * PX_POR_MINUTO,
+                        backgroundImage:
+                          "repeating-linear-gradient(135deg, rgba(120,113,108,0.16) 0, rgba(120,113,108,0.16) 6px, transparent 6px, transparent 12px)",
+                      }}
+                    />
+                  )}
+                  {maxFinVisual > maxFin && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 z-0"
+                      style={{
+                        top: (maxFin - minInicioVisual) * PX_POR_MINUTO,
+                        height: (maxFinVisual - maxFin) * PX_POR_MINUTO,
+                        backgroundImage:
+                          "repeating-linear-gradient(135deg, rgba(120,113,108,0.16) 0, rgba(120,113,108,0.16) 6px, transparent 6px, transparent 12px)",
+                      }}
+                    />
+                  )}
+
                   {marcas.map((m) => (
                     <div
                       key={m}
                       className={"absolute inset-x-0 border-t " + (m % 60 === 0 ? "border-stone-200" : "border-stone-100")}
-                      style={{ top: (m - minInicio) * PX_POR_MINUTO }}
+                      style={{ top: (m - minInicioVisual) * PX_POR_MINUTO }}
                     />
                   ))}
 
                   {esHoy && (
-                    <div className="absolute inset-x-0 z-10 border-t-2 border-red-500" style={{ top: (posicionAhora - minInicio) * PX_POR_MINUTO }}>
+                    <div className="absolute inset-x-0 z-10 border-t-2 border-red-500" style={{ top: (posicionAhora - minInicioVisual) * PX_POR_MINUTO }}>
                       <div className="absolute -left-0.5 -top-1 h-2 w-2 rounded-full bg-red-500" />
                     </div>
                   )}
@@ -363,7 +408,7 @@ export default function CalendarioDia({
                     const enArrastre = arrastrando?.profesionalId === col.id;
                     const desde = enArrastre ? arrastrando!.inicioMin : minutosDeHora(descanso.hora_inicio);
                     const hasta = enArrastre ? arrastrando!.inicioMin + arrastrando!.duracionMin : minutosDeHora(descanso.hora_fin);
-                    const top = (desde - minInicio) * PX_POR_MINUTO;
+                    const top = (desde - minInicioVisual) * PX_POR_MINUTO;
                     const alto = (hasta - desde) * PX_POR_MINUTO;
                     return (
                       <div
@@ -388,7 +433,7 @@ export default function CalendarioDia({
                     const hasta = enArrastreCita
                       ? arrastrandoCita!.inicioMin + arrastrandoCita!.duracionMin
                       : minutosEnMadrid(cita.fin);
-                    const top = (desde - minInicio) * PX_POR_MINUTO;
+                    const top = (desde - minInicioVisual) * PX_POR_MINUTO;
                     const alto = Math.max(ALTURA_MINIMA_BLOQUE, (hasta - desde) * PX_POR_MINUTO);
                     const sePuedeArrastrar = esAdmin && cita.estado === "confirmada" && Boolean(cita.profesional?.id);
                     return (

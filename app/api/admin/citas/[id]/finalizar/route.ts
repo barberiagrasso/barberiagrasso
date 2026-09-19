@@ -36,7 +36,14 @@ const METODOS_PAGO_VALIDOS = new Set(["efectivo", "tarjeta", "bizum", "bono", "o
  *    cuando lo cobrado de verdad no coincide con el cálculo automático de
  *    servicio + complementos — ese número pasa a ser el que cuenta en
  *    comisiones, fidelización, HubSpot y el historial del cliente (ver
- *    lib/precios.ts).
+ *    lib/precios.ts), y
+ *  - aplicar un descuento por % con motivo obligatorio (descuentoPorcentaje
+ *    + descuentoMotivo): el precioFinalCentimos que se manda ya viene con
+ *    el descuento restado (lo calcula el propio modal), pero estos dos
+ *    campos quedan guardados aparte para que la comisión del barbero se
+ *    siga calculando sobre el total SIN descontar (ver ingresoCitaCentimos
+ *    en app/api/admin/comisiones/route.ts) y para que Diego pueda revisar
+ *    todos los descuentos aplicados desde Informes → Descuentos.
  *
  * y deja la cita como "completada". Todo o nada: si algo falla a medio
  * camino no se ha movido nada (ver el try/catch de más abajo).
@@ -75,6 +82,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     typeof body?.precioFinalCentimos === "number" && Number.isFinite(body.precioFinalCentimos)
       ? Math.max(0, Math.round(body.precioFinalCentimos))
       : undefined;
+  // Descuento por % con motivo (checkout, ver FinalizarCitaModal.tsx):
+  // undefined = no se aplicó ningún descuento estructurado en esta cita.
+  // Cuando sí se manda, ambos campos son obligatorios juntos — el motivo
+  // nunca puede faltar (también hay un check en la propia base de datos,
+  // ver anadir-descuento-checkout.sql, por si algún día se escribe aquí
+  // sin pasar por este endpoint).
+  const descuentoPorcentajeCrudo = body?.descuentoPorcentaje;
+  const descuentoMotivoCrudo = typeof body?.descuentoMotivo === "string" ? body.descuentoMotivo.trim() : "";
+  let descuentoPorcentaje: number | undefined;
+  let descuentoMotivo: string | undefined;
+  if (descuentoPorcentajeCrudo !== undefined && descuentoPorcentajeCrudo !== null) {
+    const valor = Number(descuentoPorcentajeCrudo);
+    if (!Number.isFinite(valor) || valor <= 0 || valor > 100 || !descuentoMotivoCrudo) {
+      return NextResponse.json({ error: "El descuento necesita un % entre 1 y 100 y un motivo." }, { status: 400 });
+    }
+    descuentoPorcentaje = valor;
+    descuentoMotivo = descuentoMotivoCrudo;
+  }
   // "comprar" = se vende un bono nuevo en esta misma cita (bonoTipoId
   // dice cuál); "canjear" = se descuenta un uso de un bono que el
   // cliente ya tenía (bonoId dice cuál). Ver lib/bonos.ts.
@@ -188,6 +213,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       metodo_pago: metodoPago,
       bono_id: bonoIdParaCita,
       ...(precioFinalCentimos !== undefined ? { precio_final_centimos: precioFinalCentimos } : {}),
+      // Siempre se escriben las dos juntas (o ninguna): si esta cita ya
+      // tenía un descuento de una edición anterior y esta vez no se manda
+      // ninguno, hay que borrarlo explícitamente con null, no dejarlo tal
+      // cual — este modal no admite reabrir una cita ya completada, pero
+      // sí corregirla antes de guardar dentro de la misma sesión del modal.
+      descuento_porcentaje: descuentoPorcentaje ?? null,
+      descuento_motivo: descuentoMotivo ?? null,
     })
     .eq("id", id);
 

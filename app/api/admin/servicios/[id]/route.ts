@@ -21,7 +21,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!body) return NextResponse.json({ error: "Cuerpo inválido." }, { status: 400 });
 
   const campos: Record<string, unknown> = {};
-  for (const clave of ["nombre", "descripcion", "duracion_minutos", "precio_centimos", "categoria", "orden", "activo", "color"]) {
+  for (const clave of ["nombre", "descripcion", "duracion_minutos", "precio_centimos", "categoria", "orden", "activo", "color", "precio_variable"]) {
     if (clave in body) campos[clave] = body[clave];
   }
   if (Object.keys(campos).length === 0) {

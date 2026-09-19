@@ -236,26 +236,69 @@ export default function FinalizarCitaModal({
   const [editandoPrecio, setEditandoPrecio] = useState(false);
   const [precioManualTexto, setPrecioManualTexto] = useState("");
 
+  // Descuento por % con motivo obligatorio (pedido de Diego, 19/09/2026):
+  // sustituye a la edición manual del precio para el caso concreto de
+  // "hacer un descuento" (ofertas de la barbería o un detalle puntual a
+  // un cliente) — mutuamente excluyente con esa edición manual (aplicar
+  // uno borra el otro) y con el bono (un servicio cubierto por un bono ya
+  // no tiene un precio de catálogo sobre el que aplicar un %). El barbero
+  // sigue comisionando por el total SIN descuento (ver ingresoCitaCentimos
+  // en app/api/admin/comisiones/route.ts) — aquí solo se decide cuánto
+  // paga de verdad el cliente.
+  const [descuentoAplicado, setDescuentoAplicado] = useState<{ porcentaje: number; motivo: string } | null>(null);
+  const [editandoDescuento, setEditandoDescuento] = useState(false);
+  const [descuentoPorcentajeTexto, setDescuentoPorcentajeTexto] = useState("");
+  const [descuentoMotivoTexto, setDescuentoMotivoTexto] = useState("");
+
+  const descuentoDisponible = !bonoActivo && !comprandoBonoNuevo;
+  const descuentoActivo = descuentoDisponible && descuentoAplicado !== null;
+
+  function empezarAAplicarDescuento() {
+    setDescuentoPorcentajeTexto(descuentoAplicado ? String(descuentoAplicado.porcentaje) : "");
+    setDescuentoMotivoTexto(descuentoAplicado?.motivo ?? "");
+    setEditandoDescuento(true);
+  }
+
+  function confirmarDescuento() {
+    const porcentaje = Number(descuentoPorcentajeTexto.replace(",", "."));
+    const motivo = descuentoMotivoTexto.trim();
+    if (!Number.isFinite(porcentaje) || porcentaje <= 0 || porcentaje > 100 || !motivo) return;
+    // Un descuento y una corrección manual de precio son dos formas
+    // distintas de llegar al mismo número: aplicar uno olvida el otro,
+    // para que quede claro cuál de los dos "manda".
+    setPrecioManualCentimos(null);
+    setDescuentoAplicado({ porcentaje, motivo });
+    setEditandoDescuento(false);
+  }
+
+  function quitarDescuento() {
+    setDescuentoAplicado(null);
+    setEditandoDescuento(false);
+  }
+
   // Tres modos, de mayor a menor prioridad: vendiendo un bono nuevo (el
   // precio es el del tipo elegido, no el del catálogo), canjeando un
   // bono ya existente (el servicio principal pasa a costar 0 — solo se
-  // cobran los complementos), o el caso normal de siempre (precio
-  // manual si el barbero lo tocó, si no el automático). Si el barbero
-  // todavía no ha tocado el precio manual, éste sigue al automático
-  // aunque cambie el servicio o los complementos.
+  // cobran los complementos), un descuento con motivo aplicado, o el
+  // caso normal de siempre (precio manual si el barbero lo tocó, si no
+  // el automático). Si el barbero todavía no ha tocado el precio manual,
+  // éste sigue al automático aunque cambie el servicio o los complementos.
   const totalServicioCentimos =
     comprandoBonoNuevo && bonoTipoParaComprar
       ? bonoTipoParaComprar.precio_centimos + precioExtrasCentimos
       : bonoActivo
         ? precioExtrasCentimos
-        : (precioManualCentimos ?? totalServicioAutomaticoCentimos);
+        : descuentoActivo && descuentoAplicado
+          ? Math.round(totalServicioAutomaticoCentimos * (1 - descuentoAplicado.porcentaje / 100))
+          : (precioManualCentimos ?? totalServicioAutomaticoCentimos);
   // El precio de servicio ya no es el automático de catálogo: hay que
   // mandarlo siempre como precioFinalCentimos al guardar, aunque el
   // barbero no lo haya "tocado a mano" en el sentido de precioManualCentimos.
-  const precioServicioForzado = (comprandoBonoNuevo && bonoTipoParaComprar) || bonoActivo;
+  const precioServicioForzado = (comprandoBonoNuevo && bonoTipoParaComprar) || bonoActivo || descuentoActivo;
 
   function empezarAEditarPrecio() {
     setPrecioManualTexto(euros(totalServicioCentimos));
+    setDescuentoAplicado(null);
     setEditandoPrecio(true);
   }
 
@@ -328,6 +371,9 @@ export default function FinalizarCitaModal({
           : precioManualCentimos !== null
             ? { precioFinalCentimos: precioManualCentimos }
             : {}),
+        ...(descuentoActivo && descuentoAplicado
+          ? { descuentoPorcentaje: descuentoAplicado.porcentaje, descuentoMotivo: descuentoAplicado.motivo }
+          : {}),
       }),
     });
     setGuardando(false);
@@ -688,6 +734,71 @@ export default function FinalizarCitaModal({
                     Restablecer
                   </button>
                 </div>
+              )}
+
+              {descuentoDisponible && !editandoPrecio && (
+                <>
+                  {editandoDescuento ? (
+                    <div className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          max="100"
+                          autoFocus
+                          placeholder="% descuento"
+                          value={descuentoPorcentajeTexto}
+                          onChange={(e) => setDescuentoPorcentajeTexto(e.target.value)}
+                          className="w-24 rounded-lg border border-emerald-400 p-1.5 text-sm"
+                        />
+                        <span>%</span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Motivo del descuento (obligatorio)"
+                        value={descuentoMotivoTexto}
+                        onChange={(e) => setDescuentoMotivoTexto(e.target.value)}
+                        className="w-full rounded-lg border border-emerald-400 p-1.5 text-sm"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={confirmarDescuento}
+                          disabled={
+                            !descuentoMotivoTexto.trim() ||
+                            !(Number(descuentoPorcentajeTexto.replace(",", ".")) > 0) ||
+                            Number(descuentoPorcentajeTexto.replace(",", ".")) > 100
+                          }
+                          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+                        >
+                          Aplicar descuento
+                        </button>
+                        <button onClick={() => setEditandoDescuento(false)} className="text-xs text-stone-500 underline">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : descuentoActivo && descuentoAplicado ? (
+                    <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700">
+                      <span>
+                        Descuento del {descuentoAplicado.porcentaje}% aplicado · {descuentoAplicado.motivo} (catálogo:{" "}
+                        {euros(totalServicioAutomaticoCentimos)}€)
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button onClick={empezarAAplicarDescuento} className="font-medium underline">
+                          Editar
+                        </button>
+                        <button onClick={quitarDescuento} className="font-medium underline">
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={empezarAAplicarDescuento} className="text-xs font-medium text-emerald-700 underline">
+                      Aplicar descuento
+                    </button>
+                  )}
+                </>
               )}
               {(bonoActivo || comprandoBonoNuevo) && precioExtrasCentimos > 0 && (
                 <div className="flex justify-between">

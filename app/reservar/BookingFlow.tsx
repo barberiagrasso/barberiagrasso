@@ -84,6 +84,14 @@ function formatearPrecio(centimos: number) {
   return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }
 
+// Para servicios de precio variable (Rastas, tintes...): precio_centimos
+// sigue siendo el mínimo/orientativo de catálogo, pero se muestra como
+// "Desde X€" para no dar la impresión de un precio cerrado — el precio
+// real se decide al cerrar la cita en el panel.
+function formatearPrecioServicio(centimos: number, esVariable: boolean) {
+  return (esVariable ? "Desde " : "") + formatearPrecio(centimos);
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -208,8 +216,8 @@ function TarjetaServicio({
         {meta && <p className="mt-0.5 truncate font-body text-[11px] text-black/50">{meta}</p>}
       </div>
       <p className="shrink-0 font-mono text-base tabular-nums text-black">
-        {extra ? "+" : ""}
-        {formatearPrecio(servicio.precio_centimos)}
+        {extra && !servicio.precio_variable ? "+" : ""}
+        {formatearPrecioServicio(servicio.precio_centimos, Boolean(servicio.precio_variable))}
       </p>
     </button>
   );
@@ -343,10 +351,17 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
   const precioTotalCentimos =
     (servicioSeleccionado?.precio_centimos ?? 0) +
     complementosElegidos.reduce((acc, c) => acc + c.precio_centimos, 0);
+  // Si el servicio principal o algún complemento es de precio variable,
+  // precioTotalCentimos deja de ser "el total exacto" y pasa a ser solo
+  // una referencia mínima — se muestra con "Desde" (ver
+  // formatearPrecioServicio) y no se puede pagar con saldo, porque el
+  // canje exige cubrir el importe exacto (ver lib/fidelizacion.ts) y aquí
+  // todavía no se sabe cuál va a ser.
+  const totalEsVariable = Boolean(servicioSeleccionado?.precio_variable) || complementosElegidos.some((c) => c.precio_variable);
   const saldoDisponibleCentimos = clienteInicial?.saldoFidelizacionCentimos ?? 0;
   // El canje no admite parcialidad: el saldo tiene que cubrir el total
   // exacto de la cita, o no se puede usar en absoluto (ver lib/fidelizacion.ts).
-  const saldoCubreTotal = precioTotalCentimos > 0 && saldoDisponibleCentimos >= precioTotalCentimos;
+  const saldoCubreTotal = !totalEsVariable && precioTotalCentimos > 0 && saldoDisponibleCentimos >= precioTotalCentimos;
 
   // Si el cliente marcó "pagar con saldo" y luego cambia de servicio o
   // añade un complemento que ya no le cubre el saldo, se desmarca solo:
@@ -686,7 +701,7 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
           </div>
           {complementosElegidos.length > 0 && (
             <p className="font-mono text-sm text-brand-yellow">
-              Total con complementos: {formatearPrecio(precioTotalCentimos)} (
+              Total con complementos: {formatearPrecioServicio(precioTotalCentimos, totalEsVariable)} (
               {(servicioSeleccionado?.duracion_minutos ?? 0) + duracionExtraMinutos} min)
             </p>
           )}
@@ -942,9 +957,9 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
             <div className="mt-1 font-mono text-brand-yellow">
               Total:{" "}
               {pagarConSaldo && saldoCubreTotal ? (
-                <span className="line-through opacity-60">{formatearPrecio(precioTotalCentimos)}</span>
+                <span className="line-through opacity-60">{formatearPrecioServicio(precioTotalCentimos, totalEsVariable)}</span>
               ) : (
-                formatearPrecio(precioTotalCentimos)
+                formatearPrecioServicio(precioTotalCentimos, totalEsVariable)
               )}
               {pagarConSaldo && saldoCubreTotal && <span className="ml-1">0,00 € (con tu saldo)</span>}
             </div>
@@ -1032,7 +1047,7 @@ export default function BookingFlow({ sedes, servicios, clienteInicial }: Props)
               ` + ${complementosElegidos.map((c) => c.nombre).join(", ")}`}{" "}
             · {citaConfirmada.profesionalNombre}
           </p>
-          <p className="font-mono text-brand-white">Total: {formatearPrecio(precioTotalCentimos)}</p>
+          <p className="font-mono text-brand-white">Total: {formatearPrecioServicio(precioTotalCentimos, totalEsVariable)}</p>
           <p className="font-body text-xs text-brand-white-dim">Te avisaremos por WhatsApp antes de tu cita.</p>
         </div>
       )}
