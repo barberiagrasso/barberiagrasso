@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import FinalizarCitaModal from "./FinalizarCitaModal";
 import CalendarioDia from "./CalendarioDia";
 import ListaEsperaClient from "../lista-espera/ListaEsperaClient";
@@ -86,30 +86,49 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   no_presentada: "No presentada",
 };
 
+interface DatosAgendaIniciales {
+  citas: Cita[];
+  profesionales: { id: string; nombre: string }[];
+  horarios: { profesional_id: string; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }[];
+  descansosExcepciones: { profesional_id: string; hora_inicio: string; hora_fin: string }[];
+}
+
 export default function AgendaClient({
   sedes,
   servicios,
   esAdmin,
+  datosIniciales,
 }: {
   sedes: Sede[];
   servicios: Servicio[];
   esAdmin: boolean;
+  // Citas de hoy en la primera sede, ya cargadas en el servidor (ver
+  // dashboard/page.tsx) — mismos parámetros con los que arrancaría el
+  // primer fetch de abajo. null si no hay ninguna sede configurada.
+  datosIniciales: DatosAgendaIniciales | null;
 }) {
   const [pestana, setPestana] = useState<"citas" | "lista-espera">("citas");
   const [sedeId, setSedeId] = useState(sedes[0]?.id ?? "");
   const [fecha, setFecha] = useState(hoyISO());
   const [vista, setVista] = useState<"dia" | "semana">("dia");
-  const [citas, setCitas] = useState<Cita[]>([]);
-  const [profesionalesDia, setProfesionalesDia] = useState<{ id: string; nombre: string }[]>([]);
+  const [citas, setCitas] = useState<Cita[]>(datosIniciales?.citas ?? []);
+  const [profesionalesDia, setProfesionalesDia] = useState<{ id: string; nombre: string }[]>(
+    datosIniciales?.profesionales ?? []
+  );
   const [horariosDia, setHorariosDia] = useState<
     { profesional_id: string; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }[]
-  >([]);
+  >(datosIniciales?.horarios ?? []);
   const [descansosExcepciones, setDescansosExcepciones] = useState<
     { profesional_id: string; hora_inicio: string; hora_fin: string }[]
-  >([]);
+  >(datosIniciales?.descansosExcepciones ?? []);
   const [cargando, setCargando] = useState(false);
   const [mostrarNueva, setMostrarNueva] = useState(false);
   const [finalizando, setFinalizando] = useState<Cita | null>(null);
+  // El primer render ya trae los datos correctos desde el servidor
+  // (datosIniciales, con estos mismos sedeId/fecha) — se salta solo ESE
+  // primer fetch para no pedirlos dos veces; cualquier cambio real de
+  // sede, fecha o vista después sí dispara la carga como siempre.
+  const esPrimerFetch = useRef(true);
 
   // En modo semana, "fecha" sigue siendo el día ancla (el que se ve en el
   // selector antes de cambiar de vista); los 7 días mostrados son los de
@@ -135,6 +154,13 @@ export default function AgendaClient({
   }
 
   useEffect(() => {
+    // Si esto es lo primero que se ejecuta Y ya llegaron datos del
+    // servidor para esta misma sede/fecha (vista "día", que es como
+    // arranca siempre AgendaClient), no hace falta volver a pedirlos.
+    if (esPrimerFetch.current) {
+      esPrimerFetch.current = false;
+      if (datosIniciales && sedeId === (sedes[0]?.id ?? "") && fecha === hoyISO() && vista === "dia") return;
+    }
     void cargarCitas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sedeId, fecha, vista]);
