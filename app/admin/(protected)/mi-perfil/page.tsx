@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MiPerfilClient } from "./MiPerfilClient";
@@ -26,6 +27,13 @@ export default async function MiPerfilPage() {
           Tu cuenta no tiene una ficha de barbero vinculada, así que no hay foto que gestionar aquí.
         </p>
       )}
+
+      <Link
+        href="/admin/cambiar-password?next=/admin/mi-perfil"
+        className="mt-4 inline-block rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-stone-400"
+      >
+        Cambiar contraseña
+      </Link>
     </div>
   );
 }

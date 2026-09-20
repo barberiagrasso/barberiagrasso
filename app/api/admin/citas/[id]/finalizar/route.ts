@@ -5,6 +5,7 @@ import { sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { acumularPorCitaCompletada } from "@/lib/fidelizacion";
 import { registrarError } from "@/lib/errorLog";
 import { comprarBono, canjearUsoBono, BonoNoDisponibleError } from "@/lib/bonos";
+import { precioCitaCentimos } from "@/lib/precios";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,20 @@ interface ProductoElegido {
 }
 
 const METODOS_PAGO_VALIDOS = new Set(["efectivo", "tarjeta", "bizum", "bono", "otro"]);
+// Métodos que se pueden combinar en un pago repartido por %. "bono" queda
+// fuera: vender o canjear un bono es un modo de pago exclusivo aparte (ver
+// FinalizarCitaModal.tsx), no algo que se mezcle con un % de efectivo o
+// tarjeta.
+const METODOS_PAGO_MIXTO_VALIDOS = new Set(["efectivo", "tarjeta", "bizum", "otro"]);
+// Tolerancia al comprobar que los % de un pago repartido suman 100 (evita
+// que un redondeo de una cifra decimal en el propio input del barbero,
+// p. ej. 33.33 + 33.33 + 33.34, rebote como error).
+const TOLERANCIA_SUMA_PORCENTAJES = 0.05;
+
+interface PagoElegido {
+  metodo: string;
+  porcentaje: number;
+}
 
 /**
  * Cierra una cita "de verdad": a diferencia del PATCH normal (que solo
@@ -77,6 +92,38 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .map((p: ProductoElegido) => ({ productoId: p.productoId, cantidad: Math.max(1, Math.round(Number(p.cantidad) || 1)) }))
     : [];
   const metodoPago: string | null = typeof body?.metodoPago === "string" && METODOS_PAGO_VALIDOS.has(body.metodoPago) ? body.metodoPago : null;
+  // Pago repartido entre varios métodos (checkout, ver FinalizarCitaModal.tsx
+  // y anadir-pagos-mixtos.sql): solo se manda `pagos` cuando el barbero ha
+  // elegido más de un método para esta cita — con uno solo se sigue usando
+  // el campo `metodoPago` de siempre, sin tocar la tabla cita_pagos. Cuando
+  // sí llega, tiene que traer 2 o más métodos válidos (no "bono") cuyos %
+  // sumen 100 (con un margen mínimo para el redondeo del propio input).
+  let pagosMixtos: PagoElegido[] | null = null;
+  if (Array.isArray(body?.pagos) && body.pagos.length > 0) {
+    const pagosCrudo = body.pagos as unknown[];
+    const pagosParseados: PagoElegido[] = pagosCrudo
+      .filter((p): p is { metodo: unknown; porcentaje: unknown } => Boolean(p && typeof p === "object"))
+      .map((p) => ({
+        metodo: typeof (p as { metodo: unknown }).metodo === "string" ? (p as { metodo: string }).metodo : "",
+        porcentaje: Number((p as { porcentaje: unknown }).porcentaje),
+      }));
+    if (pagosParseados.length < 2) {
+      return NextResponse.json({ error: "Un pago repartido necesita al menos dos métodos." }, { status: 400 });
+    }
+    for (const p of pagosParseados) {
+      if (!METODOS_PAGO_MIXTO_VALIDOS.has(p.metodo)) {
+        return NextResponse.json({ error: "Método de pago no válido para un pago repartido." }, { status: 400 });
+      }
+      if (!Number.isFinite(p.porcentaje) || p.porcentaje <= 0 || p.porcentaje > 100) {
+        return NextResponse.json({ error: "Cada método necesita un % entre 1 y 100." }, { status: 400 });
+      }
+    }
+    const sumaPorcentajes = pagosParseados.reduce((acc, p) => acc + p.porcentaje, 0);
+    if (Math.abs(sumaPorcentajes - 100) > TOLERANCIA_SUMA_PORCENTAJES) {
+      return NextResponse.json({ error: "Los porcentajes del pago repartido deben sumar 100." }, { status: 400 });
+    }
+    pagosMixtos = pagosParseados;
+  }
   // undefined = "no se tocó el precio, usa el automático"; number = override a mano.
   const precioFinalCentimos: number | undefined =
     typeof body?.precioFinalCentimos === "number" && Number.isFinite(body.precioFinalCentimos)
@@ -179,6 +226,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }));
   }
 
+  // Importe exacto de cada método del pago repartido (si lo hay), sobre el
+  // mismo total que ve el barbero en el modal: servicio (ya con cualquier
+  // precio final a mano) + complementos + productos — mismo criterio que
+  // precioCitaCentimos en comisiones/informes, con los productos sumados
+  // aparte porque nunca han pasado por ese campo. Se calcula en centimos
+  // en vez de fiarse del redondeo del propio navegador, y el último método
+  // se lleva el resto de la división para que la suma cuadre siempre con
+  // el total exacto, sin descuadres de un céntimo por el redondeo del resto.
+  let pagosParaGuardar: { metodo: string; porcentaje: number; importe_centimos: number }[] = [];
+  if (pagosMixtos) {
+    const automaticoCentimos =
+      servicio.precio_centimos + extrasParaGuardar.reduce((acc, e) => acc + e.precio_centimos, 0);
+    const totalServicioCentimos = precioCitaCentimos(precioFinalCentimos, automaticoCentimos);
+    const totalProductosCentimos = productosParaGuardar.reduce((acc, p) => acc + p.precio_centimos * p.cantidad, 0);
+    const totalCentimos = totalServicioCentimos + totalProductosCentimos;
+
+    let asignado = 0;
+    pagosParaGuardar = pagosMixtos.map((p, i) => {
+      const esUltimo = i === pagosMixtos!.length - 1;
+      const importe = esUltimo ? totalCentimos - asignado : Math.round((totalCentimos * p.porcentaje) / 100);
+      asignado += importe;
+      return { metodo: p.metodo, porcentaje: p.porcentaje, importe_centimos: Math.max(0, importe) };
+    });
+  }
+  const metodoPagoFinal = pagosMixtos ? "mixto" : metodoPago;
+
   // El bono se compra o se canjea ANTES de tocar la cita: si esto falla
   // (p. ej. el bono ya se agotó en otra pestaña un segundo antes), la
   // cita se queda tal cual, sin marcar completada ni con nada a medias.
@@ -210,7 +283,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
       estado: "completada",
-      metodo_pago: metodoPago,
+      metodo_pago: metodoPagoFinal,
       bono_id: bonoIdParaCita,
       ...(precioFinalCentimos !== undefined ? { precio_final_centimos: precioFinalCentimos } : {}),
       // Siempre se escriben las dos juntas (o ninguna): si esta cita ya
@@ -246,6 +319,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   await supabase.from("cita_productos").delete().eq("cita_id", id);
   if (productosParaGuardar.length > 0) {
     await supabase.from("cita_productos").insert(productosParaGuardar.map((p) => ({ cita_id: id, ...p })));
+  }
+
+  // Mismo criterio: se sustituye del todo. Si esta cita no se paga con
+  // varios métodos (el caso normal), no queda ninguna fila — el método
+  // único ya está en citas.metodo_pago.
+  await supabase.from("cita_pagos").delete().eq("cita_id", id);
+  if (pagosParaGuardar.length > 0) {
+    await supabase.from("cita_pagos").insert(pagosParaGuardar.map((p) => ({ cita_id: id, ...p })));
   }
 
   await sincronizarCitaHubSpot(supabase, id);

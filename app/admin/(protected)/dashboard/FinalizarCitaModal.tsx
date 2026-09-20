@@ -128,7 +128,13 @@ export default function FinalizarCitaModal({
   const [productos, setProductos] = useState<Producto[]>([]);
   const [productosElegidos, setProductosElegidos] = useState<Map<string, number>>(new Map());
   const [productoParaAnadir, setProductoParaAnadir] = useState("");
-  const [metodoPago, setMetodoPago] = useState<string | null>(null);
+  // Uno o varios métodos de pago a la vez, repartidos en % cuando hay más
+  // de uno (p. ej. 80% efectivo, 20% tarjeta) — pedido de Diego
+  // (20/09/2026). "bono" es siempre exclusivo con los demás (ver
+  // alternarMetodoPago): vender o canjear un bono no se reparte con
+  // efectivo/tarjeta/bizum/otro.
+  const [metodosPago, setMetodosPago] = useState<string[]>([]);
+  const [porcentajesPago, setPorcentajesPago] = useState<Record<string, string>>({});
   const [bonos, setBonos] = useState<Bono[]>([]);
   const [bonoTipos, setBonoTipos] = useState<BonoTipo[]>([]);
   const [omitirBono, setOmitirBono] = useState(false);
@@ -162,18 +168,65 @@ export default function FinalizarCitaModal({
     }
   }, [sedeId, fechaOriginal, cita.cliente?.id]);
 
-  // Al pulsar "Bono" en el método de pago, se preselecciona el tipo que
-  // coincide con el servicio realizado (lo normal); al quitarlo, se
-  // olvida la elección para que la próxima vez vuelva a proponerla.
-  function elegirMetodoPago(id: string) {
-    const nuevo = metodoPago === id ? null : id;
-    setMetodoPago(nuevo);
-    if (nuevo === "bono") {
-      const coincidente = bonoTipos.find((t) => t.servicio_id === servicioId);
-      setBonoTipoParaComprarId((coincidente ?? bonoTipos[0])?.id ?? "");
-    } else {
-      setBonoTipoParaComprarId("");
+  // Alterna un método de pago. "Bono" sigue siendo exclusivo de siempre
+  // (vender o canjear un bono sustituye cualquier otra elección, y al
+  // pulsarlo se preselecciona el tipo que coincide con el servicio
+  // realizado). Los demás métodos (efectivo, tarjeta, bizum, otro) se
+  // pueden combinar: pulsarlos los añade o los quita de la lista, y en
+  // cuanto hay dos o más se reparte el total a partes iguales para
+  // empezar (el barbero ajusta el % de cada uno después).
+  function alternarMetodoPago(id: string) {
+    if (id === "bono") {
+      const yaElegido = metodosPago.includes("bono");
+      setMetodosPago(yaElegido ? [] : ["bono"]);
+      setPorcentajesPago({});
+      if (!yaElegido) {
+        const coincidente = bonoTipos.find((t) => t.servicio_id === servicioId);
+        setBonoTipoParaComprarId((coincidente ?? bonoTipos[0])?.id ?? "");
+      } else {
+        setBonoTipoParaComprarId("");
+      }
+      return;
     }
+
+    setBonoTipoParaComprarId("");
+    const sinBono = metodosPago.filter((m) => m !== "bono");
+    const yaElegido = sinBono.includes(id);
+    const siguiente = yaElegido ? sinBono.filter((m) => m !== id) : [...sinBono, id];
+    setMetodosPago(siguiente);
+
+    if (siguiente.length < 2) {
+      setPorcentajesPago({});
+      return;
+    }
+    const parteBase = Math.floor((100 / siguiente.length) * 100) / 100;
+    setPorcentajesPago(() => {
+      const nuevo: Record<string, string> = {};
+      siguiente.forEach((m, i) => {
+        const esUltimo = i === siguiente.length - 1;
+        nuevo[m] = esUltimo ? String(Math.round((100 - parteBase * (siguiente.length - 1)) * 100) / 100) : String(parteBase);
+      });
+      return nuevo;
+    });
+  }
+
+  // Cambia el % de un método. Con exactamente dos elegidos, el otro se
+  // autocompleta para que la suma siempre sea 100 — así el caso típico
+  // (80/20) es escribir un único número. Con tres o más, cada uno se
+  // edita a mano (ver sumaPorcentajesPago más abajo para el aviso si no
+  // suman 100 entre todos).
+  function cambiarPorcentajePago(metodo: string, texto: string) {
+    setPorcentajesPago((prev) => {
+      const actualizado = { ...prev, [metodo]: texto };
+      if (metodosPago.length === 2) {
+        const otro = metodosPago.find((m) => m !== metodo);
+        const valor = Number(texto.replace(",", "."));
+        if (otro && Number.isFinite(valor) && valor >= 0 && valor <= 100) {
+          actualizado[otro] = String(Math.round((100 - valor) * 100) / 100);
+        }
+      }
+      return actualizado;
+    });
   }
 
   function anadirComplemento() {
@@ -231,7 +284,17 @@ export default function FinalizarCitaModal({
 
   const bonoActivo = Boolean(bonoAplicable) && !omitirBono;
   const bonoTipoParaComprar = bonoTipos.find((t) => t.id === bonoTipoParaComprarId) ?? null;
-  const comprandoBonoNuevo = metodoPago === "bono";
+  const comprandoBonoNuevo = metodosPago.includes("bono");
+  // Suma de los % introducidos (solo relevante con 2+ métodos elegidos —
+  // con uno solo o ninguno no hay nada que comprobar). Con exactamente
+  // dos se autocompleta siempre a 100 al escribir (ver
+  // cambiarPorcentajePago), así que este aviso es sobre todo para el
+  // caso de tres o más métodos, donde cada % se edita a mano.
+  const sumaPorcentajesPago = useMemo(
+    () => metodosPago.reduce((acc, m) => acc + (Number((porcentajesPago[m] ?? "0").replace(",", ".")) || 0), 0),
+    [metodosPago, porcentajesPago]
+  );
+  const pagoRepartidoValido = metodosPago.length < 2 || Math.abs(sumaPorcentajesPago - 100) < 0.05;
 
   const [precioManualCentimos, setPrecioManualCentimos] = useState<number | null>(null);
   const [editandoPrecio, setEditandoPrecio] = useState(false);
@@ -341,6 +404,10 @@ export default function FinalizarCitaModal({
       setError("Elige qué bono se está vendiendo.");
       return;
     }
+    if (!pagoRepartidoValido) {
+      setError("Los porcentajes del pago repartido deben sumar 100.");
+      return;
+    }
     setGuardando(true);
     setError(null);
 
@@ -353,7 +420,14 @@ export default function FinalizarCitaModal({
     // Si el bono cubre todo el servicio (sin complementos ni productos
     // que pagar aparte), se guarda como pagado con bono aunque el
     // barbero no haya tocado los botones de método de pago.
-    const metodoPagoAEnviar = cubiertoDelTodoPorBono ? "bono" : metodoPago;
+    const metodoPagoAEnviar = cubiertoDelTodoPorBono ? "bono" : metodosPago.length === 1 ? metodosPago[0] : null;
+    // Con dos o más métodos (y sin que el bono lo cubra todo), se manda el
+    // reparto en vez del método único — ver METODOS_PAGO_MIXTO_VALIDOS en
+    // el endpoint.
+    const pagosAEnviar =
+      !cubiertoDelTodoPorBono && metodosPago.length >= 2
+        ? metodosPago.map((m) => ({ metodo: m, porcentaje: Number((porcentajesPago[m] ?? "0").replace(",", ".")) }))
+        : null;
 
     const res = await fetch(`/api/admin/citas/${cita.id}/finalizar`, {
       method: "PATCH",
@@ -366,6 +440,7 @@ export default function FinalizarCitaModal({
         extrasServicioIds: extrasIds,
         productos: Array.from(productosElegidos.entries()).map(([productoId, cantidad]) => ({ productoId, cantidad })),
         metodoPago: metodoPagoAEnviar,
+        ...(pagosAEnviar ? { pagos: pagosAEnviar } : {}),
         bono,
         ...(precioServicioForzado
           ? { precioFinalCentimos: totalServicioCentimos }
@@ -626,7 +701,7 @@ export default function FinalizarCitaModal({
             ) : (
               <div className="flex flex-wrap gap-2">
                 {METODOS_PAGO.map((m) => {
-                  const activo = metodoPago === m.id;
+                  const activo = metodosPago.includes(m.id);
                   const deshabilitado = m.id === "bono" && bonoActivo;
                   return (
                     <button
@@ -634,7 +709,7 @@ export default function FinalizarCitaModal({
                       type="button"
                       disabled={deshabilitado}
                       title={deshabilitado ? "Ya se está usando un bono de este cliente para el servicio" : undefined}
-                      onClick={() => elegirMetodoPago(m.id)}
+                      onClick={() => alternarMetodoPago(m.id)}
                       className={
                         "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 " +
                         (activo
@@ -647,6 +722,40 @@ export default function FinalizarCitaModal({
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {metodosPago.length >= 2 && (
+              <div className="mt-3 space-y-1.5 rounded-lg border border-stone-200 p-3">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-400">
+                  Reparto del pago (debe sumar 100%)
+                </p>
+                {metodosPago.map((m) => {
+                  const etiqueta = METODOS_PAGO.find((x) => x.id === m)?.etiqueta ?? m;
+                  const porcentaje = Number((porcentajesPago[m] ?? "0").replace(",", ".")) || 0;
+                  return (
+                    <div key={m} className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-stone-600">{etiqueta}</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          max="100"
+                          value={porcentajesPago[m] ?? ""}
+                          onChange={(e) => cambiarPorcentajePago(m, e.target.value)}
+                          className="w-20 rounded-lg border border-stone-300 p-1.5 text-right text-sm"
+                        />
+                        <span className="text-sm text-stone-500">%</span>
+                        <span className="w-20 text-right text-sm font-medium text-stone-700">
+                          {euros(Math.round((totalACobrarCentimos * porcentaje) / 100))}€
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!pagoRepartidoValido && (
+                  <p className="text-xs font-medium text-red-600">Suman {sumaPorcentajesPago}%, deben sumar 100%.</p>
+                )}
               </div>
             )}
             {comprandoBonoNuevo && (
@@ -822,7 +931,7 @@ export default function FinalizarCitaModal({
 
         <div className="flex gap-2 border-t border-stone-100 p-4">
           <button
-            disabled={guardando}
+            disabled={guardando || !pagoRepartidoValido}
             onClick={guardar}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
           >

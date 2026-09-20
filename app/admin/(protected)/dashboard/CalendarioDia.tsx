@@ -62,6 +62,15 @@ interface ServicioOpcion {
   nombre: string;
 }
 
+// Estado de la búsqueda por teléfono en "Nueva cita" (ver MenuCreacion):
+// igual que en el botón flotante NuevaCitaRapida.tsx, solo se pide el
+// nombre cuando el teléfono no coincide con ningún cliente ya existente.
+type EstadoClienteRapido =
+  | { tipo: "vacio" }
+  | { tipo: "buscando" }
+  | { tipo: "encontrado"; nombre: string }
+  | { tipo: "nuevo" };
+
 function horaDeMinutos(min: number) {
   const m = Math.max(0, Math.round(min));
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -177,6 +186,13 @@ export default function CalendarioDia({
   avisando: string | null;
 }) {
   const [seleccionada, setSeleccionada] = useState<Cita | null>(null);
+  const [bloqueoEditando, setBloqueoEditando] = useState<{
+    id: string;
+    profesionalNombre: string;
+    horaInicio: string;
+    horaFin: string;
+    motivo: string | null;
+  } | null>(null);
 
   // Columnas a mostrar: los profesionales que trabajan ese día (tienen
   // horario) o que ya tienen alguna cita ese día, aunque no les tocara
@@ -219,6 +235,12 @@ export default function CalendarioDia({
         motivo: string | null;
         desdeMin: number;
         hastaMin: number;
+        // Un bloqueo de franja horaria concreta (creado arrastrando, ver
+        // iniciarCreacion) se puede reabrir para corregir sus horas
+        // exactas; uno de día completo (vacaciones/festivo, desde la
+        // pantalla de Bloqueos) no — ese se gestiona por día entero desde
+        // ahí, no tiene "horas" que editar aquí.
+        esTiempoPreciso: boolean;
       }[]
     >();
     for (const b of bloqueos) {
@@ -232,9 +254,13 @@ export default function CalendarioDia({
           : minutosEnMadrid(b.fecha_fin);
       if (hastaMin <= desdeMin) continue;
       if (!mapa.has(b.profesional_id)) mapa.set(b.profesional_id, []);
-      mapa
-        .get(b.profesional_id)!
-        .push({ id: b.id, motivo: b.motivo, desdeMin, hastaMin });
+      mapa.get(b.profesional_id)!.push({
+        id: b.id,
+        motivo: b.motivo,
+        desdeMin,
+        hastaMin,
+        esTiempoPreciso: !(desdeMin === 0 && hastaMin === MINUTOS_POR_DIA),
+      });
     }
     return mapa;
   }, [bloqueos, fecha]);
@@ -251,7 +277,7 @@ export default function CalendarioDia({
   const [guardandoDescanso, setGuardandoDescanso] = useState(false);
 
   function iniciarArrastreDescanso(
-    e: React.MouseEvent,
+    e: React.PointerEvent,
     profesionalId: string,
     inicioMin: number,
     finMin: number,
@@ -264,7 +290,7 @@ export default function CalendarioDia({
     const duracionMin = finMin - inicioMin;
     const yInicial = e.clientY;
 
-    function alMover(ev: MouseEvent) {
+    function alMover(ev: PointerEvent) {
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
       const nuevoInicio = Math.min(
@@ -273,9 +299,8 @@ export default function CalendarioDia({
       );
       setArrastrando({ profesionalId, inicioMin: nuevoInicio, duracionMin });
     }
-    async function alSoltar(ev: MouseEvent) {
-      window.removeEventListener("mousemove", alMover);
-      window.removeEventListener("mouseup", alSoltar);
+    async function alSoltar(ev: PointerEvent) {
+      limpiar();
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
       const nuevoInicio = Math.min(
@@ -304,9 +329,22 @@ export default function CalendarioDia({
         setGuardandoDescanso(false);
       }
     }
+    // Un gesto táctil interrumpido (llamada entrante, gesto del sistema)
+    // no debe guardar nada — se descarta tal cual, sin intentar mover el
+    // descanso a la última posición conocida.
+    function alCancelar() {
+      limpiar();
+      setArrastrando(null);
+    }
+    function limpiar() {
+      window.removeEventListener("pointermove", alMover);
+      window.removeEventListener("pointerup", alSoltar);
+      window.removeEventListener("pointercancel", alCancelar);
+    }
 
-    window.addEventListener("mousemove", alMover);
-    window.addEventListener("mouseup", alSoltar);
+    window.addEventListener("pointermove", alMover);
+    window.addEventListener("pointerup", alSoltar);
+    window.addEventListener("pointercancel", alCancelar);
   }
 
   // Arrastre de una cita para cambiarla de hora (solo admin, y solo
@@ -335,7 +373,7 @@ export default function CalendarioDia({
   const UMBRAL_ARRASTRE_PX = 4;
 
   function iniciarArrastreCita(
-    e: React.MouseEvent,
+    e: React.PointerEvent,
     cita: Cita,
     limiteInicio: number,
     limiteFin: number,
@@ -350,7 +388,7 @@ export default function CalendarioDia({
     const duracionMin = minutosEnMadrid(cita.fin) - inicioMinOriginal;
     const yInicial = e.clientY;
 
-    function alMover(ev: MouseEvent) {
+    function alMover(ev: PointerEvent) {
       if (Math.abs(ev.clientY - yInicial) > UMBRAL_ARRASTRE_PX)
         ultimoArrastreCitaRef.current = true;
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
@@ -366,11 +404,19 @@ export default function CalendarioDia({
         duracionMin,
       });
     }
-    async function alSoltar(ev: MouseEvent) {
-      window.removeEventListener("mousemove", alMover);
-      window.removeEventListener("mouseup", alSoltar);
+    async function alSoltar(ev: PointerEvent) {
+      limpiar();
       setArrastrandoCita(null);
-      if (!ultimoArrastreCitaRef.current) return; // fue un click, no un arrastre
+      if (!ultimoArrastreCitaRef.current) {
+        // Fue un toque/clic sin arrastre real: se abre el detalle desde
+        // aquí mismo en vez de fiarse solo del onClick nativo del botón,
+        // porque un pointerdown con preventDefault no siempre deja pasar
+        // el click sintetizado en pantallas táctiles. En ratón, el onClick
+        // normal del botón también llegará justo después — llamarlo dos
+        // veces con la misma cita no hace nada raro.
+        setSeleccionada(cita);
+        return;
+      }
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
       const nuevoInicioMin = Math.min(
@@ -388,20 +434,37 @@ export default function CalendarioDia({
         setMoviendoCitaId(null);
       }
     }
+    // Gesto interrumpido: se descarta sin mover ni abrir nada.
+    function alCancelar() {
+      limpiar();
+      setArrastrandoCita(null);
+    }
+    function limpiar() {
+      window.removeEventListener("pointermove", alMover);
+      window.removeEventListener("pointerup", alSoltar);
+      window.removeEventListener("pointercancel", alCancelar);
+    }
 
-    window.addEventListener("mousemove", alMover);
-    window.addEventListener("mouseup", alSoltar);
+    window.addEventListener("pointermove", alMover);
+    window.addEventListener("pointerup", alSoltar);
+    window.addEventListener("pointercancel", alCancelar);
   }
 
   // Crear algo nuevo arrastrando sobre un hueco vacío de la agenda —
   // disponible para admin Y barberos (a diferencia de los arrastres de
   // arriba, que mueven algo ya existente y siguen siendo solo admin).
-  // Mientras se arrastra se dibuja un rectángulo en franjas de 5 minutos
-  // (PASO_CREACION_MIN); al soltar aparece un menú con "Bloqueo de
-  // agenda" o "Nueva cita" para ese hueco exacto. Un simple click sin
-  // arrastrar también abre el menú, con el bloque mínimo de 5 minutos —
-  // así funciona tanto si se arrastra como si solo se pulsa una vez.
+  // El punto de partida puede ser cualquiera (no tiene que coincidir con
+  // el inicio de un slot de cita), en pasos de 5 minutos
+  // (PASO_CREACION_MIN); por defecto el rectángulo ya sale con
+  // DURACION_BLOQUEO_DEFECTO_MIN (30 min, lo normal para un bloqueo) y
+  // arrastrando se puede alargar o encoger desde ahí, también en pasos de
+  // 5 minutos. Al soltar aparece un menú con "Bloqueo de agenda" o "Nueva
+  // cita" para ese hueco — para la cita, la duración del rectángulo no
+  // importa (la fija el servicio elegido), sí para el bloqueo (pero se
+  // puede corregir a mano en el propio formulario, y también después,
+  // ver EditarBloqueoModal).
   const PASO_CREACION_MIN = 5;
+  const DURACION_BLOQUEO_DEFECTO_MIN = 30;
   const [creacion, setCreacion] = useState<{
     profesionalId: string;
     inicioMin: number;
@@ -410,7 +473,7 @@ export default function CalendarioDia({
   } | null>(null);
 
   function iniciarCreacion(
-    e: React.MouseEvent<HTMLDivElement>,
+    e: React.PointerEvent<HTMLDivElement>,
     profesionalId: string,
     limiteInicio: number,
     limiteFin: number,
@@ -425,19 +488,19 @@ export default function CalendarioDia({
         Math.round(minutoClic / PASO_CREACION_MIN) * PASO_CREACION_MIN,
         limiteInicio,
       ),
-      Math.max(limiteInicio, limiteFin - PASO_CREACION_MIN),
+      Math.max(limiteInicio, limiteFin - DURACION_BLOQUEO_DEFECTO_MIN),
     );
     const yInicial = e.clientY;
     setCreacion({
       profesionalId,
       inicioMin,
-      finMin: inicioMin + PASO_CREACION_MIN,
+      finMin: Math.min(inicioMin + DURACION_BLOQUEO_DEFECTO_MIN, limiteFin),
       fase: "arrastrando",
     });
 
-    function alMover(ev: MouseEvent) {
+    function alMover(ev: PointerEvent) {
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
-      const finBruto = inicioMin + PASO_CREACION_MIN + deltaMin;
+      const finBruto = inicioMin + DURACION_BLOQUEO_DEFECTO_MIN + deltaMin;
       const finSnap =
         Math.round(finBruto / PASO_CREACION_MIN) * PASO_CREACION_MIN;
       const finMin = Math.min(
@@ -451,16 +514,25 @@ export default function CalendarioDia({
       );
     }
     function alSoltar() {
-      window.removeEventListener("mousemove", alMover);
-      window.removeEventListener("mouseup", alSoltar);
+      limpiar();
       setCreacion((actual) =>
         actual && actual.fase === "arrastrando"
           ? { ...actual, fase: "menu" }
           : null,
       );
     }
-    window.addEventListener("mousemove", alMover);
-    window.addEventListener("mouseup", alSoltar);
+    function alCancelar() {
+      limpiar();
+      setCreacion(null);
+    }
+    function limpiar() {
+      window.removeEventListener("pointermove", alMover);
+      window.removeEventListener("pointerup", alSoltar);
+      window.removeEventListener("pointercancel", alCancelar);
+    }
+    window.addEventListener("pointermove", alMover);
+    window.addEventListener("pointerup", alSoltar);
+    window.addEventListener("pointercancel", alCancelar);
   }
 
   // Rango de horas a mostrar: el de los turnos de ese día si hay alguno,
@@ -563,13 +635,13 @@ export default function CalendarioDia({
               {columnas.map((col) => (
                 <div
                   key={col.id}
-                  onMouseDown={
+                  onPointerDown={
                     col.id !== ID_SIN_ASIGNAR
                       ? (e) => iniciarCreacion(e, col.id, minInicio, maxFin)
                       : undefined
                   }
                   className={
-                    "relative flex-1 border-l border-stone-100" +
+                    "relative flex-1 touch-none border-l border-stone-100" +
                     (col.id !== ID_SIN_ASIGNAR ? " cursor-crosshair" : "")
                   }
                 >
@@ -637,9 +709,9 @@ export default function CalendarioDia({
                     return (
                       <div
                         key="descanso"
-                        onMouseDown={(e) => {
+                        onPointerDown={(e) => {
                           // Siempre se para aquí, incluso cuando la función de abajo no
-                          // hace nada (barbero, sin permiso): si no, el mousedown seguiría
+                          // hace nada (barbero, sin permiso): si no, el pointerdown seguiría
                           // subiendo hasta la columna y dispararía por error una creación
                           // nueva justo encima del descanso.
                           e.stopPropagation();
@@ -653,7 +725,7 @@ export default function CalendarioDia({
                           );
                         }}
                         className={
-                          "absolute inset-x-0 z-10 flex items-center justify-center border-y border-stone-700 bg-stone-800/90 text-[11px] font-medium text-white " +
+                          "absolute inset-x-0 z-10 flex touch-none items-center justify-center border-y border-stone-700 bg-stone-800/90 text-[11px] font-medium text-white " +
                           (esAdmin
                             ? "cursor-grab select-none active:cursor-grabbing"
                             : "")
@@ -677,8 +749,21 @@ export default function CalendarioDia({
                     return (
                       <div
                         key={b.id}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        className="absolute inset-x-0 z-10 flex items-center justify-center overflow-hidden border-y border-stone-400 bg-stone-300/80 px-1 text-center text-[11px] font-medium text-stone-600"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                          if (!b.esTiempoPreciso) return;
+                          setBloqueoEditando({
+                            id: b.id,
+                            profesionalNombre: col.nombre,
+                            horaInicio: horaDeMinutos(b.desdeMin),
+                            horaFin: horaDeMinutos(b.hastaMin),
+                            motivo: b.motivo,
+                          });
+                        }}
+                        className={
+                          "absolute inset-x-0 z-10 flex items-center justify-center overflow-hidden border-y border-stone-400 bg-stone-300/80 px-1 text-center text-[11px] font-medium text-stone-600" +
+                          (b.esTiempoPreciso ? " cursor-pointer hover:bg-stone-300" : "")
+                        }
                         style={{
                           top,
                           height: alto,
@@ -686,7 +771,11 @@ export default function CalendarioDia({
                             "repeating-linear-gradient(135deg, rgba(87,83,78,0.18) 0, rgba(87,83,78,0.18) 6px, transparent 6px, transparent 12px)",
                         }}
                         title={
-                          b.motivo ? `Bloqueado: ${b.motivo}` : "Bloqueado"
+                          b.esTiempoPreciso
+                            ? `${b.motivo ? `Bloqueado: ${b.motivo}` : "Bloqueado"} — toca para editar las horas`
+                            : b.motivo
+                              ? `Bloqueado: ${b.motivo}`
+                              : "Bloqueado"
                         }
                       >
                         Bloqueado{b.motivo ? ` · ${b.motivo}` : ""}
@@ -732,9 +821,9 @@ export default function CalendarioDia({
                     return (
                       <button
                         key={cita.id}
-                        onMouseDown={(e) => {
+                        onPointerDown={(e) => {
                           // Igual que en el descanso de arriba: siempre se para aquí para
-                          // que un mousedown sobre una cita nunca dispare por error una
+                          // que un pointerdown sobre una cita nunca dispare por error una
                           // creación nueva en la columna, aunque no se pueda arrastrar
                           // esta cita en concreto (barbero, o cita no confirmada).
                           e.stopPropagation();
@@ -746,7 +835,7 @@ export default function CalendarioDia({
                         }}
                         disabled={moviendoCitaId === cita.id}
                         className={
-                          "absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md disabled:opacity-60 " +
+                          "absolute inset-x-1 touch-none overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md disabled:opacity-60 " +
                           claseBloque(cita.estado) +
                           (sePuedeArrastrar
                             ? " cursor-grab active:cursor-grabbing"
@@ -855,6 +944,17 @@ export default function CalendarioDia({
           }}
         />
       )}
+
+      {bloqueoEditando && (
+        <EditarBloqueoModal
+          bloqueo={bloqueoEditando}
+          onCerrar={() => setBloqueoEditando(null)}
+          onGuardado={() => {
+            setBloqueoEditando(null);
+            onCreado();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -894,10 +994,70 @@ function MenuCreacion({
   );
   const [motivo, setMotivo] = useState("");
   const [servicioId, setServicioId] = useState(servicios[0]?.id ?? "");
-  const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [estadoCliente, setEstadoCliente] = useState<EstadoClienteRapido>({ tipo: "vacio" });
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Búsqueda del cliente por teléfono (con un pequeño debounce): si ya
+  // existe una ficha con ese número, se enseña el nombre para que el
+  // barbero lo confirme en persona; si no, se pide el nombre para dar de
+  // alta al cliente nuevo (ver buscarOCrearCliente en lib/clientes.ts, que
+  // crea la ficha —y la sincroniza con HubSpot— al guardar la cita).
+  useEffect(() => {
+    const telefonoLimpio = telefono.trim();
+    if (telefonoLimpio.length < 6) {
+      setEstadoCliente({ tipo: "vacio" });
+      return;
+    }
+    setEstadoCliente({ tipo: "buscando" });
+    const idTimeout = setTimeout(() => {
+      fetch(`/api/admin/citas/buscar-cliente?telefono=${encodeURIComponent(telefonoLimpio)}`)
+        .then((r) => r.json())
+        .then((j) => {
+          setEstadoCliente(j.nombre ? { tipo: "encontrado", nombre: j.nombre } : { tipo: "nuevo" });
+        })
+        .catch(() => setEstadoCliente({ tipo: "vacio" }));
+    }, 400);
+    return () => clearTimeout(idTimeout);
+  }, [telefono]);
+
+  const nombreParaGuardar = estadoCliente.tipo === "encontrado" ? estadoCliente.nombre : nombreNuevo.trim();
+
+  // La cita no se reserva literalmente en el minuto exacto donde se soltó
+  // el arrastre: el motor de disponibilidad solo ofrece huecos en pasos
+  // de 30 minutos (para que cuadren con el resto de la app — reserva de
+  // clientes incluida), así que aquí se busca, entre los huecos reales de
+  // este profesional/servicio/día, el más cercano a donde se ha soltado.
+  // Sin esto, crear la cita fallaría casi siempre con "ese horario ya no
+  // está disponible" en cuanto el arrastre no cayera justo en un hueco.
+  const [slotsDia, setSlotsDia] = useState<{ hora_inicio: string }[]>([]);
+  const [cargandoSlots, setCargandoSlots] = useState(false);
+
+  useEffect(() => {
+    if (fase !== "cita" || !servicioId) return;
+    setCargandoSlots(true);
+    const p = new URLSearchParams({ sedeId, servicioId, fecha, profesionalId });
+    fetch(`/api/disponibilidad?${p.toString()}`)
+      .then((r) => r.json())
+      .then((j) => setSlotsDia(j.slots ?? []))
+      .finally(() => setCargandoSlots(false));
+  }, [fase, servicioId, sedeId, fecha, profesionalId]);
+
+  const slotElegido = useMemo(() => {
+    if (slotsDia.length === 0) return null;
+    let mejor = slotsDia[0];
+    let mejorDistancia = Math.abs(minutosEnMadrid(mejor.hora_inicio) - inicioMin);
+    for (const s of slotsDia) {
+      const distancia = Math.abs(minutosEnMadrid(s.hora_inicio) - inicioMin);
+      if (distancia < mejorDistancia) {
+        mejor = s;
+        mejorDistancia = distancia;
+      }
+    }
+    return mejor;
+  }, [slotsDia, inicioMin]);
 
   async function guardarBloqueo() {
     setEnviando(true);
@@ -929,7 +1089,7 @@ function MenuCreacion({
   }
 
   async function guardarCita() {
-    if (!servicioId || !nombre || !telefono) return;
+    if (!servicioId || !telefono || !nombreParaGuardar || !slotElegido) return;
     setEnviando(true);
     setError(null);
     try {
@@ -941,8 +1101,8 @@ function MenuCreacion({
           servicioId,
           profesionalId,
           fecha,
-          horaInicioISO: isoDesdeMadrid(fecha, horaDeMinutos(inicioMin)),
-          cliente: { nombre, telefono },
+          horaInicioISO: slotElegido.hora_inicio,
+          cliente: { nombre: nombreParaGuardar, telefono },
           aceptaComercial: false,
         }),
       });
@@ -1050,22 +1210,43 @@ function MenuCreacion({
                 </option>
               ))}
             </select>
+            {cargandoSlots && <p className="text-xs text-stone-400">Buscando el hueco más cercano…</p>}
+            {!cargandoSlots && slotElegido && (
+              <p className="text-xs text-stone-500">
+                Se reservará a las <strong>{horaDeMinutos(minutosEnMadrid(slotElegido.hora_inicio))}</strong>
+                {minutosEnMadrid(slotElegido.hora_inicio) !== inicioMin ? " (el hueco real más cercano)" : ""}.
+              </p>
+            )}
+            {!cargandoSlots && !slotElegido && (
+              <p className="text-xs text-red-600">No hay ningún hueco libre para este servicio ese día.</p>
+            )}
             <input
-              placeholder="Nombre del cliente"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
-            />
-            <input
-              placeholder="Teléfono"
+              placeholder="Teléfono del cliente"
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               className="w-full rounded-lg border border-stone-300 p-2 text-sm"
             />
+            {estadoCliente.tipo === "buscando" && <p className="text-xs text-stone-400">Buscando…</p>}
+            {estadoCliente.tipo === "encontrado" && (
+              <p className="text-sm text-emerald-700">
+                Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
+              </p>
+            )}
+            {estadoCliente.tipo === "nuevo" && (
+              <div>
+                <p className="mb-1 text-xs text-amber-700">No hay ningún cliente con este teléfono — se creará uno nuevo.</p>
+                <input
+                  placeholder="Nombre del cliente nuevo"
+                  value={nombreNuevo}
+                  onChange={(e) => setNombreNuevo(e.target.value)}
+                  className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+                />
+              </div>
+            )}
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">
               <button
-                disabled={!servicioId || !nombre || !telefono || enviando}
+                disabled={!servicioId || !telefono || !nombreParaGuardar || !slotElegido || enviando}
                 onClick={guardarCita}
                 className="flex-1 rounded-lg bg-brand-yellow px-3 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
               >
@@ -1089,6 +1270,146 @@ function MenuCreacion({
             Cancelar
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Al tocar un bloqueo de franja horaria ya creado (ver MenuCreacion /
+// iniciarCreacion más arriba) se abre esto para corregir sus horas
+// exactas — el rectángulo arrastrado es solo un punto de partida, no
+// tienen por qué quedarse en los 30 minutos por defecto. Los bloqueos de
+// día completo (vacaciones/festivo) no pasan por aquí — esos se llevan
+// desde la pantalla de Bloqueos, por día entero.
+function EditarBloqueoModal({
+  bloqueo,
+  onCerrar,
+  onGuardado,
+}: {
+  bloqueo: {
+    id: string;
+    profesionalNombre: string;
+    horaInicio: string;
+    horaFin: string;
+    motivo: string | null;
+  };
+  onCerrar: () => void;
+  onGuardado: () => void;
+}) {
+  const [horaInicio, setHoraInicio] = useState(bloqueo.horaInicio);
+  const [horaFin, setHoraFin] = useState(bloqueo.horaFin);
+  const [motivo, setMotivo] = useState(bloqueo.motivo ?? "");
+  const [guardando, setGuardando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function guardar() {
+    if (horaFin <= horaInicio) {
+      setError("La hora de fin debe ser posterior a la de inicio.");
+      return;
+    }
+    setGuardando(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/bloqueos/${bloqueo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ horaInicio, horaFin, motivo: motivo || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "No se pudo guardar el bloqueo.");
+        return;
+      }
+      onGuardado();
+    } catch {
+      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function eliminar() {
+    setEliminando(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/bloqueos/${bloqueo.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setError("No se pudo eliminar el bloqueo.");
+        return;
+      }
+      onGuardado();
+    } catch {
+      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setEliminando(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      onClick={onCerrar}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3">
+          <div className="text-lg font-bold text-stone-900">Editar bloqueo</div>
+          <div className="text-sm text-stone-500">{bloqueo.profesionalNombre}</div>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm text-stone-600">
+              Desde
+              <input
+                type="time"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-stone-300 p-2 text-sm"
+              />
+            </label>
+            <label className="block text-sm text-stone-600">
+              Hasta
+              <input
+                type="time"
+                value={horaFin}
+                onChange={(e) => setHoraFin(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-stone-300 p-2 text-sm"
+              />
+            </label>
+          </div>
+          <input
+            placeholder="Motivo (opcional)"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              disabled={guardando || eliminando}
+              onClick={guardar}
+              className="flex-1 rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {guardando ? "Guardando…" : "Guardar"}
+            </button>
+            <button
+              disabled={guardando || eliminando}
+              onClick={eliminar}
+              className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              {eliminando ? "Eliminando…" : "Eliminar"}
+            </button>
+            <button
+              onClick={onCerrar}
+              className="rounded-lg bg-stone-100 px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-200"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

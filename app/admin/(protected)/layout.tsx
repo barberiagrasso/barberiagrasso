@@ -84,12 +84,6 @@ export default async function ProtectedAdminLayout({
             >
               Mi perfil
             </Link>
-            <Link
-              href="/admin/cambiar-password"
-              className="underline decoration-brand-line hover:text-brand-yellow"
-            >
-              Cambiar contraseña
-            </Link>
             <SignOutButton />
           </div>
         </div>

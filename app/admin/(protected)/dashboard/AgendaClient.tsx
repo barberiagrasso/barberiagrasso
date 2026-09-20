@@ -47,6 +47,16 @@ interface Bloqueo {
   motivo: string | null;
 }
 
+// Estado de la búsqueda por teléfono en los formularios de "cita rápida"
+// del panel (aquí y en CalendarioDia.tsx): igual que en el botón
+// flotante NuevaCitaRapida.tsx, solo se pide el nombre cuando el
+// teléfono no coincide con ningún cliente ya existente.
+type EstadoClienteRapido =
+  | { tipo: "vacio" }
+  | { tipo: "buscando" }
+  | { tipo: "encontrado"; nombre: string }
+  | { tipo: "nuevo" };
+
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -672,10 +682,36 @@ function NuevaCitaForm({
     }[]
   >([]);
   const [horaInicioISO, setHoraInicioISO] = useState("");
-  const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [estadoCliente, setEstadoCliente] = useState<EstadoClienteRapido>({ tipo: "vacio" });
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+
+  // Búsqueda del cliente por teléfono (con un pequeño debounce): si ya
+  // existe una ficha con ese número, se enseña el nombre para que el
+  // barbero lo confirme en persona; si no, se pide el nombre para dar de
+  // alta al cliente nuevo (ver buscarOCrearCliente en lib/clientes.ts, que
+  // crea la ficha —y la sincroniza con HubSpot— al guardar la cita).
+  useEffect(() => {
+    const telefonoLimpio = telefono.trim();
+    if (telefonoLimpio.length < 6) {
+      setEstadoCliente({ tipo: "vacio" });
+      return;
+    }
+    setEstadoCliente({ tipo: "buscando" });
+    const idTimeout = setTimeout(() => {
+      fetch(`/api/admin/citas/buscar-cliente?telefono=${encodeURIComponent(telefonoLimpio)}`)
+        .then((r) => r.json())
+        .then((j) => {
+          setEstadoCliente(j.nombre ? { tipo: "encontrado", nombre: j.nombre } : { tipo: "nuevo" });
+        })
+        .catch(() => setEstadoCliente({ tipo: "vacio" }));
+    }, 400);
+    return () => clearTimeout(idTimeout);
+  }, [telefono]);
+
+  const nombreParaGuardar = estadoCliente.tipo === "encontrado" ? estadoCliente.nombre : nombreNuevo.trim();
 
   useEffect(() => {
     if (!servicioId || !sedeId) return;
@@ -699,7 +735,7 @@ function NuevaCitaForm({
   }, [servicioId, sedeId, fecha, profesionalId]);
 
   async function crear() {
-    if (!horaInicioISO || !nombre || !telefono) return;
+    if (!horaInicioISO || !telefono || !nombreParaGuardar) return;
     setEnviando(true);
     setError(null);
     const res = await fetch("/api/admin/citas", {
@@ -711,7 +747,7 @@ function NuevaCitaForm({
         profesionalId: profesionalId || undefined,
         fecha,
         horaInicioISO,
-        cliente: { nombre, telefono },
+        cliente: { nombre: nombreParaGuardar, telefono },
         aceptaComercial: false,
       }),
     });
@@ -770,25 +806,36 @@ function NuevaCitaForm({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div>
         <input
-          placeholder="Nombre del cliente"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          className="rounded-lg border border-stone-300 p-2 text-sm"
-        />
-        <input
-          placeholder="Teléfono"
+          placeholder="Teléfono del cliente"
           value={telefono}
           onChange={(e) => setTelefono(e.target.value)}
-          className="rounded-lg border border-stone-300 p-2 text-sm"
+          className="w-full rounded-lg border border-stone-300 p-2 text-sm sm:w-1/2"
         />
+        {estadoCliente.tipo === "buscando" && <p className="mt-1 text-xs text-stone-400">Buscando…</p>}
+        {estadoCliente.tipo === "encontrado" && (
+          <p className="mt-1 text-sm text-emerald-700">
+            Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
+          </p>
+        )}
+        {estadoCliente.tipo === "nuevo" && (
+          <div className="mt-2 sm:w-1/2">
+            <p className="mb-1 text-xs text-amber-700">No hay ningún cliente con este teléfono — se creará uno nuevo.</p>
+            <input
+              placeholder="Nombre del cliente nuevo"
+              value={nombreNuevo}
+              onChange={(e) => setNombreNuevo(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+            />
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
-        disabled={!horaInicioISO || !nombre || !telefono || enviando}
+        disabled={!horaInicioISO || !telefono || !nombreParaGuardar || enviando}
         onClick={crear}
         className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
       >
