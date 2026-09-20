@@ -19,7 +19,11 @@ function fechaHaceNDiasISO(dias: number): string {
   return new Date(Date.now() - dias * 24 * 3600 * 1000).toISOString();
 }
 
-export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
+export default async function ProtectedAdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { admin } = await requireAdmin();
 
   // Datos para el botón flotante de "nueva cita rápida", disponible en
@@ -37,14 +41,29 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     { count: vacacionesPendientes },
   ] = await Promise.all([
     supabase.from("sedes").select("id, nombre").order("nombre"),
-    supabase.from("servicios").select("id, nombre, duracion_minutos, precio_centimos").order("nombre"),
-    supabase.from("conversaciones").select("id", { count: "exact", head: true }).eq("estado", "escalada"),
-    supabase.from("fallos_asistente").select("id", { count: "exact", head: true }).gte("created_at", desde),
-    supabase.from("errores_sistema").select("id", { count: "exact", head: true }).eq("resuelto", false),
+    supabase
+      .from("servicios")
+      .select("id, nombre, duracion_minutos, precio_centimos")
+      .order("nombre"),
+    supabase
+      .from("conversaciones")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "escalada"),
+    supabase
+      .from("fallos_asistente")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", desde),
+    supabase
+      .from("errores_sistema")
+      .select("id", { count: "exact", head: true })
+      .eq("resuelto", false),
     // Solo le interesa al rol "admin" (es quien aprueba/rechaza) — se
     // pide igualmente para todos y se filtra abajo, más simple que un
     // if aparte, y el coste de una query de más es insignificante.
-    supabase.from("solicitudes_vacaciones").select("id", { count: "exact", head: true }).eq("estado", "pendiente"),
+    supabase
+      .from("solicitudes_vacaciones")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "pendiente"),
   ]);
 
   return (
@@ -53,14 +72,22 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-2">
             <GrassoMark className="h-6 w-6 text-brand-yellow" />
-            <span className="font-heading text-lg italic text-brand-white">Barbería Grasso</span>
+            <span className="font-heading text-lg italic text-brand-white">
+              Barbería Grasso
+            </span>
           </div>
-          <div className="flex items-center gap-3 font-body text-sm text-brand-white-dim">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-body text-sm text-brand-white-dim">
             <span>{admin.nombre || "Administrador"}</span>
-            <Link href="/admin/mi-perfil" className="underline decoration-brand-line hover:text-brand-yellow">
+            <Link
+              href="/admin/mi-perfil"
+              className="underline decoration-brand-line hover:text-brand-yellow"
+            >
               Mi perfil
             </Link>
-            <Link href="/admin/cambiar-password" className="underline decoration-brand-line hover:text-brand-yellow">
+            <Link
+              href="/admin/cambiar-password"
+              className="underline decoration-brand-line hover:text-brand-yellow"
+            >
               Cambiar contraseña
             </Link>
             <SignOutButton />
@@ -83,8 +110,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
                 href="/admin/vacaciones"
                 className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"
               >
-                {vacacionesPendientes} solicitud{vacacionesPendientes === 1 ? "" : "es"} de vacaciones esperando tu
-                aprobación
+                {vacacionesPendientes} solicitud
+                {vacacionesPendientes === 1 ? "" : "es"} de vacaciones esperando
+                tu aprobación
               </Link>
             )}
             {(escaladasPendientes ?? 0) > 0 && (
@@ -92,7 +120,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
                 href="/admin/conversaciones"
                 className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"
               >
-                {escaladasPendientes} conversación{escaladasPendientes === 1 ? "" : "es"} de WhatsApp esperando tu
+                {escaladasPendientes} conversación
+                {escaladasPendientes === 1 ? "" : "es"} de WhatsApp esperando tu
                 respuesta
               </Link>
             )}
@@ -101,8 +130,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
                 href="/admin/conversaciones"
                 className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"
               >
-                {fallosRecientes} fallo{fallosRecientes === 1 ? "" : "s"} del asistente de IA en los últimos{" "}
-                {DIAS_FALLOS_ASISTENTE} días
+                {fallosRecientes} fallo{fallosRecientes === 1 ? "" : "s"} del
+                asistente de IA en los últimos {DIAS_FALLOS_ASISTENTE} días
               </Link>
             )}
             {(erroresSinResolver ?? 0) > 0 && (
@@ -110,7 +139,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
                 href="/admin/errores"
                 className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"
               >
-                {erroresSinResolver} error{erroresSinResolver === 1 ? "" : "es"} del sistema sin revisar
+                {erroresSinResolver} error{erroresSinResolver === 1 ? "" : "es"}{" "}
+                del sistema sin revisar
               </Link>
             )}
           </div>

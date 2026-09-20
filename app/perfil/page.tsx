@@ -75,8 +75,15 @@ export default async function PerfilPage() {
         <div className="mb-8 flex flex-col items-center text-center">
           <GrassoLogo className="h-auto w-48 text-brand-white sm:w-56" />
           <h1 className="mt-4 font-heading text-2xl italic text-brand-white">Mi perfil</h1>
-          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-brand-white-dim">
-            {cliente.nombre} · {cliente.telefono}
+          {/* El nombre iba antes en mayúsculas forzadas con la misma
+              tipografía que las etiquetas de sistema (p. ej. "TU SALDO DE
+              FIDELIZACIÓN") — bien para una etiqueta, pero un nombre
+              propio en mayúsculas de bloque se siente menos cercano.
+              Ahora el nombre se muestra tal cual lo escribió el cliente,
+              y el teléfono mantiene el tratamiento de etiqueta. */}
+          <p className="mt-1 font-body text-base text-brand-white">{cliente.nombre}</p>
+          <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-brand-white-dim">
+            {cliente.telefono}
           </p>
         </div>
 

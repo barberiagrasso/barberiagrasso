@@ -29,13 +29,37 @@ export interface DatosAgenda {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   citas: any[];
   profesionales: { id: string; nombre: string; foto_url?: string | null }[];
-  horarios: { profesional_id: string; hora_inicio: string; hora_fin: string; descanso_inicio?: string | null; descanso_fin?: string | null }[];
-  descansosExcepciones: { profesional_id: string; hora_inicio: string; hora_fin: string }[];
+  horarios: {
+    profesional_id: string;
+    hora_inicio: string;
+    hora_fin: string;
+    descanso_inicio?: string | null;
+    descanso_fin?: string | null;
+  }[];
+  descansosExcepciones: {
+    profesional_id: string;
+    hora_inicio: string;
+    hora_fin: string;
+  }[];
+  // Bloqueos de un profesional concreto que caen dentro del rango pedido
+  // (vacaciones/festivos de un barbero, o un bloqueo puntual de agenda
+  // creado arrastrando en el calendario — ver CalendarioDia.tsx). Los
+  // bloqueos de "toda la sede" (profesional_id nulo, festivos) no se
+  // traen aquí: ya afectan a la disponibilidad de reserva sin necesidad
+  // de pintarse en la Agenda, y pintarlos en todas las columnas a la vez
+  // añadiría una complicación visual que nadie ha pedido.
+  bloqueos: {
+    id: string;
+    profesional_id: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    motivo: string | null;
+  }[];
 }
 
 export async function cargarDatosAgenda(
   supabase: SupabaseClient,
-  params: { sedeId: string; fecha: string; fechaFin: string; rolAdmin: string }
+  params: { sedeId: string; fecha: string; fechaFin: string; rolAdmin: string },
 ): Promise<DatosAgenda> {
   const { sedeId, fecha, fechaFin, rolAdmin } = params;
   const inicioDia = `${fecha}T00:00:00`;
@@ -45,31 +69,52 @@ export async function cargarDatosAgenda(
   // lado de la fecha.
   const diaSemana = new Date(`${fecha}T12:00:00`).getDay();
 
-  // Primera tanda: ninguna de estas cuatro consultas depende del
+  // Primera tanda: ninguna de estas cinco consultas depende del
   // resultado de otra, así que salen todas a la vez.
-  const [{ data: citas, error }, { data: profesionalesSede }, { data: horariosSede }, { data: descansosExcepciones }] =
-    await Promise.all([
-      supabase
-        .from("citas")
-        .select(
-          "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, metodo_pago, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id)"
-        )
-        .eq("sede_id", sedeId)
-        .gte("inicio", inicioDia)
-        .lte("inicio", finDia)
-        .order("inicio"),
-      supabase
-        .from("profesional_sedes")
-        .select("profesional_id, profesionales!inner(id, nombre, activo)")
-        .eq("sede_id", sedeId)
-        .eq("profesionales.activo", true),
-      supabase
-        .from("horarios")
-        .select("profesional_id, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
-        .eq("sede_id", sedeId)
-        .eq("dia_semana", diaSemana),
-      supabase.from("descansos_excepciones").select("profesional_id, hora_inicio, hora_fin").eq("sede_id", sedeId).eq("fecha", fecha),
-    ]);
+  const [
+    { data: citas, error },
+    { data: profesionalesSede },
+    { data: horariosSede },
+    { data: descansosExcepciones },
+    { data: bloqueos },
+  ] = await Promise.all([
+    supabase
+      .from("citas")
+      .select(
+        "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, metodo_pago, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id)",
+      )
+      .eq("sede_id", sedeId)
+      .gte("inicio", inicioDia)
+      .lte("inicio", finDia)
+      .order("inicio"),
+    supabase
+      .from("profesional_sedes")
+      .select("profesional_id, profesionales!inner(id, nombre, activo)")
+      .eq("sede_id", sedeId)
+      .eq("profesionales.activo", true),
+    supabase
+      .from("horarios")
+      .select(
+        "profesional_id, hora_inicio, hora_fin, descanso_inicio, descanso_fin",
+      )
+      .eq("sede_id", sedeId)
+      .eq("dia_semana", diaSemana),
+    supabase
+      .from("descansos_excepciones")
+      .select("profesional_id, hora_inicio, hora_fin")
+      .eq("sede_id", sedeId)
+      .eq("fecha", fecha),
+    // Mismo criterio de límites de día que la consulta de citas de arriba
+    // (inicioDia/finDia tal cual, sin forzar zona horaria a mano): así
+    // se comportan igual frente a la columna timestamptz.
+    supabase
+      .from("bloqueos")
+      .select("id, profesional_id, fecha_inicio, fecha_fin, motivo")
+      .eq("sede_id", sedeId)
+      .not("profesional_id", "is", null)
+      .lt("fecha_inicio", finDia)
+      .gt("fecha_fin", inicioDia),
+  ]);
 
   if (error) throw new Error("No se pudieron cargar las citas.");
 
@@ -85,8 +130,13 @@ export async function cargarDatosAgenda(
       }));
 
   const profesionalesPermanentes = (profesionalesSede ?? []).map((sp) => {
-    const prof = Array.isArray(sp.profesionales) ? sp.profesionales[0] : sp.profesionales;
-    return { id: sp.profesional_id as string, nombre: (prof as { nombre: string })?.nombre ?? "" };
+    const prof = Array.isArray(sp.profesionales)
+      ? sp.profesionales[0]
+      : sp.profesionales;
+    return {
+      id: sp.profesional_id as string,
+      nombre: (prof as { nombre: string })?.nombre ?? "",
+    };
   });
 
   // Segunda tanda: los destinos puntuales de "fecha" — alguien puede
@@ -99,7 +149,9 @@ export async function cargarDatosAgenda(
   const consultasDestinos = [
     supabase
       .from("destinos_puntuales")
-      .select("profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)")
+      .select(
+        "profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)",
+      )
       .eq("sede_id", sedeId)
       .eq("fecha", fecha),
   ];
@@ -107,19 +159,30 @@ export async function cargarDatosAgenda(
     consultasDestinos.push(
       supabase
         .from("destinos_puntuales")
-        .select("profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)")
+        .select(
+          "profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)",
+        )
         .eq("fecha", fecha)
-        .in("profesional_id", idsPermanentes)
+        .in("profesional_id", idsPermanentes),
     );
   }
   const resultadosDestinos = await Promise.all(consultasDestinos);
   const destinosPorProfesional = new Map<
     string,
-    { profesional_id: string; nombre: string; sede_id: string; fecha: string; hora_inicio: string; hora_fin: string }
+    {
+      profesional_id: string;
+      nombre: string;
+      sede_id: string;
+      fecha: string;
+      hora_inicio: string;
+      hora_fin: string;
+    }
   >();
   for (const { data } of resultadosDestinos) {
     for (const fila of data ?? []) {
-      const prof = Array.isArray(fila.profesionales) ? fila.profesionales[0] : fila.profesionales;
+      const prof = Array.isArray(fila.profesionales)
+        ? fila.profesionales[0]
+        : fila.profesionales;
       destinosPorProfesional.set(fila.profesional_id, {
         profesional_id: fila.profesional_id,
         nombre: (prof as { nombre: string } | null)?.nombre ?? "",
@@ -132,22 +195,34 @@ export async function cargarDatosAgenda(
   }
   const destinosDelDia = [...destinosPorProfesional.values()];
 
-  const { candidatos: profesionalesConDestinos, horariosExtra } = resolverCandidatosConDestinosPuntuales({
-    candidatosPermanentes: profesionalesPermanentes,
-    destinosDelDia,
-    sedeId,
-    // Este listado no está restringido a un servicio concreto (es la
-    // vista de día completa de la Agenda), así que nadie queda excluido
-    // por "no hacer tal servicio": basta con que tenga un destino
-    // puntual a esta sede hoy.
-    idsQueHacenServicio: new Set(destinosDelDia.map((d) => d.profesional_id)),
-  });
-  const profesionalesSinFoto = profesionalesConDestinos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const { candidatos: profesionalesConDestinos, horariosExtra } =
+    resolverCandidatosConDestinosPuntuales({
+      candidatosPermanentes: profesionalesPermanentes,
+      destinosDelDia,
+      sedeId,
+      // Este listado no está restringido a un servicio concreto (es la
+      // vista de día completa de la Agenda), así que nadie queda excluido
+      // por "no hacer tal servicio": basta con que tenga un destino
+      // puntual a esta sede hoy.
+      idsQueHacenServicio: new Set(destinosDelDia.map((d) => d.profesional_id)),
+    });
+  const profesionalesSinFoto = profesionalesConDestinos.sort((a, b) =>
+    a.nombre.localeCompare(b.nombre),
+  );
 
   // Quita el turno habitual de quien hoy está redirigido a otra sede, y
   // añade el turno sintético de quien ha llegado puntualmente a esta.
-  const idsRedirigidosFuera = new Set(destinosDelDia.filter((d) => d.sede_id !== sedeId).map((d) => d.profesional_id));
-  const horarios = [...(horariosSede ?? []).filter((h) => !idsRedirigidosFuera.has(h.profesional_id)), ...horariosExtra];
+  const idsRedirigidosFuera = new Set(
+    destinosDelDia
+      .filter((d) => d.sede_id !== sedeId)
+      .map((d) => d.profesional_id),
+  );
+  const horarios = [
+    ...(horariosSede ?? []).filter(
+      (h) => !idsRedirigidosFuera.has(h.profesional_id),
+    ),
+    ...horariosExtra,
+  ];
 
   // Foto de perfil de cada barbero (pedido de Diego, 19/09/2026): se
   // añade aquí, en una única consulta aparte, en vez de meterla en el
@@ -160,19 +235,30 @@ export async function cargarDatosAgenda(
   };
   const idsConFoto = new Set<string>([
     ...profesionalesSinFoto.map((p) => p.id),
-    ...citasParaElRol.map((c) => idProfesionalDeCita(c)).filter((id): id is string => Boolean(id)),
+    ...citasParaElRol
+      .map((c) => idProfesionalDeCita(c))
+      .filter((id): id is string => Boolean(id)),
   ]);
   const { data: fotos } =
     idsConFoto.size > 0
-      ? await supabase.from("profesionales").select("id, foto_url").in("id", [...idsConFoto])
+      ? await supabase
+          .from("profesionales")
+          .select("id, foto_url")
+          .in("id", [...idsConFoto])
       : { data: [] as { id: string; foto_url: string | null }[] };
   const fotoPorId = new Map((fotos ?? []).map((f) => [f.id, f.foto_url]));
 
-  const profesionales = profesionalesSinFoto.map((p) => ({ ...p, foto_url: fotoPorId.get(p.id) ?? null }));
+  const profesionales = profesionalesSinFoto.map((p) => ({
+    ...p,
+    foto_url: fotoPorId.get(p.id) ?? null,
+  }));
   const citasConFoto = citasParaElRol.map((c) => {
     const p = Array.isArray(c.profesional) ? c.profesional[0] : c.profesional;
     if (!p) return c;
-    return { ...c, profesional: { ...p, foto_url: fotoPorId.get(p.id) ?? null } };
+    return {
+      ...c,
+      profesional: { ...p, foto_url: fotoPorId.get(p.id) ?? null },
+    };
   });
 
   return {
@@ -180,5 +266,6 @@ export async function cargarDatosAgenda(
     profesionales,
     horarios,
     descansosExcepciones: descansosExcepciones ?? [],
+    bloqueos: (bloqueos ?? []) as DatosAgenda["bloqueos"],
   };
 }

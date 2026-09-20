@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Clip {
   src: string;
@@ -8,9 +8,18 @@ interface Clip {
 }
 
 const CLIPS: Clip[] = [
-  { src: "/media/hero/hero-1-textura.mp4", poster: "/media/hero/hero-1-textura-poster.jpg" },
-  { src: "/media/hero/hero-2-afeitado.mp4", poster: "/media/hero/hero-2-afeitado-poster.jpg" },
-  { src: "/media/hero/hero-3-local.mp4", poster: "/media/hero/hero-3-local-poster.jpg" },
+  {
+    src: "/media/hero/hero-1-textura.mp4",
+    poster: "/media/hero/hero-1-textura-poster.jpg",
+  },
+  {
+    src: "/media/hero/hero-2-afeitado.mp4",
+    poster: "/media/hero/hero-2-afeitado-poster.jpg",
+  },
+  {
+    src: "/media/hero/hero-3-local.mp4",
+    poster: "/media/hero/hero-3-local-poster.jpg",
+  },
 ];
 
 const DURACION_MS = 9000;
@@ -25,8 +34,25 @@ const DURACION_MS = 9000;
 export function HeroBackdrop() {
   const [activo, setActivo] = useState(0);
   const [movimientoReducido, setMovimientoReducido] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+
+  // A veces el navegador deja un vídeo en pausa por su cuenta (cambio de
+  // pestaña, ahorro de batería, algún hipo del autoplay al cargar) y,
+  // como aquí no hay controles ni nada que vuelva a darle a "play", se
+  // quedaría parado para siempre. Esto reintenta reanudarlo; si el
+  // navegador lo vuelve a bloquear no pasa nada, se reintenta en el
+  // próximo evento.
+  function intentarReanudar(video: HTMLVideoElement | null) {
+    if (video && video.paused) video.play().catch(() => {});
+  }
+
+  function reanudarTodos() {
+    videoRefs.current.forEach(intentarReanudar);
+  }
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -43,8 +69,31 @@ export function HeroBackdrop() {
     return () => clearInterval(id);
   }, [movimientoReducido]);
 
+  // Cada vez que toca cambiar de clip nos aseguramos de que el nuevo
+  // (y, ya de paso, el resto) esté reproduciéndose de verdad.
+  useEffect(() => {
+    reanudarTodos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo]);
+
+  // Al volver a esta pestaña tras estar en segundo plano, algunos
+  // navegadores dejan los vídeos pausados aunque autoplay/loop sigan
+  // activos — se reintenta en cuanto vuelve a estar visible.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") reanudarTodos();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div aria-hidden="true" className="absolute inset-0 overflow-hidden bg-brand-black">
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 overflow-hidden bg-brand-black"
+    >
       {movimientoReducido ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -56,12 +105,16 @@ export function HeroBackdrop() {
         CLIPS.map((clip, i) => (
           <video
             key={clip.src}
+            ref={(el) => {
+              videoRefs.current[i] = el;
+            }}
             autoPlay
             muted
             loop
             playsInline
             preload="auto"
             poster={clip.poster}
+            onPause={(e) => intentarReanudar(e.currentTarget)}
             className="absolute inset-0 h-full w-full scale-105 object-cover transition-opacity ease-in-out"
             style={{
               opacity: i === activo ? 0.7 : 0,

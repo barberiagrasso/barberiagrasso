@@ -27,7 +27,10 @@ function hoyISO() {
 }
 
 function formatoFecha(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", dateStyle: "medium" });
+  return new Date(iso).toLocaleDateString("es-ES", {
+    timeZone: "Europe/Madrid",
+    dateStyle: "medium",
+  });
 }
 
 export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
@@ -92,7 +95,7 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {sedes.map((s) => (
           <button
             key={s.id}
@@ -144,8 +147,9 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
           </div>
         </div>
         <p className="text-xs text-stone-400">
-          Para bloquear un único día, pon la misma fecha en &quot;Desde&quot; y &quot;Hasta&quot;. El
-          bloqueo cubre el día completo (no hace falta indicar horas).
+          Para bloquear un único día, pon la misma fecha en &quot;Desde&quot; y
+          &quot;Hasta&quot;. El bloqueo cubre el día completo (no hace falta
+          indicar horas).
         </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
@@ -158,15 +162,24 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
       </div>
 
       <div>
-        <h2 className="mb-2 font-medium text-stone-800">Próximos bloqueos en esta sede</h2>
+        <h2 className="mb-2 font-medium text-stone-800">
+          Próximos bloqueos en esta sede
+        </h2>
         {cargando && <p className="text-sm text-stone-500">Cargando…</p>}
         <div className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
           {bloqueos.map((b) => (
-            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
+            <div
+              key={b.id}
+              className="flex flex-wrap items-center justify-between gap-2 p-3"
+            >
               <div>
                 <div className="flex items-center gap-1.5 font-medium text-stone-900">
                   {b.profesional && (
-                    <AvatarProfesional fotoUrl={b.profesional.foto_url} nombre={b.profesional.nombre} className="h-5 w-5" />
+                    <AvatarProfesional
+                      fotoUrl={b.profesional.foto_url}
+                      nombre={b.profesional.nombre}
+                      className="h-5 w-5"
+                    />
                   )}
                   {b.profesional?.nombre ?? "Toda la sede"}
                 </div>
@@ -175,13 +188,18 @@ export default function BloqueosClient({ sedes }: { sedes: Sede[] }) {
                   {b.motivo ? ` · ${b.motivo}` : ""}
                 </div>
               </div>
-              <button onClick={() => eliminarBloqueo(b.id)} className="text-xs text-red-700 underline">
+              <button
+                onClick={() => eliminarBloqueo(b.id)}
+                className="text-xs text-red-700 underline"
+              >
                 Eliminar
               </button>
             </div>
           ))}
           {!cargando && bloqueos.length === 0 && (
-            <p className="p-3 text-sm text-stone-500">No hay bloqueos próximos en esta sede.</p>
+            <p className="p-3 text-sm text-stone-500">
+              No hay bloqueos próximos en esta sede.
+            </p>
           )}
         </div>
       </div>

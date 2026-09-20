@@ -1,9 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fechaEnMadrid, minutosEnMadrid, minutosDeHora, isoDesdeMadrid } from "@/lib/horarioLocal";
-import { columnasVisibles, rangoHorario, resolverDescansosDia, ID_SIN_ASIGNAR } from "@/lib/calendarioDia";
-import { IconBell, IconCheck, IconAlertCircle, IconX } from "@/components/ui/Icons";
+import {
+  fechaEnMadrid,
+  minutosEnMadrid,
+  minutosDeHora,
+  isoDesdeMadrid,
+} from "@/lib/horarioLocal";
+import {
+  columnasVisibles,
+  rangoHorario,
+  resolverDescansosDia,
+  ID_SIN_ASIGNAR,
+} from "@/lib/calendarioDia";
+import {
+  IconBell,
+  IconCheck,
+  IconAlertCircle,
+  IconX,
+} from "@/components/ui/Icons";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 
 interface Cita {
@@ -34,6 +49,17 @@ interface DescansoExcepcion {
   profesional_id: string;
   hora_inicio: string;
   hora_fin: string;
+}
+interface BloqueoAgenda {
+  id: string;
+  profesional_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  motivo: string | null;
+}
+interface ServicioOpcion {
+  id: string;
+  nombre: string;
 }
 
 function horaDeMinutos(min: number) {
@@ -94,7 +120,9 @@ function claseBloque(estado: string) {
 }
 
 /** Fondo/borde de una cita a partir del color hex de su servicio. */
-function estiloColorServicio(color: string | null | undefined): React.CSSProperties {
+function estiloColorServicio(
+  color: string | null | undefined,
+): React.CSSProperties {
   const hex = color || COLOR_SERVICIO_POR_DEFECTO;
   return { backgroundColor: `${hex}26`, borderColor: `${hex}80` };
 }
@@ -115,6 +143,8 @@ export default function CalendarioDia({
   profesionales,
   horarios,
   descansosExcepciones,
+  bloqueos,
+  servicios,
   esAdmin,
   cargando,
   onFinalizar,
@@ -122,6 +152,7 @@ export default function CalendarioDia({
   onAvisarDisponible,
   onDescansoMovido,
   onMoverCita,
+  onCreado,
   avisando,
 }: {
   sedeId: string;
@@ -130,6 +161,8 @@ export default function CalendarioDia({
   profesionales: Profesional[];
   horarios: Horario[];
   descansosExcepciones: DescansoExcepcion[];
+  bloqueos: BloqueoAgenda[];
+  servicios: ServicioOpcion[];
   esAdmin: boolean;
   cargando: boolean;
   onFinalizar: (cita: Cita) => void;
@@ -137,6 +170,10 @@ export default function CalendarioDia({
   onAvisarDisponible: (id: string) => void;
   onDescansoMovido: () => void;
   onMoverCita: (id: string, nuevoInicioISO: string) => Promise<void> | void;
+  // Se llama tras crear una cita o un bloqueo de agenda desde el
+  // arrastre (ver iniciarCreacion más abajo) para que el padre recargue
+  // la Agenda — igual que onDescansoMovido.
+  onCreado: () => void;
   avisando: string | null;
 }) {
   const [seleccionada, setSeleccionada] = useState<Cita | null>(null);
@@ -148,7 +185,7 @@ export default function CalendarioDia({
   // reservar), se añade una columna aparte para no perderla de vista.
   const columnas = useMemo(
     () => columnasVisibles(profesionales, horarios, citas),
-    [profesionales, horarios, citas]
+    [profesionales, horarios, citas],
   );
 
   const citasPorColumna = useMemo(() => {
@@ -169,11 +206,48 @@ export default function CalendarioDia({
     return new Map(resueltos.map((d) => [d.profesional_id, d]));
   }, [horarios, descansosExcepciones]);
 
+  // Bloqueos de agenda de cada barbero que caen (aunque sea en parte) en
+  // este día: un bloqueo puntual creado arrastrando (ver iniciarCreacion
+  // más abajo), o unas vacaciones/festivo de ESE barbero que empiecen
+  // antes o terminen después de hoy — en ese caso se recorta a las
+  // 00:00/24:00 de este día, para no calcular minutos de otra fecha.
+  const bloqueosPorColumna = useMemo(() => {
+    const mapa = new Map<
+      string,
+      {
+        id: string;
+        motivo: string | null;
+        desdeMin: number;
+        hastaMin: number;
+      }[]
+    >();
+    for (const b of bloqueos) {
+      const desdeMin =
+        fechaEnMadrid(b.fecha_inicio) < fecha
+          ? 0
+          : minutosEnMadrid(b.fecha_inicio);
+      const hastaMin =
+        fechaEnMadrid(b.fecha_fin) > fecha
+          ? MINUTOS_POR_DIA
+          : minutosEnMadrid(b.fecha_fin);
+      if (hastaMin <= desdeMin) continue;
+      if (!mapa.has(b.profesional_id)) mapa.set(b.profesional_id, []);
+      mapa
+        .get(b.profesional_id)!
+        .push({ id: b.id, motivo: b.motivo, desdeMin, hastaMin });
+    }
+    return mapa;
+  }, [bloqueos, fecha]);
+
   // Arrastre del bloque de descanso (solo admin): mientras se arrastra se
   // guarda aquí una vista previa en minutos; al soltar se persiste como
   // excepción de ESE día concreto (no cambia la regla general) y se
   // recarga la agenda.
-  const [arrastrando, setArrastrando] = useState<{ profesionalId: string; inicioMin: number; duracionMin: number } | null>(null);
+  const [arrastrando, setArrastrando] = useState<{
+    profesionalId: string;
+    inicioMin: number;
+    duracionMin: number;
+  } | null>(null);
   const [guardandoDescanso, setGuardandoDescanso] = useState(false);
 
   function iniciarArrastreDescanso(
@@ -182,7 +256,7 @@ export default function CalendarioDia({
     inicioMin: number,
     finMin: number,
     limiteInicio: number,
-    limiteFin: number
+    limiteFin: number,
   ) {
     if (!esAdmin || guardandoDescanso) return;
     e.preventDefault();
@@ -193,7 +267,10 @@ export default function CalendarioDia({
     function alMover(ev: MouseEvent) {
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
-      const nuevoInicio = Math.min(Math.max(inicioMin + snapMin, limiteInicio), limiteFin - duracionMin);
+      const nuevoInicio = Math.min(
+        Math.max(inicioMin + snapMin, limiteInicio),
+        limiteFin - duracionMin,
+      );
       setArrastrando({ profesionalId, inicioMin: nuevoInicio, duracionMin });
     }
     async function alSoltar(ev: MouseEvent) {
@@ -201,21 +278,27 @@ export default function CalendarioDia({
       window.removeEventListener("mouseup", alSoltar);
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
-      const nuevoInicio = Math.min(Math.max(inicioMin + snapMin, limiteInicio), limiteFin - duracionMin);
+      const nuevoInicio = Math.min(
+        Math.max(inicioMin + snapMin, limiteInicio),
+        limiteFin - duracionMin,
+      );
       setArrastrando(null);
       if (nuevoInicio === inicioMin) return; // no se movió, nada que guardar
       setGuardandoDescanso(true);
       try {
-        await fetch(`/api/admin/profesionales/${profesionalId}/descanso-excepcion`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sedeId,
-            fecha,
-            horaInicio: horaDeMinutos(nuevoInicio),
-            horaFin: horaDeMinutos(nuevoInicio + duracionMin),
-          }),
-        });
+        await fetch(
+          `/api/admin/profesionales/${profesionalId}/descanso-excepcion`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sedeId,
+              fecha,
+              horaInicio: horaDeMinutos(nuevoInicio),
+              horaFin: horaDeMinutos(nuevoInicio + duracionMin),
+            }),
+          },
+        );
         onDescansoMovido();
       } finally {
         setGuardandoDescanso(false);
@@ -241,12 +324,22 @@ export default function CalendarioDia({
   // movimiento real, y el onClick de la cita lo consulta antes de abrir
   // el panel — el click llega justo después del mouseup, así que el ref
   // ya está actualizado para cuando se lee.
-  const [arrastrandoCita, setArrastrandoCita] = useState<{ citaId: string; profesionalId: string; inicioMin: number; duracionMin: number } | null>(null);
+  const [arrastrandoCita, setArrastrandoCita] = useState<{
+    citaId: string;
+    profesionalId: string;
+    inicioMin: number;
+    duracionMin: number;
+  } | null>(null);
   const [moviendoCitaId, setMoviendoCitaId] = useState<string | null>(null);
   const ultimoArrastreCitaRef = useRef(false);
   const UMBRAL_ARRASTRE_PX = 4;
 
-  function iniciarArrastreCita(e: React.MouseEvent, cita: Cita, limiteInicio: number, limiteFin: number) {
+  function iniciarArrastreCita(
+    e: React.MouseEvent,
+    cita: Cita,
+    limiteInicio: number,
+    limiteFin: number,
+  ) {
     if (!esAdmin || cita.estado !== "confirmada" || moviendoCitaId) return;
     if (!cita.profesional?.id) return; // "Sin asignar": no tiene sentido arrastrarla dentro de esa columna
     const profesionalId: string = cita.profesional.id; // ya con tipo no-opcional, para que las funciones anidadas de más abajo no lo vuelvan a ver como "string | undefined"
@@ -258,11 +351,20 @@ export default function CalendarioDia({
     const yInicial = e.clientY;
 
     function alMover(ev: MouseEvent) {
-      if (Math.abs(ev.clientY - yInicial) > UMBRAL_ARRASTRE_PX) ultimoArrastreCitaRef.current = true;
+      if (Math.abs(ev.clientY - yInicial) > UMBRAL_ARRASTRE_PX)
+        ultimoArrastreCitaRef.current = true;
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
-      const nuevoInicio = Math.min(Math.max(inicioMinOriginal + snapMin, limiteInicio), limiteFin - duracionMin);
-      setArrastrandoCita({ citaId: cita.id, profesionalId, inicioMin: nuevoInicio, duracionMin });
+      const nuevoInicio = Math.min(
+        Math.max(inicioMinOriginal + snapMin, limiteInicio),
+        limiteFin - duracionMin,
+      );
+      setArrastrandoCita({
+        citaId: cita.id,
+        profesionalId,
+        inicioMin: nuevoInicio,
+        duracionMin,
+      });
     }
     async function alSoltar(ev: MouseEvent) {
       window.removeEventListener("mousemove", alMover);
@@ -271,11 +373,17 @@ export default function CalendarioDia({
       if (!ultimoArrastreCitaRef.current) return; // fue un click, no un arrastre
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
       const snapMin = Math.round(deltaMin / 15) * 15;
-      const nuevoInicioMin = Math.min(Math.max(inicioMinOriginal + snapMin, limiteInicio), limiteFin - duracionMin);
+      const nuevoInicioMin = Math.min(
+        Math.max(inicioMinOriginal + snapMin, limiteInicio),
+        limiteFin - duracionMin,
+      );
       if (nuevoInicioMin === inicioMinOriginal) return; // soltada en el mismo sitio
       setMoviendoCitaId(cita.id);
       try {
-        await onMoverCita(cita.id, isoDesdeMadrid(fecha, horaDeMinutos(nuevoInicioMin)));
+        await onMoverCita(
+          cita.id,
+          isoDesdeMadrid(fecha, horaDeMinutos(nuevoInicioMin)),
+        );
       } finally {
         setMoviendoCitaId(null);
       }
@@ -285,15 +393,88 @@ export default function CalendarioDia({
     window.addEventListener("mouseup", alSoltar);
   }
 
+  // Crear algo nuevo arrastrando sobre un hueco vacío de la agenda —
+  // disponible para admin Y barberos (a diferencia de los arrastres de
+  // arriba, que mueven algo ya existente y siguen siendo solo admin).
+  // Mientras se arrastra se dibuja un rectángulo en franjas de 5 minutos
+  // (PASO_CREACION_MIN); al soltar aparece un menú con "Bloqueo de
+  // agenda" o "Nueva cita" para ese hueco exacto. Un simple click sin
+  // arrastrar también abre el menú, con el bloque mínimo de 5 minutos —
+  // así funciona tanto si se arrastra como si solo se pulsa una vez.
+  const PASO_CREACION_MIN = 5;
+  const [creacion, setCreacion] = useState<{
+    profesionalId: string;
+    inicioMin: number;
+    finMin: number;
+    fase: "arrastrando" | "menu" | "bloqueo" | "cita";
+  } | null>(null);
+
+  function iniciarCreacion(
+    e: React.MouseEvent<HTMLDivElement>,
+    profesionalId: string,
+    limiteInicio: number,
+    limiteFin: number,
+  ) {
+    if (e.button !== 0 || creacion || moviendoCitaId || guardandoDescanso)
+      return;
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const minutoClic = minInicioVisual + (e.clientY - rect.top) / PX_POR_MINUTO;
+    const inicioMin = Math.min(
+      Math.max(
+        Math.round(minutoClic / PASO_CREACION_MIN) * PASO_CREACION_MIN,
+        limiteInicio,
+      ),
+      Math.max(limiteInicio, limiteFin - PASO_CREACION_MIN),
+    );
+    const yInicial = e.clientY;
+    setCreacion({
+      profesionalId,
+      inicioMin,
+      finMin: inicioMin + PASO_CREACION_MIN,
+      fase: "arrastrando",
+    });
+
+    function alMover(ev: MouseEvent) {
+      const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
+      const finBruto = inicioMin + PASO_CREACION_MIN + deltaMin;
+      const finSnap =
+        Math.round(finBruto / PASO_CREACION_MIN) * PASO_CREACION_MIN;
+      const finMin = Math.min(
+        Math.max(finSnap, inicioMin + PASO_CREACION_MIN),
+        limiteFin,
+      );
+      setCreacion((actual) =>
+        actual && actual.fase === "arrastrando"
+          ? { ...actual, finMin }
+          : actual,
+      );
+    }
+    function alSoltar() {
+      window.removeEventListener("mousemove", alMover);
+      window.removeEventListener("mouseup", alSoltar);
+      setCreacion((actual) =>
+        actual && actual.fase === "arrastrando"
+          ? { ...actual, fase: "menu" }
+          : null,
+      );
+    }
+    window.addEventListener("mousemove", alMover);
+    window.addEventListener("mouseup", alSoltar);
+  }
+
   // Rango de horas a mostrar: el de los turnos de ese día si hay alguno,
   // si no el de las citas ya puestas, y si tampoco hay nada, un horario
   // razonable por defecto — para que un día vacío no se quede sin eje.
   const { minInicio, maxFin } = useMemo(() => {
-    const citasConMinutos = citas.map((c) => ({ desdeMin: minutosEnMadrid(c.inicio), hastaMin: minutosEnMadrid(c.fin) }));
+    const citasConMinutos = citas.map((c) => ({
+      desdeMin: minutosEnMadrid(c.inicio),
+      hastaMin: minutosEnMadrid(c.fin),
+    }));
     return rangoHorario(
       columnas.map((c) => c.id),
       horarios,
-      citasConMinutos
+      citasConMinutos,
     );
   }, [horarios, citas, columnas]);
 
@@ -323,13 +504,20 @@ export default function CalendarioDia({
     return () => clearInterval(id);
   }, []);
   const ahoraMin = minutosEnMadrid(ahoraISO);
-  const posicionAhora = Math.min(Math.max(ahoraMin, minInicioVisual), maxFinVisual);
+  const posicionAhora = Math.min(
+    Math.max(ahoraMin, minInicioVisual),
+    maxFinVisual,
+  );
 
   if (cargando && citas.length === 0) {
     return <p className="text-sm text-stone-500">Cargando…</p>;
   }
   if (columnas.length === 0) {
-    return <p className="text-sm text-stone-500">No hay ningún barbero de turno ese día en esta sede.</p>;
+    return (
+      <p className="text-sm text-stone-500">
+        No hay ningún barbero de turno ese día en esta sede.
+      </p>
+    );
   }
 
   return (
@@ -340,8 +528,17 @@ export default function CalendarioDia({
           <div className="sticky top-0 z-20 flex border-b border-stone-200 bg-white">
             <div className="w-16 shrink-0" />
             {columnas.map((col) => (
-              <div key={col.id} className="flex flex-1 items-center justify-center gap-1.5 border-l border-stone-100 p-2 text-center text-sm font-medium text-stone-900">
-                {col.id !== ID_SIN_ASIGNAR && <AvatarProfesional fotoUrl={col.foto_url} nombre={col.nombre} className="h-5 w-5" />}
+              <div
+                key={col.id}
+                className="flex flex-1 items-center justify-center gap-1.5 border-l border-stone-100 p-2 text-center text-sm font-medium text-stone-900"
+              >
+                {col.id !== ID_SIN_ASIGNAR && (
+                  <AvatarProfesional
+                    fotoUrl={col.foto_url}
+                    nombre={col.nombre}
+                    className="h-5 w-5"
+                  />
+                )}
                 {col.nombre}
               </div>
             ))}
@@ -357,13 +554,25 @@ export default function CalendarioDia({
                     className="absolute right-2 -translate-y-1/2 text-[11px] text-stone-400"
                     style={{ top: (m - minInicioVisual) * PX_POR_MINUTO }}
                   >
-                    {String(Math.floor(m / 60)).padStart(2, "0")}:{String(m % 60).padStart(2, "0")}
+                    {String(Math.floor(m / 60)).padStart(2, "0")}:
+                    {String(m % 60).padStart(2, "0")}
                   </div>
                 ))}
               </div>
 
               {columnas.map((col) => (
-                <div key={col.id} className="relative flex-1 border-l border-stone-100">
+                <div
+                  key={col.id}
+                  onMouseDown={
+                    col.id !== ID_SIN_ASIGNAR
+                      ? (e) => iniciarCreacion(e, col.id, minInicio, maxFin)
+                      : undefined
+                  }
+                  className={
+                    "relative flex-1 border-l border-stone-100" +
+                    (col.id !== ID_SIN_ASIGNAR ? " cursor-crosshair" : "")
+                  }
+                >
                   {/* Franjas "cerrado" (antes de abrir / después de cerrar): puramente
                       visuales, con rayado, para orientarse — nunca se puede arrastrar
                       nada hasta aquí (los límites de arrastre siguen siendo minInicio
@@ -394,13 +603,21 @@ export default function CalendarioDia({
                   {marcas.map((m) => (
                     <div
                       key={m}
-                      className={"absolute inset-x-0 border-t " + (m % 60 === 0 ? "border-stone-200" : "border-stone-100")}
+                      className={
+                        "absolute inset-x-0 border-t " +
+                        (m % 60 === 0 ? "border-stone-200" : "border-stone-100")
+                      }
                       style={{ top: (m - minInicioVisual) * PX_POR_MINUTO }}
                     />
                   ))}
 
                   {esHoy && (
-                    <div className="absolute inset-x-0 z-10 border-t-2 border-red-500" style={{ top: (posicionAhora - minInicioVisual) * PX_POR_MINUTO }}>
+                    <div
+                      className="absolute inset-x-0 z-10 border-t-2 border-red-500"
+                      style={{
+                        top: (posicionAhora - minInicioVisual) * PX_POR_MINUTO,
+                      }}
+                    >
                       <div className="absolute -left-0.5 -top-1 h-2 w-2 rounded-full bg-red-500" />
                     </div>
                   )}
@@ -409,20 +626,44 @@ export default function CalendarioDia({
                     const descanso = descansoPorColumna.get(col.id);
                     if (!descanso) return null;
                     const enArrastre = arrastrando?.profesionalId === col.id;
-                    const desde = enArrastre ? arrastrando!.inicioMin : minutosDeHora(descanso.hora_inicio);
-                    const hasta = enArrastre ? arrastrando!.inicioMin + arrastrando!.duracionMin : minutosDeHora(descanso.hora_fin);
+                    const desde = enArrastre
+                      ? arrastrando!.inicioMin
+                      : minutosDeHora(descanso.hora_inicio);
+                    const hasta = enArrastre
+                      ? arrastrando!.inicioMin + arrastrando!.duracionMin
+                      : minutosDeHora(descanso.hora_fin);
                     const top = (desde - minInicioVisual) * PX_POR_MINUTO;
                     const alto = (hasta - desde) * PX_POR_MINUTO;
                     return (
                       <div
                         key="descanso"
-                        onMouseDown={(e) => iniciarArrastreDescanso(e, col.id, minutosDeHora(descanso.hora_inicio), minutosDeHora(descanso.hora_fin), minInicio, maxFin)}
+                        onMouseDown={(e) => {
+                          // Siempre se para aquí, incluso cuando la función de abajo no
+                          // hace nada (barbero, sin permiso): si no, el mousedown seguiría
+                          // subiendo hasta la columna y dispararía por error una creación
+                          // nueva justo encima del descanso.
+                          e.stopPropagation();
+                          iniciarArrastreDescanso(
+                            e,
+                            col.id,
+                            minutosDeHora(descanso.hora_inicio),
+                            minutosDeHora(descanso.hora_fin),
+                            minInicio,
+                            maxFin,
+                          );
+                        }}
                         className={
                           "absolute inset-x-0 z-10 flex items-center justify-center border-y border-stone-700 bg-stone-800/90 text-[11px] font-medium text-white " +
-                          (esAdmin ? "cursor-grab select-none active:cursor-grabbing" : "")
+                          (esAdmin
+                            ? "cursor-grab select-none active:cursor-grabbing"
+                            : "")
                         }
                         style={{ top, height: alto }}
-                        title={esAdmin ? "Descanso — arrástralo para moverlo solo este día" : "Descanso"}
+                        title={
+                          esAdmin
+                            ? "Descanso — arrástralo para moverlo solo este día"
+                            : "Descanso"
+                        }
                       >
                         Descanso {horaDeMinutos(desde)}–{horaDeMinutos(hasta)}
                         {descanso.esExcepcion && " *"}
@@ -430,19 +671,75 @@ export default function CalendarioDia({
                     );
                   })()}
 
+                  {(bloqueosPorColumna.get(col.id) ?? []).map((b) => {
+                    const top = (b.desdeMin - minInicioVisual) * PX_POR_MINUTO;
+                    const alto = (b.hastaMin - b.desdeMin) * PX_POR_MINUTO;
+                    return (
+                      <div
+                        key={b.id}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="absolute inset-x-0 z-10 flex items-center justify-center overflow-hidden border-y border-stone-400 bg-stone-300/80 px-1 text-center text-[11px] font-medium text-stone-600"
+                        style={{
+                          top,
+                          height: alto,
+                          backgroundImage:
+                            "repeating-linear-gradient(135deg, rgba(87,83,78,0.18) 0, rgba(87,83,78,0.18) 6px, transparent 6px, transparent 12px)",
+                        }}
+                        title={
+                          b.motivo ? `Bloqueado: ${b.motivo}` : "Bloqueado"
+                        }
+                      >
+                        Bloqueado{b.motivo ? ` · ${b.motivo}` : ""}
+                      </div>
+                    );
+                  })}
+
+                  {creacion && creacion.profesionalId === col.id && (
+                    <div
+                      className="absolute inset-x-0.5 z-30 flex items-center justify-center rounded-sm border-2 border-dashed border-blue-500 bg-blue-400/20 text-[11px] font-medium text-blue-700"
+                      style={{
+                        top:
+                          (creacion.inicioMin - minInicioVisual) *
+                          PX_POR_MINUTO,
+                        height:
+                          (creacion.finMin - creacion.inicioMin) *
+                          PX_POR_MINUTO,
+                      }}
+                    >
+                      {horaDeMinutos(creacion.inicioMin)}–
+                      {horaDeMinutos(creacion.finMin)}
+                    </div>
+                  )}
+
                   {(citasPorColumna.get(col.id) ?? []).map((cita) => {
                     const enArrastreCita = arrastrandoCita?.citaId === cita.id;
-                    const desde = enArrastreCita ? arrastrandoCita!.inicioMin : minutosEnMadrid(cita.inicio);
+                    const desde = enArrastreCita
+                      ? arrastrandoCita!.inicioMin
+                      : minutosEnMadrid(cita.inicio);
                     const hasta = enArrastreCita
-                      ? arrastrandoCita!.inicioMin + arrastrandoCita!.duracionMin
+                      ? arrastrandoCita!.inicioMin +
+                        arrastrandoCita!.duracionMin
                       : minutosEnMadrid(cita.fin);
                     const top = (desde - minInicioVisual) * PX_POR_MINUTO;
-                    const alto = Math.max(ALTURA_MINIMA_BLOQUE, (hasta - desde) * PX_POR_MINUTO);
-                    const sePuedeArrastrar = esAdmin && cita.estado === "confirmada" && Boolean(cita.profesional?.id);
+                    const alto = Math.max(
+                      ALTURA_MINIMA_BLOQUE,
+                      (hasta - desde) * PX_POR_MINUTO,
+                    );
+                    const sePuedeArrastrar =
+                      esAdmin &&
+                      cita.estado === "confirmada" &&
+                      Boolean(cita.profesional?.id);
                     return (
                       <button
                         key={cita.id}
-                        onMouseDown={(e) => iniciarArrastreCita(e, cita, minInicio, maxFin)}
+                        onMouseDown={(e) => {
+                          // Igual que en el descanso de arriba: siempre se para aquí para
+                          // que un mousedown sobre una cita nunca dispare por error una
+                          // creación nueva en la columna, aunque no se pueda arrastrar
+                          // esta cita en concreto (barbero, o cita no confirmada).
+                          e.stopPropagation();
+                          iniciarArrastreCita(e, cita, minInicio, maxFin);
+                        }}
                         onClick={() => {
                           if (ultimoArrastreCitaRef.current) return; // fue un arrastre, no un click
                           setSeleccionada(cita);
@@ -451,26 +748,64 @@ export default function CalendarioDia({
                         className={
                           "absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md disabled:opacity-60 " +
                           claseBloque(cita.estado) +
-                          (sePuedeArrastrar ? " cursor-grab active:cursor-grabbing" : "") +
+                          (sePuedeArrastrar
+                            ? " cursor-grab active:cursor-grabbing"
+                            : "") +
                           (enArrastreCita ? " z-30 shadow-lg" : "")
                         }
-                        style={{ top, height: alto, ...(cita.estado !== "cancelada" ? estiloColorServicio(cita.servicio?.color) : {}) }}
-                        title={sePuedeArrastrar ? "Arrástrala para cambiarla de hora" : undefined}
+                        style={{
+                          top,
+                          height: alto,
+                          ...(cita.estado !== "cancelada"
+                            ? estiloColorServicio(cita.servicio?.color)
+                            : {}),
+                        }}
+                        title={
+                          sePuedeArrastrar
+                            ? "Arrástrala para cambiarla de hora"
+                            : undefined
+                        }
                       >
                         <div className="flex items-center gap-1">
                           {cita.profesional_elegido_por_cliente && (
-                            <span className="text-red-500" title="El cliente pidió a este profesional en concreto">♥</span>
+                            <span
+                              className="text-red-500"
+                              title="El cliente pidió a este profesional en concreto"
+                            >
+                              ♥
+                            </span>
                           )}
-                          {cita.estado === "completada" && <span className="text-emerald-600" title="Completada">✓</span>}
+                          {cita.estado === "completada" && (
+                            <span
+                              className="text-emerald-600"
+                              title="Completada"
+                            >
+                              ✓
+                            </span>
+                          )}
                           {cita.estado === "completada" && cita.metodo_pago && (
-                            <span className="text-emerald-600" title="Pagada">$</span>
+                            <span className="text-emerald-600" title="Pagada">
+                              $
+                            </span>
                           )}
-                          {cita.estado === "no_presentada" && <span className="text-amber-600" title="No presentada">!</span>}
+                          {cita.estado === "no_presentada" && (
+                            <span
+                              className="text-amber-600"
+                              title="No presentada"
+                            >
+                              !
+                            </span>
+                          )}
                           <div className="truncate font-medium">
-                            {formatoHora(cita.inicio)} · {cita.cliente?.nombre ?? "Cliente"}
+                            {formatoHora(cita.inicio)} ·{" "}
+                            {cita.cliente?.nombre ?? "Cliente"}
                           </div>
                         </div>
-                        {alto >= 34 && <div className="truncate text-stone-500">{cita.servicio?.nombre}</div>}
+                        {alto >= 34 && (
+                          <div className="truncate text-stone-500">
+                            {cita.servicio?.nombre}
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -497,6 +832,264 @@ export default function CalendarioDia({
           onAvisarDisponible={() => onAvisarDisponible(seleccionada.id)}
         />
       )}
+
+      {creacion && creacion.fase !== "arrastrando" && (
+        <MenuCreacion
+          sedeId={sedeId}
+          fecha={fecha}
+          profesionalId={creacion.profesionalId}
+          profesionalNombre={
+            columnas.find((c) => c.id === creacion.profesionalId)?.nombre ?? ""
+          }
+          inicioMin={creacion.inicioMin}
+          finMin={creacion.finMin}
+          fase={creacion.fase}
+          servicios={servicios}
+          onCambiarFase={(fase) =>
+            setCreacion((actual) => (actual ? { ...actual, fase } : actual))
+          }
+          onCerrar={() => setCreacion(null)}
+          onCreado={() => {
+            setCreacion(null);
+            onCreado();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Menú que aparece al soltar el arrastre de creación (ver iniciarCreacion
+// más arriba): primero ofrece elegir entre "Bloqueo de agenda" y "Nueva
+// cita", y según lo que se elija muestra un formulario mínimo para esa
+// franja — ya con barbero y hora fijados por el propio arrastre, así que
+// no hay que volver a elegirlos.
+function MenuCreacion({
+  sedeId,
+  fecha,
+  profesionalId,
+  profesionalNombre,
+  inicioMin,
+  finMin,
+  fase,
+  servicios,
+  onCambiarFase,
+  onCerrar,
+  onCreado,
+}: {
+  sedeId: string;
+  fecha: string;
+  profesionalId: string;
+  profesionalNombre: string;
+  inicioMin: number;
+  finMin: number;
+  fase: "menu" | "bloqueo" | "cita";
+  servicios: ServicioOpcion[];
+  onCambiarFase: (fase: "menu" | "bloqueo" | "cita") => void;
+  onCerrar: () => void;
+  onCreado: () => void;
+}) {
+  const [duracionMin, setDuracionMin] = useState(
+    Math.max(5, finMin - inicioMin),
+  );
+  const [motivo, setMotivo] = useState("");
+  const [servicioId, setServicioId] = useState(servicios[0]?.id ?? "");
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function guardarBloqueo() {
+    setEnviando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/bloqueos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sedeId,
+          profesionalId,
+          fecha,
+          horaInicio: horaDeMinutos(inicioMin),
+          horaFin: horaDeMinutos(inicioMin + duracionMin),
+          motivo: motivo || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "No se pudo crear el bloqueo.");
+        return;
+      }
+      onCreado();
+    } catch {
+      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function guardarCita() {
+    if (!servicioId || !nombre || !telefono) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/citas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sedeId,
+          servicioId,
+          profesionalId,
+          fecha,
+          horaInicioISO: isoDesdeMadrid(fecha, horaDeMinutos(inicioMin)),
+          cliente: { nombre, telefono },
+          aceptaComercial: false,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "No se pudo crear la cita.");
+        return;
+      }
+      onCreado();
+    } catch {
+      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      onClick={onCerrar}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3">
+          <div className="text-lg font-bold text-stone-900">
+            {horaDeMinutos(inicioMin)} – {horaDeMinutos(finMin)}
+          </div>
+          <div className="text-sm text-stone-500">{profesionalNombre}</div>
+        </div>
+
+        {fase === "menu" && (
+          <div className="space-y-2">
+            <button
+              onClick={() => onCambiarFase("bloqueo")}
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-left text-sm font-medium text-stone-800 hover:border-stone-400"
+            >
+              Bloqueo de agenda
+            </button>
+            <button
+              onClick={() => onCambiarFase("cita")}
+              className="w-full rounded-lg bg-brand-yellow px-3 py-2 text-left text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark"
+            >
+              Nueva cita
+            </button>
+          </div>
+        )}
+
+        {fase === "bloqueo" && (
+          <div className="space-y-3">
+            <label className="block text-sm text-stone-600">
+              Duración (minutos)
+              <input
+                type="number"
+                min={5}
+                step={5}
+                value={duracionMin}
+                onChange={(e) =>
+                  setDuracionMin(
+                    Math.max(
+                      5,
+                      Math.round((Number(e.target.value) || 5) / 5) * 5,
+                    ),
+                  )
+                }
+                className="mt-1 w-full rounded-lg border border-stone-300 p-2 text-sm"
+              />
+            </label>
+            <input
+              placeholder="Motivo (opcional)"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+            />
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex gap-2">
+              <button
+                disabled={enviando}
+                onClick={guardarBloqueo}
+                className="flex-1 rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {enviando ? "Guardando…" : "Bloquear"}
+              </button>
+              <button
+                onClick={onCerrar}
+                className="rounded-lg bg-stone-100 px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-200"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {fase === "cita" && (
+          <div className="space-y-3">
+            <select
+              value={servicioId}
+              onChange={(e) => setServicioId(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+            >
+              {servicios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+            <input
+              placeholder="Nombre del cliente"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+            />
+            <input
+              placeholder="Teléfono"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+            />
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex gap-2">
+              <button
+                disabled={!servicioId || !nombre || !telefono || enviando}
+                onClick={guardarCita}
+                className="flex-1 rounded-lg bg-brand-yellow px-3 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+              >
+                {enviando ? "Guardando…" : "Guardar cita"}
+              </button>
+              <button
+                onClick={onCerrar}
+                className="rounded-lg bg-stone-100 px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-200"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {fase === "menu" && (
+          <button
+            onClick={onCerrar}
+            className="mt-3 w-full rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-200"
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -517,14 +1110,22 @@ function DetalleCitaPanel({
   onAvisarDisponible: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10" onClick={onCerrar}>
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      onClick={onCerrar}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-stone-900">
               {formatoHora(cita.inicio)} – {formatoHora(cita.fin)}
             </div>
-            <div className="text-sm text-stone-500">{cita.cliente?.nombre ?? "Cliente"}</div>
+            <div className="text-sm text-stone-500">
+              {cita.cliente?.nombre ?? "Cliente"}
+            </div>
           </div>
           <span
             className={
@@ -532,10 +1133,10 @@ function DetalleCitaPanel({
               (cita.estado === "cancelada"
                 ? "bg-red-100 text-red-700"
                 : cita.estado === "completada"
-                ? "bg-green-100 text-green-700"
-                : cita.estado === "no_presentada"
-                ? "bg-amber-100 text-amber-700"
-                : "bg-stone-100 text-stone-700")
+                  ? "bg-green-100 text-green-700"
+                  : cita.estado === "no_presentada"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-stone-100 text-stone-700")
             }
           >
             {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
@@ -550,11 +1151,18 @@ function DetalleCitaPanel({
           <div className="flex items-center gap-1.5">
             <span className="text-stone-400">Barbero: </span>
             {cita.profesional && (
-              <AvatarProfesional fotoUrl={cita.profesional.foto_url} nombre={cita.profesional.nombre} className="h-5 w-5" />
+              <AvatarProfesional
+                fotoUrl={cita.profesional.foto_url}
+                nombre={cita.profesional.nombre}
+                className="h-5 w-5"
+              />
             )}
             {cita.profesional?.nombre ?? "Sin asignar"}
             {cita.profesional_elegido_por_cliente && (
-              <span className="ml-1 text-red-500" title="El cliente pidió a este profesional en concreto">
+              <span
+                className="ml-1 text-red-500"
+                title="El cliente pidió a este profesional en concreto"
+              >
                 ♥
               </span>
             )}
@@ -610,7 +1218,10 @@ function DetalleCitaPanel({
           )}
         </div>
 
-        <button onClick={onCerrar} className="mt-4 rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200">
+        <button
+          onClick={onCerrar}
+          className="mt-4 rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200"
+        >
           Cerrar
         </button>
       </div>

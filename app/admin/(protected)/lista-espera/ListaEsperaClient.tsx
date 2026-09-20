@@ -15,13 +15,19 @@ interface Entrada {
   flexibilidad_dias: number;
   estado: Estado;
   created_at: string;
-  cliente: { nombre: string; telefono: string | null } | { nombre: string; telefono: string | null }[] | null;
+  cliente:
+    | { nombre: string; telefono: string | null }
+    | { nombre: string; telefono: string | null }[]
+    | null;
   servicio: { nombre: string } | { nombre: string }[] | null;
-  profesional: { nombre: string; foto_url?: string | null } | { nombre: string; foto_url?: string | null }[] | null;
+  profesional:
+    | { nombre: string; foto_url?: string | null }
+    | { nombre: string; foto_url?: string | null }[]
+    | null;
 }
 
 function uno<T>(v: T | T[] | null): T | null {
-  return Array.isArray(v) ? v[0] ?? null : v;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
 function formatoFechaLarga(fechaISO: string) {
@@ -35,10 +41,17 @@ function formatoFechaLarga(fechaISO: string) {
 }
 
 function formatoFechaAlta(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", timeZone: "Europe/Madrid" });
+  return new Date(iso).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Madrid",
+  });
 }
 
-const ETIQUETA_ESTADO: Record<Estado, string> = { pendiente: "Pendiente", notificado: "Notificado" };
+const ETIQUETA_ESTADO: Record<Estado, string> = {
+  pendiente: "Pendiente",
+  notificado: "Notificado",
+};
 
 /**
  * Pestaña "Lista de espera" del panel: las entradas de quien sigue
@@ -86,7 +99,7 @@ export default function ListaEsperaClient({ sedes }: { sedes: Sede[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {sedes.map((s) => (
           <button
             key={s.id}
@@ -105,38 +118,57 @@ export default function ListaEsperaClient({ sedes }: { sedes: Sede[] }) {
 
       {cargando && <p className="text-sm text-stone-400">Cargando…</p>}
       {!cargando && grupos.length === 0 && (
-        <p className="text-sm text-stone-400">Nadie está esperando un hueco en esta sede ahora mismo.</p>
+        <p className="text-sm text-stone-400">
+          Nadie está esperando un hueco en esta sede ahora mismo.
+        </p>
       )}
 
       <div className="space-y-5">
         {grupos.map(([fecha, entradasDelDia]) => (
           <div key={fecha}>
-            <h2 className="mb-2 text-sm font-semibold text-stone-800">{formatoFechaLarga(fecha)}</h2>
+            <h2 className="mb-2 text-sm font-semibold text-stone-800">
+              {formatoFechaLarga(fecha)}
+            </h2>
             <div className="space-y-2">
               {entradasDelDia.map((e) => {
                 const cliente = uno(e.cliente);
                 const servicio = uno(e.servicio);
                 const profesional = uno(e.profesional);
                 return (
-                  <div key={e.id} className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-2.5 text-sm">
+                  <div
+                    key={e.id}
+                    className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-2.5 text-sm"
+                  >
                     <div>
-                      <p className="font-medium text-stone-900">{cliente?.nombre ?? "Cliente"}</p>
+                      <p className="font-medium text-stone-900">
+                        {cliente?.nombre ?? "Cliente"}
+                      </p>
                       <p className="flex items-center gap-1 text-xs text-stone-500">
-                        {profesional && <AvatarProfesional fotoUrl={profesional.foto_url} nombre={profesional.nombre} className="h-4 w-4" />}
+                        {profesional && (
+                          <AvatarProfesional
+                            fotoUrl={profesional.foto_url}
+                            nombre={profesional.nombre}
+                            className="h-4 w-4"
+                          />
+                        )}
                         <span>
                           {cliente?.telefono && `${cliente.telefono} · `}
-                          {servicio?.nombre ?? "Servicio"} · {profesional?.nombre ?? "Cualquiera"}
+                          {servicio?.nombre ?? "Servicio"} ·{" "}
+                          {profesional?.nombre ?? "Cualquiera"}
                         </span>
                       </p>
                       <p className="text-xs text-stone-400">
-                        Le vale {etiquetaFlexibilidad(e.flexibilidad_dias)} · apuntado el {formatoFechaAlta(e.created_at)}
+                        Le vale {etiquetaFlexibilidad(e.flexibilidad_dias)} ·
+                        apuntado el {formatoFechaAlta(e.created_at)}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <span
                         className={
                           "rounded-full px-2 py-0.5 text-xs " +
-                          (e.estado === "notificado" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700")
+                          (e.estado === "notificado"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-amber-100 text-amber-700")
                         }
                       >
                         {ETIQUETA_ESTADO[e.estado]}

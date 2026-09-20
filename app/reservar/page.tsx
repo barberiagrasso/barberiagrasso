@@ -13,10 +13,15 @@ export default async function ReservarPage() {
   const supabase = createPublicClient();
 
   const [{ data: sedes }, { data: servicios }] = await Promise.all([
-    supabase.from("sedes").select("id, nombre, slug, direccion, telefono, activo").order("nombre"),
+    supabase
+      .from("sedes")
+      .select("id, nombre, slug, direccion, telefono, activo")
+      .order("nombre"),
     supabase
       .from("servicios")
-      .select("id, nombre, descripcion, duracion_minutos, precio_centimos, activo, categoria, orden, precio_variable")
+      .select(
+        "id, nombre, descripcion, duracion_minutos, precio_centimos, activo, categoria, orden, precio_variable",
+      )
       .order("orden"),
   ]);
 
@@ -30,16 +35,16 @@ export default async function ReservarPage() {
         className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-40"
         style={{ backgroundImage: "url(/media/texturas/reservar-bg.jpg)" }}
       />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-brand-black/70" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-brand-black/70"
+      />
 
       <div className="relative mx-auto max-w-xl">
         <div className="mb-10 flex flex-col items-center text-center">
           <GrassoLogo className="h-auto w-28 text-brand-white sm:w-32" />
           <p className="mt-4 font-heading text-lg italic text-brand-white-dim">
             Reserva tu cita
-          </p>
-          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-brand-white-dim">
-            Los Molinos · Avenida de las Ciudades
           </p>
         </div>
         <InstalarApp />

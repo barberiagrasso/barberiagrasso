@@ -14,48 +14,111 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdminApi();
   } catch (err) {
-    if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err instanceof NoAutorizadoError)
+      return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
   }
 
   const sedeId = request.nextUrl.searchParams.get("sedeId");
-  if (!sedeId) return NextResponse.json({ error: "Falta sedeId." }, { status: 400 });
+  if (!sedeId)
+    return NextResponse.json({ error: "Falta sedeId." }, { status: 400 });
 
   const supabase = createAdminClient();
   const { data: bloqueos, error } = await supabase
     .from("bloqueos")
-    .select("id, profesional_id, fecha_inicio, fecha_fin, motivo, profesional:profesionales(nombre, foto_url)")
+    .select(
+      "id, profesional_id, fecha_inicio, fecha_fin, motivo, profesional:profesionales(nombre, foto_url)",
+    )
     .eq("sede_id", sedeId)
     .gte("fecha_fin", new Date().toISOString())
     .order("fecha_inicio");
 
-  if (error) return NextResponse.json({ error: "No se pudieron cargar los bloqueos." }, { status: 500 });
+  if (error)
+    return NextResponse.json(
+      { error: "No se pudieron cargar los bloqueos." },
+      { status: 500 },
+    );
   return NextResponse.json({ bloqueos });
 }
 
 // Crea un bloqueo. `profesionalId: null` bloquea toda la sede (por
 // ejemplo, un festivo). `fecha`/`fechaFin` son días completos en
 // formato YYYY-MM-DD, en la hora local del negocio.
+//
+// Variante de franja horaria (usada por el arrastre de "Bloqueo de
+// agenda" en la Agenda, ver CalendarioDia.tsx): si llegan `horaInicio` y
+// `horaFin` ("HH:mm"), el bloqueo no cubre el día entero sino solo esa
+// franja de `fecha` — siempre para un profesional concreto (bloquear
+// unos minutos de "toda la sede" no tiene sentido, a diferencia del
+// cierre de día completo). `fechaFin` se ignora en ese caso: la franja
+// nunca cruza de un día a otro.
 export async function POST(request: NextRequest) {
   try {
     await requireAdminApi();
   } catch (err) {
-    if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err instanceof NoAutorizadoError)
+      return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
   }
 
   const body = await request.json().catch(() => null);
-  if (!body?.sedeId || !body?.fecha || !body?.fechaFin) {
-    return NextResponse.json({ error: "Faltan sedeId, fecha y fechaFin." }, { status: 400 });
+  const horaInicio =
+    typeof body?.horaInicio === "string" ? body.horaInicio : null;
+  const horaFin = typeof body?.horaFin === "string" ? body.horaFin : null;
+
+  if (!body?.sedeId || !body?.fecha) {
+    return NextResponse.json(
+      { error: "Faltan sedeId y fecha." },
+      { status: 400 },
+    );
   }
 
-  const inicioLocal = startOfDay(parse(body.fecha, "yyyy-MM-dd", new Date()));
-  const finLocal = endOfDay(parse(body.fechaFin, "yyyy-MM-dd", new Date()));
-  const fechaInicio = fromZonedTime(inicioLocal, TZ);
-  const fechaFin = fromZonedTime(finLocal, TZ);
+  let fechaInicio: Date;
+  let fechaFin: Date;
+
+  if (horaInicio || horaFin) {
+    if (!horaInicio || !horaFin) {
+      return NextResponse.json(
+        { error: "Faltan horaInicio y horaFin." },
+        { status: 400 },
+      );
+    }
+    if (!body.profesionalId) {
+      return NextResponse.json(
+        { error: "Un bloqueo con hora necesita un profesional concreto." },
+        { status: 400 },
+      );
+    }
+    const inicioLocal = parse(
+      `${body.fecha} ${horaInicio}`,
+      "yyyy-MM-dd HH:mm",
+      new Date(),
+    );
+    const finLocal = parse(
+      `${body.fecha} ${horaFin}`,
+      "yyyy-MM-dd HH:mm",
+      new Date(),
+    );
+    fechaInicio = fromZonedTime(inicioLocal, TZ);
+    fechaFin = fromZonedTime(finLocal, TZ);
+  } else {
+    if (!body?.fechaFin) {
+      return NextResponse.json(
+        { error: "Faltan sedeId, fecha y fechaFin." },
+        { status: 400 },
+      );
+    }
+    const inicioLocal = startOfDay(parse(body.fecha, "yyyy-MM-dd", new Date()));
+    const finLocal = endOfDay(parse(body.fechaFin, "yyyy-MM-dd", new Date()));
+    fechaInicio = fromZonedTime(inicioLocal, TZ);
+    fechaFin = fromZonedTime(finLocal, TZ);
+  }
 
   if (fechaFin < fechaInicio) {
-    return NextResponse.json({ error: "La fecha de fin no puede ser anterior a la de inicio." }, { status: 400 });
+    return NextResponse.json(
+      { error: "La fecha de fin no puede ser anterior a la de inicio." },
+      { status: 400 },
+    );
   }
 
   const supabase = createAdminClient();
@@ -71,6 +134,10 @@ export async function POST(request: NextRequest) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: "No se pudo crear el bloqueo." }, { status: 500 });
+  if (error)
+    return NextResponse.json(
+      { error: "No se pudo crear el bloqueo." },
+      { status: 500 },
+    );
   return NextResponse.json({ bloqueo });
 }

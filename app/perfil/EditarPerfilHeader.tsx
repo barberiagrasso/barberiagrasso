@@ -90,7 +90,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-heading text-lg text-brand-white">Editar perfil</h2>
+          <h2 className="font-heading text-lg italic text-brand-white">Editar perfil</h2>
           <button onClick={onCerrar} className="text-brand-white-dim hover:text-brand-white" aria-label="Cerrar">
             <IconX className="h-5 w-5" />
           </button>
@@ -130,7 +130,11 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
               type="date"
               value={fechaNacimiento}
               onChange={(e) => setFechaNacimiento(e.target.value)}
-              className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white focus:border-brand-yellow focus:outline-none"
+              // [color-scheme:dark] hace que el propio selector nativo del
+              // navegador (icono y calendario emergente) se pinte en modo
+              // oscuro en vez de con los colores claros por defecto, que
+              // desentonaban con el resto de la interfaz de marca.
+              className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white focus:border-brand-yellow focus:outline-none [color-scheme:dark]"
             />
             <span className="mt-1 block font-body text-xs text-brand-white-dim">
               Cuéntanoslo y te mandamos una sorpresa por WhatsApp ese día. Es opcional.
