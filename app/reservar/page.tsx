@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { requireCliente } from "@/lib/clienteAuth";
 import BookingFlow from "./BookingFlow";
@@ -48,16 +49,21 @@ export default async function ReservarPage() {
           </p>
         </div>
         <InstalarApp />
-        <BookingFlow
-          sedes={sedes ?? []}
-          servicios={servicios ?? []}
-          clienteInicial={{
-            nombre: cliente.nombre,
-            telefono: cliente.telefono,
-            email: cliente.email,
-            saldoFidelizacionCentimos: cliente.saldo_fidelizacion_centimos ?? 0,
-          }}
-        />
+        {/* BookingFlow usa useSearchParams (para recoger la propuesta que
+            venga del buscador de la portada, ver AsistenteReservaInicio) —
+            Next.js exige envolverlo en Suspense por eso. */}
+        <Suspense fallback={null}>
+          <BookingFlow
+            sedes={sedes ?? []}
+            servicios={servicios ?? []}
+            clienteInicial={{
+              nombre: cliente.nombre,
+              telefono: cliente.telefono,
+              email: cliente.email,
+              saldoFidelizacionCentimos: cliente.saldo_fidelizacion_centimos ?? 0,
+            }}
+          />
+        </Suspense>
       </div>
     </main>
   );

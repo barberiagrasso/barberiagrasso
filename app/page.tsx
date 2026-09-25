@@ -3,6 +3,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { requireCliente } from "@/lib/clienteAuth";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
+import { AsistenteReservaInicio } from "@/components/reservar/AsistenteReservaInicio";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,11 @@ export default async function Home() {
         >
           Reservar cita
         </Link>
+
+        <div className="mt-5 w-full max-w-xs text-left sm:max-w-sm">
+          <AsistenteReservaInicio />
+        </div>
+
         <Link
           href="/perfil"
           className="mt-4 rounded-full border border-brand-yellow/50 px-6 py-2.5 font-body text-sm font-semibold text-brand-yellow transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"

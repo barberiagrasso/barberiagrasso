@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   Sede,
   Servicio,
@@ -10,7 +11,6 @@ import type {
 } from "@/lib/types";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
-import { AsistenteReserva } from "@/components/reservar/AsistenteReserva";
 import type { OpcionPropuestaCita } from "@/lib/asistenteReserva";
 
 // Cuántos meses hacia delante del actual se puede navegar en el
@@ -368,9 +368,11 @@ export default function BookingFlow({
   servicios,
   clienteInicial,
 }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [paso, setPaso] = useState<Paso>("sede");
   // true cuando la cita en curso viene de aceptar una propuesta del
-  // buscador de AsistenteReserva (dentro del paso "Sede") en vez de
+  // buscador de la portada (ver AsistenteReservaInicio) en vez de
   // elegirse a mano paso a paso — solo afecta a qué "origen" se manda a
   // /api/citas (para el desglose por canal de los informes), nada más.
   const [viaAsistente, setViaAsistente] = useState(false);
@@ -679,15 +681,14 @@ export default function BookingFlow({
     });
   }
 
-  // El cliente aceptó una de las propuestas del buscador de
-  // AsistenteReserva (ver lib/asistenteReserva.ts), dentro del paso
-  // "Sede": se rellena el mismo estado que dejaría el paso a paso manual
-  // y se salta
-  // directamente a "datos" — así confirmarReserva no necesita saber de
-  // dónde vino la elección. profesionalId solo se fija si el cliente lo
-  // pidió expresamente por nombre; si no, se deja en null ("cualquiera")
-  // para que el corazón de "elegido por el cliente" de la Agenda siga
-  // significando lo mismo que en el resto de la app.
+  // El cliente aceptó una de las propuestas del buscador de IA (ver
+  // lib/asistenteReserva.ts): se rellena el mismo estado que dejaría el
+  // paso a paso manual y se salta directamente a "datos" — así
+  // confirmarReserva no necesita saber de dónde vino la elección.
+  // profesionalId solo se fija si el cliente lo pidió expresamente por
+  // nombre; si no, se deja en null ("cualquiera") para que el corazón de
+  // "elegido por el cliente" de la Agenda siga significando lo mismo que
+  // en el resto de la app.
   function elegirPropuestaAsistente(opcion: OpcionPropuestaCita) {
     setSedeId(opcion.sedeId);
     setServicioId(opcion.servicioId);
@@ -702,6 +703,37 @@ export default function BookingFlow({
     setViaAsistente(true);
     setPaso("datos");
   }
+
+  // El buscador de la portada (AsistenteReservaInicio) vive en OTRA
+  // página: no hay ningún estado de este componente que pueda rellenar
+  // directamente, así que le pasa la propuesta elegida como parámetro
+  // "propuesta" en la URL de /reservar. Al montar, si esa propuesta
+  // viene en la URL, se aplica exactamente igual que si se hubiera
+  // elegido aquí mismo (elegirPropuestaAsistente) y se limpia la URL
+  // para que un refresco de página no la vuelva a aplicar sola.
+  useEffect(() => {
+    const crudo = searchParams.get("propuesta");
+    if (!crudo) return;
+    router.replace("/reservar");
+    try {
+      const opcion = JSON.parse(crudo) as Partial<OpcionPropuestaCita>;
+      if (
+        typeof opcion.sedeId === "string" &&
+        typeof opcion.servicioId === "string" &&
+        typeof opcion.profesionalId === "string" &&
+        typeof opcion.profesionalNombre === "string" &&
+        typeof opcion.fecha === "string" &&
+        typeof opcion.horaInicioISO === "string" &&
+        Array.isArray(opcion.complementoIds)
+      ) {
+        elegirPropuestaAsistente(opcion as OpcionPropuestaCita);
+      }
+    } catch {
+      // Propuesta corrupta o manipulada a mano en la URL: se ignora en
+      // silencio y el cliente simplemente empieza el paso a paso normal.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Solo una franja horaria por hora visible (si "cualquiera" hay varios
   // profesionales libres a la misma hora, se muestra una sola opción).
@@ -766,7 +798,6 @@ export default function BookingFlow({
         {paso === "sede" && (
           <div className="space-y-3">
             <PasoTitulo>Elige tu sede</PasoTitulo>
-            <AsistenteReserva onElegirOpcion={elegirPropuestaAsistente} />
             {sedes.map((sede) => (
               <TarjetaOpcion
                 key={sede.id}
