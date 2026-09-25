@@ -18,12 +18,8 @@ import type { OpcionPropuestaCita } from "@/lib/asistenteReserva";
 const MESES_ADELANTE_MAX = 2;
 const NOMBRES_DIA_SEMANA = ["L", "M", "X", "J", "V", "S", "D"];
 
-// "inicio" (pantalla "¿Qué deseas?", ver AsistenteReserva) es un paso
-// opcional ANTES del recorrido de siempre: no cuenta como uno de los
-// nodos del Stepper (ver PASOS más abajo) porque no es "paso 1 de 6", es
-// un atajo alternativo a todo el recorrido.
 type Paso =
-  "inicio" | "sede" | "servicio" | "complementos" | "fecha" | "datos" | "confirmado";
+  "sede" | "servicio" | "complementos" | "fecha" | "datos" | "confirmado";
 
 // Los servicios "principales" (categoria = null) se muestran siempre
 // directamente en el paso de reserva. El resto vive dentro de un
@@ -372,11 +368,11 @@ export default function BookingFlow({
   servicios,
   clienteInicial,
 }: Props) {
-  const [paso, setPaso] = useState<Paso>("inicio");
-  // true cuando la cita en curso viene de aceptar una propuesta de la
-  // pantalla "¿Qué deseas?" en vez de elegirse a mano paso a paso — solo
-  // afecta a qué "origen" se manda a /api/citas (para el desglose por
-  // canal de los informes), nada más.
+  const [paso, setPaso] = useState<Paso>("sede");
+  // true cuando la cita en curso viene de aceptar una propuesta del
+  // buscador de AsistenteReserva (dentro del paso "Sede") en vez de
+  // elegirse a mano paso a paso — solo afecta a qué "origen" se manda a
+  // /api/citas (para el desglose por canal de los informes), nada más.
   const [viaAsistente, setViaAsistente] = useState(false);
   const [sedeId, setSedeId] = useState<string | null>(null);
   const [servicioId, setServicioId] = useState<string | null>(null);
@@ -683,9 +679,10 @@ export default function BookingFlow({
     });
   }
 
-  // El cliente aceptó una de las propuestas de la pantalla "¿Qué
-  // deseas?" (ver AsistenteReserva/lib/asistenteReserva.ts): se rellena
-  // el mismo estado que dejaría el paso a paso manual y se salta
+  // El cliente aceptó una de las propuestas del buscador de
+  // AsistenteReserva (ver lib/asistenteReserva.ts), dentro del paso
+  // "Sede": se rellena el mismo estado que dejaría el paso a paso manual
+  // y se salta
   // directamente a "datos" — así confirmarReserva no necesita saber de
   // dónde vino la elección. profesionalId solo se fija si el cliente lo
   // pidió expresamente por nombre; si no, se deja en null ("cualquiera")
@@ -764,18 +761,12 @@ export default function BookingFlow({
         {sedesTexto}
       </p>
       <div className="rounded-3xl border border-brand-line bg-brand-black-soft/60 p-5 shadow-2xl shadow-black/40 sm:p-8">
-        {paso !== "inicio" && <Stepper paso={paso} />}
-
-        {paso === "inicio" && (
-          <AsistenteReserva
-            onElegirOpcion={elegirPropuestaAsistente}
-            onOmitir={() => setPaso("sede")}
-          />
-        )}
+        <Stepper paso={paso} />
 
         {paso === "sede" && (
           <div className="space-y-3">
             <PasoTitulo>Elige tu sede</PasoTitulo>
+            <AsistenteReserva onElegirOpcion={elegirPropuestaAsistente} />
             {sedes.map((sede) => (
               <TarjetaOpcion
                 key={sede.id}

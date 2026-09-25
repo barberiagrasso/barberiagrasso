@@ -212,16 +212,3 @@ export function IconSend(props: IconProps) {
     </svg>
   );
 }
-
-// Destello/estrella — usado en la pantalla "¿Qué deseas?" de
-// app/reservar (asistente de reserva por IA, ver
-// components/reservar/AsistenteReserva.tsx) para diferenciarla del resto
-// de iconos "de barbería".
-export function IconSparkle(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.5 5.5l2.8 2.8M15.7 15.7l2.8 2.8M18.5 5.5l-2.8 2.8M8.3 15.7l-2.8 2.8" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}

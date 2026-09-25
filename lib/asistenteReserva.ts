@@ -6,11 +6,14 @@ import { fechaEnMadrid, horaEnMadrid, minutosDeHora } from "@/lib/horarioLocal";
 import type { FranjaDisponible } from "@/lib/types";
 
 // =====================================================================
-// "¿Qué deseas?" — pantalla nueva pedida por Diego (25/09/2026) antes del
-// paso a paso de app/reservar: el cliente escribe en una frase lo que
-// quiere y esto le propone una cita YA CONCRETA (sede, servicio, día,
-// hora y profesional reales) para que solo tenga que darle a "Elegir
-// esta cita", o escribir feedback y que se lo vuelva a proponer.
+// Buscador por texto libre pedido por Diego (25/09/2026), integrado
+// dentro del primer paso ("Sede") de app/reservar (ver
+// components/reservar/AsistenteReserva.tsx): el cliente escribe en una
+// frase lo que quiere y esto le propone una cita YA CONCRETA (sede,
+// servicio, día, hora y profesional reales) para que solo tenga que
+// darle a "Elegir esta cita", o escribir feedback y que se lo vuelva a
+// proponer. A propósito discreto: no sustituye al paso a paso, convive
+// con él en la misma pantalla.
 //
 // A propósito NUNCA reserva nada por su cuenta (a diferencia del
 // asistente de WhatsApp de lib/aiAssistant.ts, que sí crea la cita él

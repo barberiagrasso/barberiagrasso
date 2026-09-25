@@ -5,11 +5,13 @@ import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 
-// Pantalla "¿Qué deseas?" antes del paso a paso de app/reservar — ver
-// lib/asistenteReserva.ts. Público (todavía no se conoce al cliente en
-// este punto, igual que el resto de app/reservar), así que se frena por
-// IP igual que /api/citas; no hace falta límite por teléfono porque aquí
-// todavía no se ha pedido ninguno.
+// Buscador por texto libre del primer paso de app/reservar (ver
+// lib/asistenteReserva.ts y components/reservar/AsistenteReserva.tsx).
+// Sin comprobación de sesión, igual que /api/disponibilidad o
+// /api/profesionales (no necesita saber quién es el cliente para
+// proponer una cita), así que se frena por IP igual que /api/citas; no
+// hace falta límite por teléfono porque aquí todavía no se ha pedido
+// ninguno.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
 
