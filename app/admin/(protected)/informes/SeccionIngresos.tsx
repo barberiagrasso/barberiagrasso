@@ -32,7 +32,7 @@ interface Datos {
   porCanal: { canal: string; citas: number; ingresosCentimos: number }[];
 }
 
-const ETIQUETA_CANAL: Record<string, string> = { app: "Web", panel: "Panel (a mano)", whatsapp: "WhatsApp" };
+const ETIQUETA_CANAL: Record<string, string> = { app: "Web", app_asistente: "Asistente IA", panel: "Panel (a mano)", whatsapp: "WhatsApp" };
 
 export default function SeccionIngresos({
   sedeId,

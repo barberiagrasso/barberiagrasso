@@ -14,6 +14,7 @@ export type OrigenError =
   | "fidelizacion"
   | "aviso_disponibilidad"
   | "recibo_whatsapp"
+  | "asistente_reserva"
   | "recuperacion_password"
   | "aviso_alta"
   | "servidor";

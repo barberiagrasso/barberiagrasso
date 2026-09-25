@@ -49,6 +49,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // "app_asistente" cuando el cliente aceptó una propuesta de la
+  // pantalla "¿Qué deseas?" (ver lib/asistenteReserva.ts) en vez de
+  // elegirla a mano paso a paso; cualquier otro valor que llegue se
+  // ignora y se trata como "app", para que nadie pueda colarse un
+  // origen falso en el body.
+  const origen = body.origen === "app_asistente" ? "app_asistente" : "app";
+
   try {
     const { cita, profesionalNombre } = await crearReserva({
       sedeId: body.sedeId,
@@ -59,7 +66,7 @@ export async function POST(request: NextRequest) {
       cliente: datosCliente,
       aceptaComercial: Boolean(body.aceptaComercial),
       canal: "app",
-      origen: "app",
+      origen,
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
       pagarConSaldo,
       profesionalElegidoPorCliente: Boolean(body.profesionalElegidoPorCliente),

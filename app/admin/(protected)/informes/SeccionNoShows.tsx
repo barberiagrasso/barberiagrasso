@@ -27,7 +27,7 @@ interface Datos {
   tendencia: { etiqueta: string; pctNoShow: number; canceladas: number }[];
 }
 
-const ETIQUETA_CANAL: Record<string, string> = { app: "Web", panel: "Panel (a mano)", whatsapp: "WhatsApp" };
+const ETIQUETA_CANAL: Record<string, string> = { app: "Web", app_asistente: "Asistente IA", panel: "Panel (a mano)", whatsapp: "WhatsApp" };
 
 export default function SeccionNoShows({ sedeId, desde, hasta }: { sedeId: string; desde: string; hasta: string }) {
   const [datos, setDatos] = useState<Datos | null>(null);

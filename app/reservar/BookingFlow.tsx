@@ -10,14 +10,20 @@ import type {
 } from "@/lib/types";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { AsistenteReserva } from "@/components/reservar/AsistenteReserva";
+import type { OpcionPropuestaCita } from "@/lib/asistenteReserva";
 
 // Cuántos meses hacia delante del actual se puede navegar en el
 // calendario de reserva (0 = solo el mes en curso).
 const MESES_ADELANTE_MAX = 2;
 const NOMBRES_DIA_SEMANA = ["L", "M", "X", "J", "V", "S", "D"];
 
+// "inicio" (pantalla "¿Qué deseas?", ver AsistenteReserva) es un paso
+// opcional ANTES del recorrido de siempre: no cuenta como uno de los
+// nodos del Stepper (ver PASOS más abajo) porque no es "paso 1 de 6", es
+// un atajo alternativo a todo el recorrido.
 type Paso =
-  "sede" | "servicio" | "complementos" | "fecha" | "datos" | "confirmado";
+  "inicio" | "sede" | "servicio" | "complementos" | "fecha" | "datos" | "confirmado";
 
 // Los servicios "principales" (categoria = null) se muestran siempre
 // directamente en el paso de reserva. El resto vive dentro de un
@@ -366,7 +372,12 @@ export default function BookingFlow({
   servicios,
   clienteInicial,
 }: Props) {
-  const [paso, setPaso] = useState<Paso>("sede");
+  const [paso, setPaso] = useState<Paso>("inicio");
+  // true cuando la cita en curso viene de aceptar una propuesta de la
+  // pantalla "¿Qué deseas?" en vez de elegirse a mano paso a paso — solo
+  // afecta a qué "origen" se manda a /api/citas (para el desglose por
+  // canal de los informes), nada más.
+  const [viaAsistente, setViaAsistente] = useState(false);
   const [sedeId, setSedeId] = useState<string | null>(null);
   const [servicioId, setServicioId] = useState<string | null>(null);
   const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
@@ -672,6 +683,29 @@ export default function BookingFlow({
     });
   }
 
+  // El cliente aceptó una de las propuestas de la pantalla "¿Qué
+  // deseas?" (ver AsistenteReserva/lib/asistenteReserva.ts): se rellena
+  // el mismo estado que dejaría el paso a paso manual y se salta
+  // directamente a "datos" — así confirmarReserva no necesita saber de
+  // dónde vino la elección. profesionalId solo se fija si el cliente lo
+  // pidió expresamente por nombre; si no, se deja en null ("cualquiera")
+  // para que el corazón de "elegido por el cliente" de la Agenda siga
+  // significando lo mismo que en el resto de la app.
+  function elegirPropuestaAsistente(opcion: OpcionPropuestaCita) {
+    setSedeId(opcion.sedeId);
+    setServicioId(opcion.servicioId);
+    setComplementoIds(opcion.complementoIds);
+    setProfesionalId(opcion.profesionalElegidoPorCliente ? opcion.profesionalId : null);
+    setFecha(opcion.fecha);
+    setSlotElegido({
+      hora_inicio: opcion.horaInicioISO,
+      profesional_id: opcion.profesionalId,
+      profesional_nombre: opcion.profesionalNombre,
+    });
+    setViaAsistente(true);
+    setPaso("datos");
+  }
+
   // Solo una franja horaria por hora visible (si "cualquiera" hay varios
   // profesionales libres a la misma hora, se muestra una sola opción).
   const horasUnicas = useMemo(() => {
@@ -704,6 +738,7 @@ export default function BookingFlow({
           // "Cualquiera": el barbero de arriba es el que tocó al buscar
           // hueco, no uno que el cliente pidiera a propósito.
           profesionalElegidoPorCliente: profesionalId !== null,
+          origen: viaAsistente ? "app_asistente" : "app",
         }),
       });
       const json = await res.json();
@@ -729,7 +764,14 @@ export default function BookingFlow({
         {sedesTexto}
       </p>
       <div className="rounded-3xl border border-brand-line bg-brand-black-soft/60 p-5 shadow-2xl shadow-black/40 sm:p-8">
-        <Stepper paso={paso} />
+        {paso !== "inicio" && <Stepper paso={paso} />}
+
+        {paso === "inicio" && (
+          <AsistenteReserva
+            onElegirOpcion={elegirPropuestaAsistente}
+            onOmitir={() => setPaso("sede")}
+          />
+        )}
 
         {paso === "sede" && (
           <div className="space-y-3">
@@ -1247,7 +1289,15 @@ export default function BookingFlow({
             {error && <p className="font-body text-sm text-red-400">{error}</p>}
 
             <div className="flex items-center justify-between pt-1">
-              <EnlaceVolver onClick={() => setPaso("fecha")}>
+              <EnlaceVolver
+                onClick={() => {
+                  // Si venía de una propuesta del asistente y ahora
+                  // decide tocar la hora a mano, deja de contar como
+                  // "vía asistente" (ver viaAsistente más arriba).
+                  setViaAsistente(false);
+                  setPaso("fecha");
+                }}
+              >
                 ← Cambiar hora
               </EnlaceVolver>
               <BotonPrimario

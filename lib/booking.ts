@@ -46,8 +46,12 @@ interface CrearReservaParams {
   canal: CanalConsentimiento;
   // "lista_espera": la crea sola el sistema al liberarse un hueco que le
   // encajaba a alguien apuntado (ver asignarListaEsperaPorHueco), no el
-  // propio cliente en el momento.
-  origen: "app" | "panel" | "whatsapp" | "lista_espera";
+  // propio cliente en el momento. "app_asistente": el cliente aceptó una
+  // propuesta de la pantalla "¿Qué deseas?" (ver lib/asistenteReserva.ts)
+  // en vez de elegirla a mano paso a paso — se distingue de "app" para
+  // que los informes por canal (SeccionIngresos/SeccionNoShows) puedan
+  // mostrar cuánto se reserva a través del asistente de IA.
+  origen: "app" | "app_asistente" | "panel" | "whatsapp" | "lista_espera";
   // Complementos añadidos al servicio principal en el paso extra de la
   // reserva (p. ej. cejas, lavado). Amplían el hueco bloqueado en la
   // agenda y quedan anotados en la cita para que el barbero cobre bien.
