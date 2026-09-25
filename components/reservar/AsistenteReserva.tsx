@@ -1,24 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { IconSend } from "@/components/ui/Icons";
+import { useEffect, useRef, useState } from "react";
+import { IconMic, IconSend } from "@/components/ui/Icons";
 import type { OpcionPropuestaCita, ResultadoAsistenteReserva, TurnoConversacionAsistente } from "@/lib/asistenteReserva";
 
-// Atajo dentro del primer paso de app/reservar ("Elige tu sede", ver
-// BookingFlow.tsx) — pedido por Diego (25/09/2026): el cliente puede
-// escribir en una frase lo que quiere y se le propone una cita ya
-// concreta (ver lib/asistenteReserva.ts, /api/reservar/asistente), sin
-// competir visualmente con el paso a paso normal que sigue justo debajo.
-// A propósito se presenta como una caja de texto más de la app (mismo
-// estilo que los campos de "Tus datos"), no como un "chat con una IA":
-// sin cabecera, sin icono de estrellitas, sin enfatizar que hay un
-// modelo detrás. No reserva nada por su cuenta: solo cuando el cliente
-// pulsa "Elegir esta cita" se rellena el resto del formulario y sigue el
-// mismo circuito de siempre (confirmarReserva en BookingFlow.tsx → POST
-// /api/citas).
+// Buscador por texto libre de la portada (ver AsistenteReservaInicio.tsx),
+// pedido por Diego (25/09/2026): el cliente puede escribir en una frase lo
+// que quiere y se le propone una cita ya concreta (ver lib/asistenteReserva.ts,
+// /api/reservar/asistente). No reserva nada por su cuenta: solo cuando el
+// cliente pulsa "Elegir esta cita" se traslada la propuesta a /reservar.
+//
+// Rediseño pedido por Diego (25/09/2026): que la caja parezca la de una
+// app de mensajería (fondo blanco, letra negra) en vez de un campo más del
+// formulario, y que se pueda "enviar un audio". La IA solo entiende texto,
+// así que el audio se transcribe en el propio teléfono con el reconocimiento
+// de voz del navegador (Web Speech API) — sin coste ni servicio externo — y
+// el texto reconocido se envía igual que si se hubiera escrito. Si el
+// navegador no lo soporta (por ejemplo Firefox, o algunos Android antiguos),
+// el botón de micrófono no se muestra: solo queda el envío por texto.
 
 interface Props {
   onElegirOpcion: (opcion: OpcionPropuestaCita) => void;
+}
+
+// Tipos mínimos para la Web Speech API — no forma parte de los tipos DOM
+// estándar de TypeScript, así que solo se tipa lo que usamos aquí: crear un
+// reconocedor, arrancarlo/pararlo y leer el texto reconocido.
+interface ResultadoReconocimientoVoz {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [indice: number]: { readonly transcript: string };
+}
+
+interface EventoReconocimientoVoz extends Event {
+  readonly results: ArrayLike<ResultadoReconocimientoVoz>;
+}
+
+interface EventoErrorReconocimientoVoz extends Event {
+  readonly error: string;
+}
+
+interface ReconocedorVoz extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  onresult: ((ev: EventoReconocimientoVoz) => void) | null;
+  onerror: ((ev: EventoErrorReconocimientoVoz) => void) | null;
+  onend: (() => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => ReconocedorVoz;
+    webkitSpeechRecognition?: new () => ReconocedorVoz;
+  }
+}
+
+function obtenerConstructorReconocimiento(): (new () => ReconocedorVoz) | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition;
+}
+
+function mensajeErrorVoz(codigo: string): string {
+  if (codigo === "not-allowed" || codigo === "service-not-allowed") {
+    return "No hemos podido acceder al micrófono. Revisa los permisos o escribe tu petición.";
+  }
+  if (codigo === "no-speech") {
+    return "No se ha detectado voz. Inténtalo de nuevo o escribe tu petición.";
+  }
+  return "No se ha podido usar el micrófono. Escribe tu petición.";
 }
 
 function formatearPrecio(centimos: number, esVariable: boolean) {
@@ -73,9 +126,18 @@ export function AsistenteReserva({ onElegirOpcion }: Props) {
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoAsistenteReserva | null>(null);
   const [errorRed, setErrorRed] = useState<string | null>(null);
+  const [escuchando, setEscuchando] = useState(false);
+  const [vozDisponible, setVozDisponible] = useState(false);
+  const reconocedorRef = useRef<ReconocedorVoz | null>(null);
 
-  async function enviar() {
-    const texto = mensaje.trim();
+  useEffect(() => {
+    setVozDisponible(Boolean(obtenerConstructorReconocimiento()));
+    return () => {
+      reconocedorRef.current?.stop();
+    };
+  }, []);
+
+  async function enviarTexto(texto: string) {
     if (!texto || cargando) return;
     setCargando(true);
     setErrorRed(null);
@@ -107,9 +169,58 @@ export function AsistenteReserva({ onElegirOpcion }: Props) {
     }
   }
 
+  function enviar() {
+    enviarTexto(mensaje.trim());
+  }
+
+  function iniciarEscucha() {
+    if (cargando || escuchando) return;
+    const Reconocedor = obtenerConstructorReconocimiento();
+    if (!Reconocedor) return;
+
+    // Variable de cierre (no estado) para tener siempre el último texto
+    // reconocido a mano en onend, sin depender de renders anteriores.
+    let textoReconocido = "";
+    const reconocedor = new Reconocedor();
+    reconocedor.lang = "es-ES";
+    reconocedor.interimResults = true;
+    reconocedor.continuous = false;
+    reconocedor.maxAlternatives = 1;
+
+    reconocedor.onresult = (ev) => {
+      let texto = "";
+      for (let i = 0; i < ev.results.length; i++) {
+        texto += ev.results[i][0].transcript;
+      }
+      textoReconocido = texto;
+      setMensaje(texto);
+    };
+    reconocedor.onerror = (ev) => {
+      setEscuchando(false);
+      reconocedorRef.current = null;
+      setErrorRed(mensajeErrorVoz(ev.error));
+    };
+    reconocedor.onend = () => {
+      setEscuchando(false);
+      reconocedorRef.current = null;
+      const texto = textoReconocido.trim();
+      if (texto) enviarTexto(texto);
+    };
+
+    reconocedorRef.current = reconocedor;
+    setMensaje("");
+    setErrorRed(null);
+    setEscuchando(true);
+    reconocedor.start();
+  }
+
+  function detenerEscucha() {
+    reconocedorRef.current?.stop();
+  }
+
   return (
     <div className="mb-4 space-y-2">
-      <div className="relative">
+      <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white py-1.5 pl-4 pr-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.18)]">
         <input
           type="text"
           value={mensaje}
@@ -120,24 +231,51 @@ export function AsistenteReserva({ onElegirOpcion }: Props) {
               enviar();
             }
           }}
+          readOnly={escuchando}
           maxLength={500}
-          placeholder="O dinos qué te apetece reservar…"
-          className="w-full rounded-lg border border-brand-line bg-transparent py-2.5 pl-3 pr-10 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+          placeholder={escuchando ? "Escuchando…" : "O dinos qué te apetece reservar…"}
+          className="min-w-0 flex-1 bg-transparent py-1 font-body text-sm text-black placeholder:text-black/40 focus:outline-none"
         />
-        <button
-          onClick={enviar}
-          disabled={!mensaje.trim() || cargando}
-          aria-label="Enviar"
-          className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-brand-white-dim transition-colors hover:text-brand-yellow disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          <IconSend className="h-3.5 w-3.5" />
-        </button>
+
+        {escuchando ? (
+          <button
+            onClick={detenerEscucha}
+            aria-label="Detener grabación"
+            className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-white"
+          >
+            <span className="absolute inset-0 animate-ping rounded-full bg-red-500/60" />
+            <IconMic className="relative h-4 w-4" />
+          </button>
+        ) : mensaje.trim() ? (
+          <button
+            onClick={enviar}
+            disabled={cargando}
+            aria-label="Enviar"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-yellow text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <IconSend className="h-3.5 w-3.5" />
+          </button>
+        ) : vozDisponible ? (
+          <button
+            onClick={iniciarEscucha}
+            disabled={cargando}
+            aria-label="Enviar un audio"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-black/50 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <IconMic className="h-4 w-4" />
+          </button>
+        ) : (
+          <button disabled aria-label="Enviar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-black/25">
+            <IconSend className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
+      {escuchando && <p className="font-body text-xs text-brand-white-dim">Escuchando… habla y se enviará solo.</p>}
       {cargando && <p className="font-body text-xs text-brand-white-dim">Buscando el mejor hueco…</p>}
       {errorRed && <p className="font-body text-xs text-red-400">{errorRed}</p>}
 
-      {!cargando && resultado?.mensaje && (
+      {!cargando && !escuchando && resultado?.mensaje && (
         <p className="font-body text-xs text-brand-white-dim">{resultado.mensaje}</p>
       )}
 
