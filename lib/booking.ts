@@ -1,7 +1,7 @@
 import "server-only";
 import { addMinutes } from "date-fns";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAvailableSlots } from "@/lib/availability";
+import { getAvailableSlots, comprobarHuecoLibre } from "@/lib/availability";
 import { buscarOCrearCliente, normalizarTelefono } from "@/lib/clientes";
 import { sincronizarClienteHubSpot, sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
@@ -62,6 +62,18 @@ interface CrearReservaParams {
   // deducir de profesionalId/slotElegido porque esos ya traen el barbero
   // asignado en los dos casos.
   profesionalElegidoPorCliente?: boolean;
+  // Creación manual desde la Agenda arrastrando (ver MenuCreacion en
+  // CalendarioDia.tsx, pedido de Diego 25/09/2026): el barbero escribe la
+  // hora de inicio y fin a mano, como en Booksy, sin atarse a la
+  // cuadrícula de huecos de 30 minutos que sí rige para el cliente
+  // reservando por la web/WhatsApp. Requiere profesionalId (no vale
+  // "cualquiera") y se valida con comprobarHuecoLibre en vez de con
+  // getAvailableSlots.
+  saltarValidacionSlot?: boolean;
+  // Fin exacto de la cita cuando saltarValidacionSlot es true. Si no se
+  // manda, se calcula sumando la duración del servicio (+ complementos) a
+  // horaInicioISO, igual que en el resto de la app.
+  horaFinISO?: string;
 }
 
 export class ReservaError extends Error {}
@@ -304,18 +316,18 @@ export async function crearReserva(params: CrearReservaParams) {
     }
   }
 
-  // Estas tres consultas no dependen entre sí (ninguna necesita el
-  // resultado de otra), así que se lanzan a la vez en vez de en cadena
-  // — la disponibilidad y estas dos consultas de servicio/sede eran tres
-  // idas y vueltas seguidas a la base de datos en cada reserva.
-  const [slots, { data: servicio }, { data: override }] = await Promise.all([
-    getAvailableSlots({
-      sedeId: params.sedeId,
-      servicioId: params.servicioId,
-      fecha: params.fecha,
-      profesionalId: params.profesionalId,
-      duracionExtraMinutos,
-    }),
+  // La disponibilidad se calcula distinto según el origen de la reserva:
+  // - Normal (cliente por web/WhatsApp, cita rápida del barbero): tiene
+  //   que coincidir con un hueco real de la cuadrícula de 30 minutos
+  //   (getAvailableSlots) — sin cambios.
+  // - saltarValidacionSlot (creación manual arrastrando en la Agenda,
+  //   pedido de Diego 25/09/2026): el barbero escribe la hora a mano, como
+  //   en Booksy; se comprueba con comprobarHuecoLibre en su lugar (mismo
+  //   criterio de fondo — turno, descanso, bloqueos/vacaciones y otras
+  //   citas — pero sin exigir que caiga justo en un múltiplo de 30 min).
+  // Las otras dos consultas (servicio/sede) no dependen de ninguna de las
+  // dos, así que van siempre en el mismo Promise.all.
+  const [{ data: servicio }, { data: override }] = await Promise.all([
     supabase.from("servicios").select("duracion_minutos, precio_centimos").eq("id", params.servicioId).single(),
     supabase
       .from("sede_servicios")
@@ -324,14 +336,58 @@ export async function crearReserva(params: CrearReservaParams) {
       .eq("servicio_id", params.servicioId)
       .maybeSingle(),
   ]);
-
-  const slotElegido = slots.find((s) => s.hora_inicio === params.horaInicioISO);
-  if (!slotElegido) {
-    throw new ReservaError(
-      "Ese horario ya no está disponible. Por favor, elige otra hora."
-    );
-  }
   const duracionMinutos = (override?.duracion_minutos ?? servicio?.duracion_minutos ?? 30) + duracionExtraMinutos;
+
+  let profesionalIdElegido: string;
+  let profesionalNombreElegido: string;
+  let inicio: Date;
+  let fin: Date;
+
+  if (params.saltarValidacionSlot) {
+    if (!params.profesionalId) {
+      throw new ReservaError("Falta indicar el profesional para crear la cita.");
+    }
+    inicio = new Date(params.horaInicioISO);
+    fin = params.horaFinISO ? new Date(params.horaFinISO) : addMinutes(inicio, duracionMinutos);
+    if (!(fin > inicio)) {
+      throw new ReservaError("La hora de fin debe ser posterior a la de inicio.");
+    }
+    const libre = await comprobarHuecoLibre({
+      sedeId: params.sedeId,
+      profesionalId: params.profesionalId,
+      fecha: params.fecha,
+      inicioISO: inicio.toISOString(),
+      finISO: fin.toISOString(),
+    });
+    if (!libre) {
+      throw new ReservaError("Ese profesional no tiene hueco libre a esa hora.");
+    }
+    profesionalIdElegido = params.profesionalId;
+    const { data: profesional } = await supabase
+      .from("profesionales")
+      .select("nombre")
+      .eq("id", params.profesionalId)
+      .single();
+    profesionalNombreElegido = profesional?.nombre ?? "";
+  } else {
+    const slots = await getAvailableSlots({
+      sedeId: params.sedeId,
+      servicioId: params.servicioId,
+      fecha: params.fecha,
+      profesionalId: params.profesionalId,
+      duracionExtraMinutos,
+    });
+    const slotElegido = slots.find((s) => s.hora_inicio === params.horaInicioISO);
+    if (!slotElegido) {
+      throw new ReservaError(
+        "Ese horario ya no está disponible. Por favor, elige otra hora."
+      );
+    }
+    profesionalIdElegido = slotElegido.profesional_id;
+    profesionalNombreElegido = slotElegido.profesional_nombre;
+    inicio = new Date(params.horaInicioISO);
+    fin = addMinutes(inicio, duracionMinutos);
+  }
 
   // Total de la cita (servicio + complementos) — el mismo número que ve
   // el cliente en el paso de confirmación de app/reservar. sede_servicios
@@ -342,9 +398,6 @@ export async function crearReserva(params: CrearReservaParams) {
   const precioServicioCentimos = servicio?.precio_centimos ?? 0;
   const totalCentimos =
     precioServicioCentimos + complementosParaGuardar.reduce((acc, c) => acc + c.precio_centimos, 0);
-
-  const inicio = new Date(params.horaInicioISO);
-  const fin = addMinutes(inicio, duracionMinutos);
 
   // 1. Encontrar o crear el cliente por teléfono (mismo criterio que usa
   // el registro de cuenta con contraseña y el alta manual desde el
@@ -398,7 +451,7 @@ export async function crearReserva(params: CrearReservaParams) {
     .insert({
       cliente_id: clienteId,
       sede_id: params.sedeId,
-      profesional_id: slotElegido.profesional_id,
+      profesional_id: profesionalIdElegido,
       servicio_id: params.servicioId,
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
@@ -454,7 +507,7 @@ export async function crearReserva(params: CrearReservaParams) {
   await sincronizarClienteHubSpot(supabase, clienteId);
   await sincronizarCitaHubSpot(supabase, cita.id);
 
-  return { cita, clienteId, profesionalNombre: slotElegido.profesional_nombre };
+  return { cita, clienteId, profesionalNombre: profesionalNombreElegido };
 }
 
 /**

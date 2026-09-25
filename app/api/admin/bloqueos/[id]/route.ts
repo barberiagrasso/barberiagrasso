@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 const TZ = process.env.BUSINESS_TIMEZONE || "Europe/Madrid";
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -19,6 +20,17 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { id } = await params;
   const supabase = createAdminClient();
+
+  // Una cuenta de equipo (rol "barbero") solo puede borrar sus propios
+  // bloqueos, nunca los de otro compañero ni uno de "toda la sede"
+  // (pedido de Diego, 25/09/2026 — no debe poder tocar las vacaciones de
+  // los demás).
+  const { data: actual } = await supabase.from("bloqueos").select("profesional_id").eq("id", id).maybeSingle();
+  if (!actual) return NextResponse.json({ error: "Bloqueo no encontrado." }, { status: 404 });
+  if (admin.rol !== "admin" && actual.profesional_id !== admin.profesional_id) {
+    return NextResponse.json({ error: "No puedes eliminar el bloqueo de otro profesional." }, { status: 403 });
+  }
+
   const { error } = await supabase.from("bloqueos").delete().eq("id", id);
   if (error) return NextResponse.json({ error: "No se pudo eliminar el bloqueo." }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -31,8 +43,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 // lo que haga falta. Mantiene el mismo día del bloqueo original: solo
 // cambian las horas dentro de ese día, nunca cruza a otro.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -59,6 +72,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // edita por horas desde aquí — esos se gestionan por día entero desde
     // la pantalla de Bloqueos.
     return NextResponse.json({ error: "Este bloqueo no se puede editar por horas." }, { status: 400 });
+  }
+  // Una cuenta de equipo solo puede editar sus propios bloqueos, nunca los
+  // de otro barbero (pedido de Diego, 25/09/2026).
+  if (admin.rol !== "admin" && actual.profesional_id !== admin.profesional_id) {
+    return NextResponse.json({ error: "No puedes editar el bloqueo de otro profesional." }, { status: 403 });
   }
 
   const fecha = fechaEnMadrid(actual.fecha_inicio);

@@ -748,6 +748,104 @@ function combinarFechaYHora(fecha: string, hora: string): Date {
   return parse(`${fecha} ${hora}`, "yyyy-MM-dd HH:mm:ss", new Date());
 }
 
+/**
+ * Comprueba si un rango exacto [inicioISO, finISO) está libre para un
+ * profesional concreto: dentro de su turno de ese día de la semana, sin
+ * pisar su descanso, ningún bloqueo/vacación suya (o de "toda la sede") y
+ * ninguna cita ya confirmada. A diferencia de getAvailableSlots, no exige
+ * que el rango caiga en la cuadrícula de huecos de 30 minutos — lo usa la
+ * creación manual de una cita arrastrando en la Agenda (ver
+ * crearReserva/saltarValidacionSlot en lib/booking.ts), donde el propio
+ * barbero puede escribir cualquier hora a mano, igual que en Booksy;
+ * sigue habiendo un hueco real detrás (nadie puede crear una cita encima
+ * de otra, de un bloqueo o fuera de turno).
+ */
+export async function comprobarHuecoLibre({
+  sedeId,
+  profesionalId,
+  fecha,
+  inicioISO,
+  finISO,
+}: {
+  sedeId: string;
+  profesionalId: string;
+  fecha: string; // "YYYY-MM-DD"
+  inicioISO: string;
+  finISO: string;
+}): Promise<boolean> {
+  const supabase = createAdminClient();
+  const fechaLocal = parse(fecha, "yyyy-MM-dd", new Date());
+  const diaSemana = toZonedTime(fechaLocal, TZ).getDay();
+  const inicioDiaUTC = fromZonedTime(startOfDay(fechaLocal), TZ);
+  const finDiaUTC = fromZonedTime(endOfDay(fechaLocal), TZ);
+  const inicio = new Date(inicioISO);
+  const fin = new Date(finISO);
+  if (!(fin > inicio)) return false;
+
+  const [{ data: horarios }, { data: excepciones }, { data: bloqueos }, { data: vacaciones }, { data: citas }] =
+    await Promise.all([
+      supabase
+        .from("horarios")
+        .select("profesional_id, hora_inicio, hora_fin, descanso_inicio, descanso_fin")
+        .eq("sede_id", sedeId)
+        .eq("dia_semana", diaSemana)
+        .eq("profesional_id", profesionalId),
+      supabase
+        .from("descansos_excepciones")
+        .select("profesional_id, hora_inicio, hora_fin")
+        .eq("fecha", fecha)
+        .eq("profesional_id", profesionalId),
+      supabase
+        .from("bloqueos")
+        .select("profesional_id, fecha_inicio, fecha_fin")
+        .eq("sede_id", sedeId)
+        .lt("fecha_inicio", finDiaUTC.toISOString())
+        .gt("fecha_fin", inicioDiaUTC.toISOString()),
+      supabase
+        .from("solicitudes_vacaciones")
+        .select("profesional_id, fecha_inicio, fecha_fin")
+        .eq("estado", "aprobada")
+        .eq("profesional_id", profesionalId)
+        .lte("fecha_inicio", fecha)
+        .gte("fecha_fin", fecha),
+      supabase
+        .from("citas")
+        .select("profesional_id, inicio, fin")
+        .eq("profesional_id", profesionalId)
+        .neq("estado", "cancelada")
+        .lt("inicio", finDiaUTC.toISOString())
+        .gt("fin", inicioDiaUTC.toISOString()),
+    ]);
+
+  const turno = (horarios ?? [])[0];
+  if (!turno) return false; // no tiene turno ese día
+
+  const turnoInicioUTC = fromZonedTime(combinarFechaYHora(fecha, turno.hora_inicio), TZ);
+  const turnoFinUTC = fromZonedTime(combinarFechaYHora(fecha, turno.hora_fin), TZ);
+  if (inicio < turnoInicioUTC || fin > turnoFinUTC) return false;
+
+  const descanso = resolverDescansos([turno], excepciones ?? [])[0];
+  const bloqueosDelDia = [
+    ...(bloqueos ?? []).filter((b) => b.profesional_id === profesionalId || b.profesional_id === null),
+    ...vacacionesComoBloqueos(vacaciones ?? [], inicioDiaUTC, finDiaUTC),
+  ];
+
+  const obstaculos: { inicio: Date; fin: Date }[] = [
+    ...bloqueosDelDia.map((b) => ({ inicio: new Date(b.fecha_inicio), fin: new Date(b.fecha_fin) })),
+    ...(citas ?? []).map((c) => ({ inicio: new Date(c.inicio), fin: new Date(c.fin) })),
+    ...(descanso
+      ? [
+          {
+            inicio: fromZonedTime(combinarFechaYHora(fecha, descanso.hora_inicio), TZ),
+            fin: fromZonedTime(combinarFechaYHora(fecha, descanso.hora_fin), TZ),
+          },
+        ]
+      : []),
+  ];
+
+  return !obstaculos.some((o) => o.inicio < fin && o.fin > inicio);
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }

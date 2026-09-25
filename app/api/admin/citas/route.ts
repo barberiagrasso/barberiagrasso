@@ -68,6 +68,13 @@ export async function POST(request: NextRequest) {
       origen: "panel",
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
       pagarConSaldo: Boolean(body.pagarConSaldo),
+      profesionalElegidoPorCliente: Boolean(body.profesionalElegidoPorCliente),
+      // Creación manual desde la Agenda arrastrando (ver MenuCreacion en
+      // CalendarioDia.tsx): el barbero escribe la hora de inicio y fin a
+      // mano, sin atarse a la cuadrícula de huecos de 30 minutos — ver
+      // saltarValidacionSlot en lib/booking.ts.
+      saltarValidacionSlot: Boolean(body.saltarValidacionSlot),
+      horaFinISO: typeof body.horaFinISO === "string" ? body.horaFinISO : undefined,
     });
     return NextResponse.json({ cita, profesionalNombre });
   } catch (err) {

@@ -32,6 +32,18 @@ interface Cita {
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string; foto_url?: string | null } | null;
+  // Complementos añadidos al servicio principal (ver lib/booking.ts),
+  // igual que en AgendaClient.tsx — "servicio" puede llegar como objeto o
+  // array suelto según cómo Supabase resuelva la relación anidada.
+  extras?: { servicio_id: string; servicio: { nombre: string } | { nombre: string }[] | null }[];
+}
+
+// Nombres de los complementos de una cita, listos para mostrar.
+function nombresExtras(cita: Cita): string[] {
+  return (cita.extras ?? [])
+    .map((ex) => (Array.isArray(ex.servicio) ? ex.servicio[0] : ex.servicio))
+    .map((s) => s?.nombre)
+    .filter((n): n is string => Boolean(n));
 }
 interface Profesional {
   id: string;
@@ -60,6 +72,7 @@ interface BloqueoAgenda {
 interface ServicioOpcion {
   id: string;
   nombre: string;
+  duracion_minutos: number;
 }
 
 // Estado de la búsqueda por teléfono en "Nueva cita" (ver MenuCreacion):
@@ -155,6 +168,7 @@ export default function CalendarioDia({
   bloqueos,
   servicios,
   esAdmin,
+  profesionalIdPropio,
   cargando,
   onFinalizar,
   onCambiarEstado,
@@ -173,6 +187,12 @@ export default function CalendarioDia({
   bloqueos: BloqueoAgenda[];
   servicios: ServicioOpcion[];
   esAdmin: boolean;
+  // Ficha de barbero de la propia cuenta (null para el admin, o si la
+  // cuenta no tiene una vinculada) — para saber si un bloqueo/vacación es
+  // "propio" y por tanto se le puede mostrar el motivo y editarlo (ver
+  // bloqueosPorColumna más abajo). Un barbero nunca ve el motivo del
+  // bloqueo de un compañero, solo que esa franja está ocupada.
+  profesionalIdPropio: string | null;
   cargando: boolean;
   onFinalizar: (cita: Cita) => void;
   onCambiarEstado: (id: string, estado: string) => void;
@@ -453,18 +473,30 @@ export default function CalendarioDia({
   // Crear algo nuevo arrastrando sobre un hueco vacío de la agenda —
   // disponible para admin Y barberos (a diferencia de los arrastres de
   // arriba, que mueven algo ya existente y siguen siendo solo admin).
-  // El punto de partida puede ser cualquiera (no tiene que coincidir con
-  // el inicio de un slot de cita), en pasos de 5 minutos
-  // (PASO_CREACION_MIN); por defecto el rectángulo ya sale con
-  // DURACION_BLOQUEO_DEFECTO_MIN (30 min, lo normal para un bloqueo) y
-  // arrastrando se puede alargar o encoger desde ahí, también en pasos de
-  // 5 minutos. Al soltar aparece un menú con "Bloqueo de agenda" o "Nueva
-  // cita" para ese hueco — para la cita, la duración del rectángulo no
-  // importa (la fija el servicio elegido), sí para el bloqueo (pero se
-  // puede corregir a mano en el propio formulario, y también después,
-  // ver EditarBloqueoModal).
+  // El bloque sale siempre con DURACION_BLOQUEO_DEFECTO_MIN (30 min, lo
+  // normal para un bloqueo) y, mientras se sigue arrastrando, se mueve
+  // ENTERO (no se alarga ni se encoge) a donde esté el dedo/cursor, en
+  // pasos de 5 minutos (PASO_CREACION_MIN) — igual que arrastrar una cita
+  // o el descanso para cambiarlos de hora. Ajustar la duración exacta del
+  // bloqueo se hace después, ya creado (ver EditarBloqueoModal); para una
+  // cita la duración del rectángulo no importa, la fija el servicio
+  // elegido en el propio formulario.
+  //
+  // En pantallas táctiles, el gesto no empieza hasta mantener pulsado
+  // ESPERA_PULSACION_LARGA_MS sin apenas moverse (pedido de Diego,
+  // 25/09/2026: antes reaccionaba a cualquier roce y no dejaba hacer
+  // scroll por la agenda). Si en ese tiempo el dedo se desplaza más de
+  // UMBRAL_CANCELAR_ESPERA_PX, se entiende que es un gesto de scroll/pan
+  // normal: se cancela la espera y el propio navegador se encarga de
+  // moverse por la pantalla (la columna deja pasar el scroll vertical
+  // nativo — ver className="touch-pan-y" más abajo — así que ni falta
+  // cancelar nada a mano en ese caso, el navegador manda un pointercancel
+  // solo). Con ratón o lápiz no hay ninguna espera: el arrastre empieza
+  // al instante, como siempre.
   const PASO_CREACION_MIN = 5;
   const DURACION_BLOQUEO_DEFECTO_MIN = 30;
+  const ESPERA_PULSACION_LARGA_MS = 500;
+  const UMBRAL_CANCELAR_ESPERA_PX = 10;
   const [creacion, setCreacion] = useState<{
     profesionalId: string;
     inicioMin: number;
@@ -480,41 +512,65 @@ export default function CalendarioDia({
   ) {
     if (e.button !== 0 || creacion || moviendoCitaId || guardandoDescanso)
       return;
-    e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    const minutoClic = minInicioVisual + (e.clientY - rect.top) / PX_POR_MINUTO;
-    const inicioMin = Math.min(
-      Math.max(
-        Math.round(minutoClic / PASO_CREACION_MIN) * PASO_CREACION_MIN,
-        limiteInicio,
-      ),
-      Math.max(limiteInicio, limiteFin - DURACION_BLOQUEO_DEFECTO_MIN),
-    );
+    const xInicial = e.clientX;
     const yInicial = e.clientY;
-    setCreacion({
-      profesionalId,
-      inicioMin,
-      finMin: Math.min(inicioMin + DURACION_BLOQUEO_DEFECTO_MIN, limiteFin),
-      fase: "arrastrando",
-    });
+    let confirmado = false;
+    let idTimer: number | undefined;
 
-    function alMover(ev: PointerEvent) {
+    function calcularInicioMin(clientY: number) {
+      const minutoClic = minInicioVisual + (clientY - rect.top) / PX_POR_MINUTO;
+      return Math.min(
+        Math.max(
+          Math.round(minutoClic / PASO_CREACION_MIN) * PASO_CREACION_MIN,
+          limiteInicio,
+        ),
+        Math.max(limiteInicio, limiteFin - DURACION_BLOQUEO_DEFECTO_MIN),
+      );
+    }
+
+    const inicioBase = calcularInicioMin(yInicial);
+
+    function empezarDeVerdad() {
+      confirmado = true;
+      setCreacion({
+        profesionalId,
+        inicioMin: inicioBase,
+        finMin: Math.min(inicioBase + DURACION_BLOQUEO_DEFECTO_MIN, limiteFin),
+        fase: "arrastrando",
+      });
+      window.addEventListener("pointermove", alMoverArrastre);
+    }
+
+    function alMoverArrastre(ev: PointerEvent) {
       const deltaMin = (ev.clientY - yInicial) / PX_POR_MINUTO;
-      const finBruto = inicioMin + DURACION_BLOQUEO_DEFECTO_MIN + deltaMin;
-      const finSnap =
-        Math.round(finBruto / PASO_CREACION_MIN) * PASO_CREACION_MIN;
-      const finMin = Math.min(
-        Math.max(finSnap, inicioMin + PASO_CREACION_MIN),
-        limiteFin,
+      const snapMin = Math.round(deltaMin / PASO_CREACION_MIN) * PASO_CREACION_MIN;
+      const inicioMin = Math.min(
+        Math.max(inicioBase + snapMin, limiteInicio),
+        Math.max(limiteInicio, limiteFin - DURACION_BLOQUEO_DEFECTO_MIN),
       );
       setCreacion((actual) =>
         actual && actual.fase === "arrastrando"
-          ? { ...actual, finMin }
+          ? { ...actual, inicioMin, finMin: inicioMin + DURACION_BLOQUEO_DEFECTO_MIN }
           : actual,
       );
     }
+
+    // Mientras se espera a que se cumpla la pulsación larga (solo táctil):
+    // si el dedo se mueve de verdad, es un scroll, no una creación — se
+    // cancela la espera sin crear nada.
+    function alMoverEspera(ev: PointerEvent) {
+      if (confirmado) return;
+      const distancia = Math.hypot(ev.clientX - xInicial, ev.clientY - yInicial);
+      if (distancia > UMBRAL_CANCELAR_ESPERA_PX) {
+        window.clearTimeout(idTimer);
+        limpiar();
+      }
+    }
     function alSoltar() {
+      window.clearTimeout(idTimer);
       limpiar();
+      if (!confirmado) return; // se soltó antes de cumplirse la pulsación larga: no crear nada
       setCreacion((actual) =>
         actual && actual.fase === "arrastrando"
           ? { ...actual, fase: "menu" }
@@ -522,17 +578,33 @@ export default function CalendarioDia({
       );
     }
     function alCancelar() {
+      window.clearTimeout(idTimer);
       limpiar();
-      setCreacion(null);
+      if (confirmado) setCreacion(null);
     }
     function limpiar() {
-      window.removeEventListener("pointermove", alMover);
+      window.removeEventListener("pointermove", alMoverEspera);
+      window.removeEventListener("pointermove", alMoverArrastre);
       window.removeEventListener("pointerup", alSoltar);
       window.removeEventListener("pointercancel", alCancelar);
     }
-    window.addEventListener("pointermove", alMover);
+
     window.addEventListener("pointerup", alSoltar);
     window.addEventListener("pointercancel", alCancelar);
+
+    if (e.pointerType === "touch") {
+      // Solo táctil: espera la pulsación larga, vigilando que no se mueva.
+      // A propósito NO se llama a preventDefault aquí — el scroll vertical
+      // nativo tiene que poder arrancar libremente si el dedo se mueve
+      // (className="touch-pan-y" en la columna es quien lo permite); si
+      // eso pasa, el propio navegador cancela este puntero solo.
+      window.addEventListener("pointermove", alMoverEspera);
+      idTimer = window.setTimeout(empezarDeVerdad, ESPERA_PULSACION_LARGA_MS);
+    } else {
+      // Ratón o lápiz: empieza al instante, como siempre.
+      e.preventDefault();
+      empezarDeVerdad();
+    }
   }
 
   // Rango de horas a mostrar: el de los turnos de ese día si hay alguno,
@@ -640,8 +712,14 @@ export default function CalendarioDia({
                       ? (e) => iniciarCreacion(e, col.id, minInicio, maxFin)
                       : undefined
                   }
+                  onContextMenu={(e) => e.preventDefault()}
                   className={
-                    "relative flex-1 touch-none border-l border-stone-100" +
+                    // touch-pan-y (no touch-none): deja que el scroll
+                    // vertical nativo funcione con normalidad al arrastrar
+                    // el dedo por la columna — la creación de un bloque
+                    // nuevo solo se activa con una pulsación larga sin
+                    // apenas movimiento (ver iniciarCreacion más arriba).
+                    "relative flex-1 touch-pan-y border-l border-stone-100" +
                     (col.id !== ID_SIN_ASIGNAR ? " cursor-crosshair" : "")
                   }
                 >
@@ -746,12 +824,21 @@ export default function CalendarioDia({
                   {(bloqueosPorColumna.get(col.id) ?? []).map((b) => {
                     const top = (b.desdeMin - minInicioVisual) * PX_POR_MINUTO;
                     const alto = (b.hastaMin - b.desdeMin) * PX_POR_MINUTO;
+                    // Un barbero solo ve el motivo (y puede editar/tocar
+                    // para abrir el detalle) de SUS PROPIOS bloqueos —
+                    // nunca el de un compañero, aunque sea admin quien lo
+                    // creó (pedido de Diego, 25/09/2026: "no quiero que un
+                    // barbero pueda ver las vacaciones de los demás,
+                    // simplemente que los días están bloqueados"). El
+                    // admin sigue viendo y editando todo, como siempre.
+                    const esPropio = esAdmin || col.id === profesionalIdPropio;
+                    const puedeEditar = esPropio && b.esTiempoPreciso;
                     return (
                       <div
                         key={b.id}
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => {
-                          if (!b.esTiempoPreciso) return;
+                          if (!puedeEditar) return;
                           setBloqueoEditando({
                             id: b.id,
                             profesionalNombre: col.nombre,
@@ -762,7 +849,7 @@ export default function CalendarioDia({
                         }}
                         className={
                           "absolute inset-x-0 z-10 flex items-center justify-center overflow-hidden border-y border-stone-400 bg-stone-300/80 px-1 text-center text-[11px] font-medium text-stone-600" +
-                          (b.esTiempoPreciso ? " cursor-pointer hover:bg-stone-300" : "")
+                          (puedeEditar ? " cursor-pointer hover:bg-stone-300" : "")
                         }
                         style={{
                           top,
@@ -771,14 +858,16 @@ export default function CalendarioDia({
                             "repeating-linear-gradient(135deg, rgba(87,83,78,0.18) 0, rgba(87,83,78,0.18) 6px, transparent 6px, transparent 12px)",
                         }}
                         title={
-                          b.esTiempoPreciso
-                            ? `${b.motivo ? `Bloqueado: ${b.motivo}` : "Bloqueado"} — toca para editar las horas`
-                            : b.motivo
-                              ? `Bloqueado: ${b.motivo}`
-                              : "Bloqueado"
+                          !esPropio
+                            ? "Bloqueado"
+                            : puedeEditar
+                              ? `${b.motivo ? `Bloqueado: ${b.motivo}` : "Bloqueado"} — toca para editar las horas`
+                              : b.motivo
+                                ? `Bloqueado: ${b.motivo}`
+                                : "Bloqueado"
                         }
                       >
-                        Bloqueado{b.motivo ? ` · ${b.motivo}` : ""}
+                        Bloqueado{esPropio && b.motivo ? ` · ${b.motivo}` : ""}
                       </div>
                     );
                   })}
@@ -893,6 +982,9 @@ export default function CalendarioDia({
                         {alto >= 34 && (
                           <div className="truncate text-stone-500">
                             {cita.servicio?.nombre}
+                            {nombresExtras(cita).length > 0
+                              ? ` + ${nombresExtras(cita).join(", ")}`
+                              : ""}
                           </div>
                         )}
                       </button>
@@ -927,9 +1019,7 @@ export default function CalendarioDia({
           sedeId={sedeId}
           fecha={fecha}
           profesionalId={creacion.profesionalId}
-          profesionalNombre={
-            columnas.find((c) => c.id === creacion.profesionalId)?.nombre ?? ""
-          }
+          profesionales={columnas.filter((c) => c.id !== ID_SIN_ASIGNAR)}
           inicioMin={creacion.inicioMin}
           finMin={creacion.finMin}
           fase={creacion.fase}
@@ -962,13 +1052,14 @@ export default function CalendarioDia({
 // Menú que aparece al soltar el arrastre de creación (ver iniciarCreacion
 // más arriba): primero ofrece elegir entre "Bloqueo de agenda" y "Nueva
 // cita", y según lo que se elija muestra un formulario mínimo para esa
-// franja — ya con barbero y hora fijados por el propio arrastre, así que
-// no hay que volver a elegirlos.
+// franja — ya con barbero y hora de inicio precargados del propio
+// arrastre (aunque se pueden corregir a mano, ver más abajo), así que no
+// hay que volver a elegirlos desde cero.
 function MenuCreacion({
   sedeId,
   fecha,
   profesionalId,
-  profesionalNombre,
+  profesionales,
   inicioMin,
   finMin,
   fase,
@@ -980,7 +1071,7 @@ function MenuCreacion({
   sedeId: string;
   fecha: string;
   profesionalId: string;
-  profesionalNombre: string;
+  profesionales: { id: string; nombre: string; foto_url?: string | null }[];
   inicioMin: number;
   finMin: number;
   fase: "menu" | "bloqueo" | "cita";
@@ -989,16 +1080,38 @@ function MenuCreacion({
   onCerrar: () => void;
   onCreado: () => void;
 }) {
+  const profesionalNombre = profesionales.find((p) => p.id === profesionalId)?.nombre ?? "";
   const [duracionMin, setDuracionMin] = useState(
     Math.max(5, finMin - inicioMin),
   );
   const [motivo, setMotivo] = useState("");
   const [servicioId, setServicioId] = useState(servicios[0]?.id ?? "");
+  const [profesionalIdElegido, setProfesionalIdElegido] = useState(profesionalId);
+  // Hora de inicio y fin de la cita, editables a mano (pedido de Diego,
+  // 25/09/2026: como en Booksy, sin atarse a la cuadrícula de huecos de
+  // 30 minutos que sí rige para el cliente reservando por la web/
+  // WhatsApp) — se validan en el servidor contra el turno, el descanso,
+  // los bloqueos/vacaciones y las demás citas de ese barbero (ver
+  // saltarValidacionSlot en lib/booking.ts).
+  const [horaInicio, setHoraInicio] = useState(horaDeMinutos(inicioMin));
+  const [horaFin, setHoraFin] = useState(horaDeMinutos(finMin));
+  const [finTocadoAMano, setFinTocadoAMano] = useState(false);
+  const [solicitadoPorCliente, setSolicitadoPorCliente] = useState(false);
   const [telefono, setTelefono] = useState("");
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [estadoCliente, setEstadoCliente] = useState<EstadoClienteRapido>({ tipo: "vacio" });
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mientras el barbero no haya tocado la hora de fin a mano, se
+  // recalcula sola a partir de la hora de inicio y la duración del
+  // servicio elegido — un punto de partida razonable que se puede seguir
+  // ajustando libremente después.
+  useEffect(() => {
+    if (finTocadoAMano) return;
+    const duracion = servicios.find((s) => s.id === servicioId)?.duracion_minutos ?? 30;
+    setHoraFin(horaDeMinutos(minutosDeHora(horaInicio) + duracion));
+  }, [servicioId, horaInicio, finTocadoAMano, servicios]);
 
   // Búsqueda del cliente por teléfono (con un pequeño debounce): si ya
   // existe una ficha con ese número, se enseña el nombre para que el
@@ -1024,40 +1137,7 @@ function MenuCreacion({
   }, [telefono]);
 
   const nombreParaGuardar = estadoCliente.tipo === "encontrado" ? estadoCliente.nombre : nombreNuevo.trim();
-
-  // La cita no se reserva literalmente en el minuto exacto donde se soltó
-  // el arrastre: el motor de disponibilidad solo ofrece huecos en pasos
-  // de 30 minutos (para que cuadren con el resto de la app — reserva de
-  // clientes incluida), así que aquí se busca, entre los huecos reales de
-  // este profesional/servicio/día, el más cercano a donde se ha soltado.
-  // Sin esto, crear la cita fallaría casi siempre con "ese horario ya no
-  // está disponible" en cuanto el arrastre no cayera justo en un hueco.
-  const [slotsDia, setSlotsDia] = useState<{ hora_inicio: string }[]>([]);
-  const [cargandoSlots, setCargandoSlots] = useState(false);
-
-  useEffect(() => {
-    if (fase !== "cita" || !servicioId) return;
-    setCargandoSlots(true);
-    const p = new URLSearchParams({ sedeId, servicioId, fecha, profesionalId });
-    fetch(`/api/disponibilidad?${p.toString()}`)
-      .then((r) => r.json())
-      .then((j) => setSlotsDia(j.slots ?? []))
-      .finally(() => setCargandoSlots(false));
-  }, [fase, servicioId, sedeId, fecha, profesionalId]);
-
-  const slotElegido = useMemo(() => {
-    if (slotsDia.length === 0) return null;
-    let mejor = slotsDia[0];
-    let mejorDistancia = Math.abs(minutosEnMadrid(mejor.hora_inicio) - inicioMin);
-    for (const s of slotsDia) {
-      const distancia = Math.abs(minutosEnMadrid(s.hora_inicio) - inicioMin);
-      if (distancia < mejorDistancia) {
-        mejor = s;
-        mejorDistancia = distancia;
-      }
-    }
-    return mejor;
-  }, [slotsDia, inicioMin]);
+  const horaFinValida = minutosDeHora(horaFin) > minutosDeHora(horaInicio);
 
   async function guardarBloqueo() {
     setEnviando(true);
@@ -1089,7 +1169,7 @@ function MenuCreacion({
   }
 
   async function guardarCita() {
-    if (!servicioId || !telefono || !nombreParaGuardar || !slotElegido) return;
+    if (!servicioId || !telefono || !nombreParaGuardar || !horaFinValida) return;
     setEnviando(true);
     setError(null);
     try {
@@ -1099,11 +1179,14 @@ function MenuCreacion({
         body: JSON.stringify({
           sedeId,
           servicioId,
-          profesionalId,
+          profesionalId: profesionalIdElegido,
           fecha,
-          horaInicioISO: slotElegido.hora_inicio,
+          horaInicioISO: isoDesdeMadrid(fecha, horaInicio),
+          horaFinISO: isoDesdeMadrid(fecha, horaFin),
+          saltarValidacionSlot: true,
           cliente: { nombre: nombreParaGuardar, telefono },
           aceptaComercial: false,
+          profesionalElegidoPorCliente: solicitadoPorCliente,
         }),
       });
       const json = await res.json();
@@ -1130,7 +1213,7 @@ function MenuCreacion({
       >
         <div className="mb-3">
           <div className="text-lg font-bold text-stone-900">
-            {horaDeMinutos(inicioMin)} – {horaDeMinutos(finMin)}
+            {fase === "cita" ? "Nueva cita" : `${horaDeMinutos(inicioMin)} – ${horaDeMinutos(finMin)}`}
           </div>
           <div className="text-sm text-stone-500">{profesionalNombre}</div>
         </div>
@@ -1199,54 +1282,102 @@ function MenuCreacion({
 
         {fase === "cita" && (
           <div className="space-y-3">
-            <select
-              value={servicioId}
-              onChange={(e) => setServicioId(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
-            >
-              {servicios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-            {cargandoSlots && <p className="text-xs text-stone-400">Buscando el hueco más cercano…</p>}
-            {!cargandoSlots && slotElegido && (
-              <p className="text-xs text-stone-500">
-                Se reservará a las <strong>{horaDeMinutos(minutosEnMadrid(slotElegido.hora_inicio))}</strong>
-                {minutosEnMadrid(slotElegido.hora_inicio) !== inicioMin ? " (el hueco real más cercano)" : ""}.
-              </p>
-            )}
-            {!cargandoSlots && !slotElegido && (
-              <p className="text-xs text-red-600">No hay ningún hueco libre para este servicio ese día.</p>
-            )}
-            <input
-              placeholder="Teléfono del cliente"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 p-2 text-sm"
-            />
-            {estadoCliente.tipo === "buscando" && <p className="text-xs text-stone-400">Buscando…</p>}
-            {estadoCliente.tipo === "encontrado" && (
-              <p className="text-sm text-emerald-700">
-                Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
-              </p>
-            )}
-            {estadoCliente.tipo === "nuevo" && (
-              <div>
-                <p className="mb-1 text-xs text-amber-700">No hay ningún cliente con este teléfono — se creará uno nuevo.</p>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Cliente</label>
+              <input
+                placeholder="Teléfono del cliente"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+              />
+              {estadoCliente.tipo === "buscando" && <p className="mt-1 text-xs text-stone-400">Buscando…</p>}
+              {estadoCliente.tipo === "encontrado" && (
+                <p className="mt-1 text-sm text-emerald-700">
+                  Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
+                </p>
+              )}
+              {estadoCliente.tipo === "nuevo" && (
+                <div className="mt-1">
+                  <p className="mb-1 text-xs text-amber-700">No hay ningún cliente con este teléfono — se creará uno nuevo.</p>
+                  <input
+                    placeholder="Nombre del cliente nuevo"
+                    value={nombreNuevo}
+                    onChange={(e) => setNombreNuevo(e.target.value)}
+                    className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Servicio</label>
+              <select
+                value={servicioId}
+                onChange={(e) => setServicioId(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+              >
+                {servicios.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-medium uppercase tracking-wide text-stone-400">
+                Inicio
                 <input
-                  placeholder="Nombre del cliente nuevo"
-                  value={nombreNuevo}
-                  onChange={(e) => setNombreNuevo(e.target.value)}
-                  className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+                  type="time"
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-stone-300 p-2 text-sm normal-case tracking-normal text-stone-900"
                 />
-              </div>
-            )}
+              </label>
+              <label className="block text-xs font-medium uppercase tracking-wide text-stone-400">
+                Final
+                <input
+                  type="time"
+                  value={horaFin}
+                  onChange={(e) => {
+                    setFinTocadoAMano(true);
+                    setHoraFin(e.target.value);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-stone-300 p-2 text-sm normal-case tracking-normal text-stone-900"
+                />
+              </label>
+            </div>
+            {!horaFinValida && <p className="text-xs text-red-600">La hora de fin debe ser posterior a la de inicio.</p>}
+
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Empleado</label>
+              <select
+                value={profesionalIdElegido}
+                onChange={(e) => setProfesionalIdElegido(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 p-2 text-sm"
+              >
+                {profesionales.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                checked={solicitadoPorCliente}
+                onChange={(e) => setSolicitadoPorCliente(e.target.checked)}
+              />
+              <span className="text-red-500">♥</span>
+              Solicitado por el cliente
+            </label>
+
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">
               <button
-                disabled={!servicioId || !telefono || !nombreParaGuardar || !slotElegido || enviando}
+                disabled={!servicioId || !telefono || !nombreParaGuardar || !horaFinValida || enviando}
                 onClick={guardarCita}
                 className="flex-1 rounded-lg bg-brand-yellow px-3 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
               >
@@ -1468,6 +1599,9 @@ function DetalleCitaPanel({
           <div>
             <span className="text-stone-400">Servicio: </span>
             {cita.servicio?.nombre ?? "—"}
+            {nombresExtras(cita).length > 0 && (
+              <span className="text-stone-500"> + {nombresExtras(cita).join(", ")}</span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-stone-400">Barbero: </span>

@@ -37,7 +37,20 @@ interface Cita {
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string; foto_url?: string | null } | null;
-  extras?: { servicio_id: string }[];
+  // Complementos añadidos al servicio principal (ver lib/booking.ts) —
+  // "servicio" viene anidado por la relación con la tabla servicios, para
+  // poder mostrar su nombre en la Agenda sin otra consulta aparte.
+  extras?: { servicio_id: string; servicio: { nombre: string } | { nombre: string }[] | null }[];
+}
+
+// Nombres de los complementos de una cita, listos para mostrar (p.ej.
+// "Corte + Barba, Cejas") — "servicio" puede llegar como objeto o array
+// suelto según cómo Supabase resuelva la relación anidada.
+function nombresExtras(cita: { extras?: Cita["extras"] }): string[] {
+  return (cita.extras ?? [])
+    .map((ex) => (Array.isArray(ex.servicio) ? ex.servicio[0] : ex.servicio))
+    .map((s) => s?.nombre)
+    .filter((n): n is string => Boolean(n));
 }
 interface Bloqueo {
   id: string;
@@ -132,11 +145,16 @@ export default function AgendaClient({
   sedes,
   servicios,
   esAdmin,
+  profesionalIdPropio,
   datosIniciales,
 }: {
   sedes: Sede[];
   servicios: Servicio[];
   esAdmin: boolean;
+  // Ficha de barbero de la propia cuenta (null para el admin, o si la
+  // cuenta no tiene una vinculada) — para que la Agenda pueda distinguir
+  // "tu propio bloqueo/vacación" de la de un compañero (ver CalendarioDia.tsx).
+  profesionalIdPropio: string | null;
   // Citas de hoy en la primera sede, ya cargadas en el servidor (ver
   // dashboard/page.tsx) — mismos parámetros con los que arrancaría el
   // primer fetch de abajo. null si no hay ninguna sede configurada.
@@ -445,6 +463,7 @@ export default function AgendaClient({
               bloqueos={bloqueos}
               servicios={servicios}
               esAdmin={esAdmin}
+              profesionalIdPropio={profesionalIdPropio}
               cargando={cargando}
               onFinalizar={setFinalizando}
               onCambiarEstado={cambiarEstado}
@@ -591,7 +610,8 @@ function VistaSemanal({
                     />
                   )}
                   <span>
-                    {cita.servicio?.nombre} ·{" "}
+                    {cita.servicio?.nombre}
+                    {nombresExtras(cita).length > 0 ? ` + ${nombresExtras(cita).join(", ")}` : ""} ·{" "}
                     {cita.profesional?.nombre ?? "Cualquiera"}
                   </span>
                 </div>

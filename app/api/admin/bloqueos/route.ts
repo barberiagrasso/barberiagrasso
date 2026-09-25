@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { startOfDay, endOfDay, parse } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
-import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
+import { requireAdminApi, requireRolAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +10,15 @@ const TZ = process.env.BUSINESS_TIMEZONE || "Europe/Madrid";
 
 // Lista los bloqueos (vacaciones, días libres, cierres puntuales) de una
 // sede, incluyendo los que afectan a toda la sede (profesional_id nulo).
+// Solo rol "admin" (requireRolAdminApi): esta lista trae el motivo de
+// TODOS los barberos de la sede a la vez, sin filtrar por quién pregunta
+// — lo usa únicamente la pantalla de "Vacaciones y días libres", que ya
+// es solo-admin (ver app/admin/(protected)/bloqueos/page.tsx). Un
+// barbero viendo sus propios bloqueos en la Agenda no pasa por aquí (ver
+// lib/agenda.ts).
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminApi();
+    await requireRolAdminApi();
   } catch (err) {
     if (err instanceof NoAutorizadoError)
       return NextResponse.json({ error: err.message }, { status: 401 });
@@ -53,8 +59,9 @@ export async function GET(request: NextRequest) {
 // cierre de día completo). `fechaFin` se ignora en ese caso: la franja
 // nunca cruza de un día a otro.
 export async function POST(request: NextRequest) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError)
       return NextResponse.json({ error: err.message }, { status: 401 });
@@ -70,6 +77,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: "Faltan sedeId y fecha." },
       { status: 400 },
+    );
+  }
+
+  // Una cuenta de equipo (rol "barbero") puede crear un bloqueo arrastrando
+  // en su propia Agenda, pero solo en su propia columna — nunca en la de
+  // otro barbero ni "toda la sede" (eso sigue siendo cosa del admin desde
+  // la pantalla de Bloqueos, ya restringida a ese rol).
+  if (admin.rol !== "admin" && body.profesionalId !== admin.profesional_id) {
+    return NextResponse.json(
+      { error: "No puedes crear un bloqueo en la agenda de otro profesional." },
+      { status: 403 },
     );
   }
 

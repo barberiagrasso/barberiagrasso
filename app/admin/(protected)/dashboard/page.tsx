@@ -36,6 +36,7 @@ export default async function DashboardPage() {
         sedes={sedes ?? []}
         servicios={servicios ?? []}
         esAdmin={admin.rol === "admin"}
+        profesionalIdPropio={admin.profesional_id}
         datosIniciales={datosIniciales}
       />
     </div>
