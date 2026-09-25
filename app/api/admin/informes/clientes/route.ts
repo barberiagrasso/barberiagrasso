@@ -132,6 +132,9 @@ export async function GET(request: NextRequest) {
       "id, cliente_id, inicio, saldo_canjeado_centimos, precio_final_centimos, cliente:clientes(nombre), servicio:servicios(precio_centimos)",
     )
     .eq("estado", "completada")
+    // Un recibo anulado y archivado no es dinero real: fuera de ingresos
+    // por cliente, top clientes y valor medio (pedido de Diego, 25/09/2026).
+    .is("recibo_anulado_at", null)
     .gte("inicio", rango.desdeUTC.toISOString())
     .lte("inicio", rango.hastaUTC.toISOString());
   if (filtrarSede) rangoQuery = rangoQuery.eq("sede_id", sedeId);

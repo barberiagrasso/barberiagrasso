@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { ReciboView } from "@/components/recibo/ReciboView";
+import type { DatosRecibo } from "@/lib/recibo";
 
 export interface CitaNormalizada {
   id: string;
@@ -13,6 +15,10 @@ export interface CitaNormalizada {
   profesionalNombre: string;
   profesionalFotoUrl?: string | null;
   extrasNombres: string[];
+  // Solo presente en una cita "completada" (ver lib/recibo.ts) — permite
+  // enseñar "Ver recibo" sin tener que pedirlo aparte al servidor, ya
+  // viene calculado desde app/perfil/page.tsx.
+  recibo: DatosRecibo | null;
 }
 
 function formatearPrecio(centimos: number) {
@@ -49,6 +55,7 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [errorPorId, setErrorPorId] = useState<Record<string, string>>({});
+  const [reciboAbierto, setReciboAbierto] = useState<DatosRecibo | null>(null);
   // Se fija una sola vez al montar (no en cada render, que sería una
   // lectura "impura") — de sobra para decidir qué citas son futuras.
   const [ahora] = useState(() => Date.now());
@@ -128,6 +135,17 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
                   {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
                 </p>
                 <p className="mt-1 font-mono text-base tabular-nums">{formatearPrecio(cita.precioTotalCentimos)}</p>
+                {cita.recibo && (
+                  <button
+                    onClick={() => setReciboAbierto(cita.recibo)}
+                    className={
+                      "mt-1 font-body text-xs underline decoration-brand-line underline-offset-4 " +
+                      (activa ? "text-brand-black/70 hover:text-brand-black" : "text-brand-white-dim hover:text-brand-yellow")
+                    }
+                  >
+                    Ver recibo
+                  </button>
+                )}
               </div>
             </div>
 
@@ -174,6 +192,23 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
           </div>
         );
       })}
+
+      {reciboAbierto && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-10"
+          onClick={() => setReciboAbierto(null)}
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 text-stone-900 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <ReciboView recibo={reciboAbierto} />
+            <button
+              onClick={() => setReciboAbierto(null)}
+              className="mt-4 w-full rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-200"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

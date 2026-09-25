@@ -168,3 +168,47 @@ export function IconLogOut(props: IconProps) {
     </svg>
   );
 }
+
+export function IconPhone(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 4.5c0-.8.6-1.5 1.5-1.5H9l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v2.5c0 .8-.7 1.5-1.5 1.5C10.6 21.5 2.5 13.4 2.5 6.5 2.5 5.7 2.6 5 5 4.5Z" />
+    </svg>
+  );
+}
+
+export function IconChat(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 12a8 8 0 1 1 3.2 6.4L4 19.5l1.1-3.3A7.96 7.96 0 0 1 4 12Z" />
+    </svg>
+  );
+}
+
+export function IconCalendar(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3.5" y="5" width="17" height="16" rx="2" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+      <path d="M8.5 14l2 2 4-4" />
+    </svg>
+  );
+}
+
+export function IconArchive(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3.5" y="4.5" width="17" height="4.5" rx="1.2" />
+      <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
+      <path d="M10 13h4" />
+    </svg>
+  );
+}
+
+export function IconSend(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 12 20 4l-6 16-3-6-6-2Z" />
+    </svg>
+  );
+}

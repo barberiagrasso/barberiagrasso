@@ -7,15 +7,29 @@ import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
 import { BonosSection } from "./BonosSection";
 import { precioCitaCentimos } from "@/lib/precios";
 import { bonosDelCliente } from "@/lib/bonos";
+import { construirRecibo } from "@/lib/recibo";
 
 export const dynamic = "force-dynamic";
 
+// Incluye tanto lo que ya usaba esta pantalla (nombre de servicio/sede/
+// profesional, precio) como lo que hace falta para poder construir el
+// recibo de una visita completada con construirRecibo() (ver
+// lib/recibo.ts): pagado_at, método de pago, descuento aplicado y si se
+// anuló — todo en una sola consulta, sin repetirla por cada cita.
 interface CitaCruda {
   id: string;
   inicio: string;
   estado: string;
+  pagado_at: string | null;
+  metodo_pago: string | null;
   precio_final_centimos: number | null;
-  sede: { nombre: string } | { nombre: string }[] | null;
+  saldo_canjeado_centimos: number;
+  descuento_porcentaje: number | null;
+  descuento_motivo: string | null;
+  recibo_anulado_at: string | null;
+  recibo_anulado_por: string | null;
+  recibo_anulado_motivo: string | null;
+  sede: { nombre: string; direccion: string | null } | { nombre: string; direccion: string | null }[] | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
   profesional: { nombre: string; foto_url?: string | null } | { nombre: string; foto_url?: string | null }[] | null;
   extras: { precio_centimos: number; servicio: { nombre: string } | { nombre: string }[] | null }[] | null;
@@ -42,15 +56,42 @@ export default async function PerfilPage() {
   // y aquí solo se piden citas de ESE cliente, nunca de otro.
   const admin = createAdminClient();
   const bonos = await bonosDelCliente(admin, cliente.id);
+  // Trae de una vez tanto lo que ya usaba esta pantalla (nombre de
+  // servicio/sede/profesional, precio) como lo que hace falta para poder
+  // construir el recibo de una visita completada (ver lib/recibo.ts):
+  // pagado_at, método de pago, descuento aplicado y si se anuló.
   const { data: citas } = await admin
     .from("citas")
     .select(
-      "id, inicio, estado, precio_final_centimos, sede:sedes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
+      "id, inicio, estado, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, sede:sedes(nombre, direccion), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
     )
     .eq("cliente_id", cliente.id)
     .order("inicio", { ascending: false });
 
-  const historial: CitaNormalizada[] = ((citas ?? []) as unknown as CitaCruda[]).map((cita) => {
+  const citasCrudas = (citas ?? []) as unknown as CitaCruda[];
+
+  // El recibo completo (ver lib/recibo.ts) solo tiene sentido para citas
+  // ya "completada" — se cargan sus complementos/productos/reparto de
+  // pago EN BLOQUE (no cita por cita) para no lanzar un montón de
+  // consultas repetidas por cada visita del historial.
+  const idsCompletadas = citasCrudas.filter((c) => c.estado === "completada").map((c) => c.id);
+  const idsSeguro = idsCompletadas.length ? idsCompletadas : ["00000000-0000-0000-0000-000000000000"];
+  const [{ data: productosCrudos }, { data: pagosCrudos }] = await Promise.all([
+    admin.from("cita_productos").select("cita_id, cantidad, precio_centimos, producto:productos(nombre)").in("cita_id", idsSeguro),
+    admin.from("cita_pagos").select("cita_id, metodo, importe_centimos").in("cita_id", idsSeguro),
+  ]);
+  const productosPorCita = new Map<string, typeof productosCrudos>();
+  for (const p of productosCrudos ?? []) {
+    if (!productosPorCita.has(p.cita_id)) productosPorCita.set(p.cita_id, []);
+    productosPorCita.get(p.cita_id)!.push(p);
+  }
+  const pagosPorCita = new Map<string, typeof pagosCrudos>();
+  for (const p of pagosCrudos ?? []) {
+    if (!pagosPorCita.has(p.cita_id)) pagosPorCita.set(p.cita_id, []);
+    pagosPorCita.get(p.cita_id)!.push(p);
+  }
+
+  const historial: CitaNormalizada[] = citasCrudas.map((cita) => {
     const servicio = uno(cita.servicio);
     const extras = cita.extras ?? [];
     const totalAutomatico = (servicio?.precio_centimos ?? 0) + extras.reduce((acc, e) => acc + e.precio_centimos, 0);
@@ -66,6 +107,18 @@ export default async function PerfilPage() {
       profesionalNombre: uno(cita.profesional)?.nombre ?? "Cualquiera",
       profesionalFotoUrl: uno(cita.profesional)?.foto_url ?? null,
       extrasNombres: extras.map((e) => uno(e.servicio)?.nombre).filter((n): n is string => Boolean(n)),
+      // El propio cliente ve su recibo sin necesidad de otra consulta:
+      // ya se sabe quién es (requireCliente() de arriba), así que se le
+      // añade aquí a mano en vez de volver a pedirlo a la base de datos.
+      recibo:
+        cita.estado === "completada"
+          ? construirRecibo({
+              cita: { ...cita, cliente: { id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono } },
+              extras: extras as unknown as Parameters<typeof construirRecibo>[0]["extras"],
+              productos: (productosPorCita.get(cita.id) ?? []) as unknown as Parameters<typeof construirRecibo>[0]["productos"],
+              pagos: (pagosPorCita.get(cita.id) ?? []) as unknown as Parameters<typeof construirRecibo>[0]["pagos"],
+            })
+          : null,
     };
   });
 

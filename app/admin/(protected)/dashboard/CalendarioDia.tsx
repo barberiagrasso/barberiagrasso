@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   fechaEnMadrid,
   minutosEnMadrid,
   minutosDeHora,
+  horaEnMadrid,
   isoDesdeMadrid,
 } from "@/lib/horarioLocal";
 import {
@@ -18,8 +20,16 @@ import {
   IconCheck,
   IconAlertCircle,
   IconX,
+  IconPhone,
+  IconChat,
+  IconCalendar,
+  IconArchive,
+  IconSend,
 } from "@/components/ui/Icons";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { ReciboView } from "@/components/recibo/ReciboView";
+import { euros } from "@/lib/formato";
+import type { DatosRecibo } from "@/lib/recibo";
 
 interface Cita {
   id: string;
@@ -29,13 +39,26 @@ interface Cita {
   origen: string;
   profesional_elegido_por_cliente?: boolean;
   metodo_pago?: string | null;
+  // Precio corregido a mano al cerrar la cita (checkout de "Finalizar
+  // cita") — null si no se tocó, en cuyo caso el precio es el automático
+  // de servicio + complementos (ver lib/precios.ts). Junto con
+  // saldo_canjeado_centimos y recibo_anulado_at, permiten mostrar un
+  // importe/estado de pago ya en el panel de detalle, sin esperar a abrir
+  // el recibo completo (ver lib/recibo.ts).
+  precio_final_centimos?: number | null;
+  saldo_canjeado_centimos?: number;
+  recibo_anulado_at?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
-  servicio: { id: string; nombre: string; color?: string | null } | null;
+  servicio: { id: string; nombre: string; color?: string | null; precio_centimos?: number; duracion_minutos?: number } | null;
   profesional: { id: string; nombre: string; foto_url?: string | null } | null;
   // Complementos añadidos al servicio principal (ver lib/booking.ts),
   // igual que en AgendaClient.tsx — "servicio" puede llegar como objeto o
   // array suelto según cómo Supabase resuelva la relación anidada.
-  extras?: { servicio_id: string; servicio: { nombre: string } | { nombre: string }[] | null }[];
+  extras?: {
+    servicio_id: string;
+    precio_centimos?: number;
+    servicio: { nombre: string } | { nombre: string }[] | null;
+  }[];
 }
 
 // Nombres de los complementos de una cita, listos para mostrar.
@@ -213,6 +236,13 @@ export default function CalendarioDia({
     horaFin: string;
     motivo: string | null;
   } | null>(null);
+  // Datos con los que precargar el formulario de "Nueva cita" cuando se
+  // abre desde "Reservar de nuevo" en el panel de detalle (ver
+  // reservarDeNuevo más abajo, definida después de `columnas` y
+  // `creacion` porque depende de las dos) — null cuando se abre del modo
+  // normal (arrastrando sobre la agenda), que no tiene cliente/servicio
+  // previos.
+  const [prefillCita, setPrefillCita] = useState<{ telefono: string; nombre: string; servicioId: string } | null>(null);
 
   // Columnas a mostrar: los profesionales que trabajan ese día (tienen
   // horario) o que ya tienen alguna cita ese día, aunque no les tocara
@@ -503,6 +533,31 @@ export default function CalendarioDia({
     finMin: number;
     fase: "arrastrando" | "menu" | "bloqueo" | "cita";
   } | null>(null);
+
+  // "Reservar de nuevo" (botón del panel de detalle, ver DetalleCitaPanel
+  // más abajo): abre el mismo formulario de "Nueva cita" que arrastrando
+  // en la agenda, pero ya con el cliente y el servicio de esta cita
+  // rellenos — el barbero solo tiene que confirmar la hora. Se abre para
+  // "ahora mismo" (redondeado a los 5 minutos siguientes), en la columna
+  // de ese mismo profesional si la cita tenía uno asignado.
+  function reservarDeNuevo(cita: Cita) {
+    if (!cita.cliente || !cita.servicio) return;
+    const minutosAhora = minutosDeHora(horaEnMadrid(new Date().toISOString()));
+    const inicioMin = Math.ceil(minutosAhora / 5) * 5;
+    const duracion = cita.servicio.duracion_minutos ?? 30;
+    setSeleccionada(null);
+    setPrefillCita({
+      telefono: cita.cliente.telefono ?? "",
+      nombre: cita.cliente.nombre,
+      servicioId: cita.servicio.id,
+    });
+    setCreacion({
+      profesionalId: cita.profesional?.id ?? columnas.find((c) => c.id !== ID_SIN_ASIGNAR)?.id ?? ID_SIN_ASIGNAR,
+      inicioMin,
+      finMin: inicioMin + duracion,
+      fase: "cita",
+    });
+  }
 
   function iniciarCreacion(
     e: React.PointerEvent<HTMLDivElement>,
@@ -962,7 +1017,10 @@ export default function CalendarioDia({
                             </span>
                           )}
                           {cita.estado === "completada" && cita.metodo_pago && (
-                            <span className="text-emerald-600" title="Pagada">
+                            <span
+                              className={cita.recibo_anulado_at ? "text-red-500 line-through" : "text-emerald-600"}
+                              title={cita.recibo_anulado_at ? "Recibo anulado" : "Pagada"}
+                            >
                               $
                             </span>
                           )}
@@ -1001,6 +1059,7 @@ export default function CalendarioDia({
         <DetalleCitaPanel
           cita={seleccionada}
           avisando={avisando}
+          esAdmin={esAdmin}
           onCerrar={() => setSeleccionada(null)}
           onFinalizar={() => {
             onFinalizar(seleccionada);
@@ -1011,6 +1070,8 @@ export default function CalendarioDia({
             setSeleccionada(null);
           }}
           onAvisarDisponible={() => onAvisarDisponible(seleccionada.id)}
+          onReservarDeNuevo={() => reservarDeNuevo(seleccionada)}
+          onRecargarAgenda={onCreado}
         />
       )}
 
@@ -1024,12 +1085,17 @@ export default function CalendarioDia({
           finMin={creacion.finMin}
           fase={creacion.fase}
           servicios={servicios}
+          valoresIniciales={prefillCita}
           onCambiarFase={(fase) =>
             setCreacion((actual) => (actual ? { ...actual, fase } : actual))
           }
-          onCerrar={() => setCreacion(null)}
+          onCerrar={() => {
+            setCreacion(null);
+            setPrefillCita(null);
+          }}
           onCreado={() => {
             setCreacion(null);
+            setPrefillCita(null);
             onCreado();
           }}
         />
@@ -1064,6 +1130,7 @@ function MenuCreacion({
   finMin,
   fase,
   servicios,
+  valoresIniciales,
   onCambiarFase,
   onCerrar,
   onCreado,
@@ -1076,6 +1143,11 @@ function MenuCreacion({
   finMin: number;
   fase: "menu" | "bloqueo" | "cita";
   servicios: ServicioOpcion[];
+  // Precarga de "Reservar de nuevo" desde el panel de detalle de una
+  // cita ya pasada (ver reservarDeNuevo más arriba): mismo cliente y
+  // mismo servicio que esa cita, el barbero solo confirma la hora. null
+  // en el flujo normal (arrastrando sobre un hueco vacío de la agenda).
+  valoresIniciales?: { telefono: string; nombre: string; servicioId: string } | null;
   onCambiarFase: (fase: "menu" | "bloqueo" | "cita") => void;
   onCerrar: () => void;
   onCreado: () => void;
@@ -1085,7 +1157,7 @@ function MenuCreacion({
     Math.max(5, finMin - inicioMin),
   );
   const [motivo, setMotivo] = useState("");
-  const [servicioId, setServicioId] = useState(servicios[0]?.id ?? "");
+  const [servicioId, setServicioId] = useState(valoresIniciales?.servicioId ?? servicios[0]?.id ?? "");
   const [profesionalIdElegido, setProfesionalIdElegido] = useState(profesionalId);
   // Hora de inicio y fin de la cita, editables a mano (pedido de Diego,
   // 25/09/2026: como en Booksy, sin atarse a la cuadrícula de huecos de
@@ -1097,9 +1169,11 @@ function MenuCreacion({
   const [horaFin, setHoraFin] = useState(horaDeMinutos(finMin));
   const [finTocadoAMano, setFinTocadoAMano] = useState(false);
   const [solicitadoPorCliente, setSolicitadoPorCliente] = useState(false);
-  const [telefono, setTelefono] = useState("");
+  const [telefono, setTelefono] = useState(valoresIniciales?.telefono ?? "");
   const [nombreNuevo, setNombreNuevo] = useState("");
-  const [estadoCliente, setEstadoCliente] = useState<EstadoClienteRapido>({ tipo: "vacio" });
+  const [estadoCliente, setEstadoCliente] = useState<EstadoClienteRapido>(
+    valoresIniciales?.telefono ? { tipo: "encontrado", nombre: valoresIniciales.nombre } : { tipo: "vacio" },
+  );
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1546,21 +1620,78 @@ function EditarBloqueoModal({
   );
 }
 
+// Iniciales de un nombre para el avatar redondo del cliente (no tiene
+// foto, a diferencia de un profesional) — hasta dos iniciales, de la
+// primera y la última palabra del nombre.
+function inicialesCliente(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "?";
+  const primera = partes[0][0] ?? "";
+  const ultima = partes.length > 1 ? (partes[partes.length - 1][0] ?? "") : "";
+  return (primera + ultima).toUpperCase();
+}
+
+/** Precio estimado de una cita todavía no completada: servicio + complementos de catálogo. */
+function precioEstimadoCentimos(cita: Cita): number {
+  const automatico = (cita.servicio?.precio_centimos ?? 0) + (cita.extras ?? []).reduce((acc, e) => acc + (e.precio_centimos ?? 0), 0);
+  return typeof cita.precio_final_centimos === "number" ? cita.precio_final_centimos : automatico;
+}
+
+function formatoFechaCorta(iso: string) {
+  return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric", timeZone: "Europe/Madrid" });
+}
+
+function formatoICSFecha(iso: string) {
+  return new Date(iso).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+/** data: URI de un .ics de un solo evento, para el enlace "Añadir al calendario". */
+function urlICSDeCita(cita: Cita): string {
+  const contenido = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Barberia Grasso//Agenda//ES",
+    "BEGIN:VEVENT",
+    `UID:${cita.id}@barberiagrasso.com`,
+    `DTSTAMP:${formatoICSFecha(new Date().toISOString())}`,
+    `DTSTART:${formatoICSFecha(cita.inicio)}`,
+    `DTEND:${formatoICSFecha(cita.fin)}`,
+    `SUMMARY:${(cita.servicio?.nombre ?? "Cita") + " · Barbería Grasso"}`,
+    `DESCRIPTION:Cliente: ${cita.cliente?.nombre ?? "—"}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(contenido)}`;
+}
+
 function DetalleCitaPanel({
   cita,
   avisando,
+  esAdmin,
   onCerrar,
   onFinalizar,
   onCambiarEstado,
   onAvisarDisponible,
+  onReservarDeNuevo,
+  onRecargarAgenda,
 }: {
   cita: Cita;
   avisando: string | null;
+  esAdmin: boolean;
   onCerrar: () => void;
   onFinalizar: () => void;
   onCambiarEstado: (estado: string) => void;
   onAvisarDisponible: () => void;
+  onReservarDeNuevo: () => void;
+  // Refresca la lista de citas de la Agenda tras anular/reactivar un
+  // recibo desde el panel de recibo (ver ReciboPanel) — para que el "$"
+  // del bloque se actualice sin tener que cerrar y volver a abrir.
+  onRecargarAgenda: () => void;
 }) {
+  const [verRecibo, setVerRecibo] = useState(false);
+  const telefono = cita.cliente?.telefono;
+  const puedeVerRecibo = cita.estado === "completada" && Boolean(cita.metodo_pago);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
@@ -1571,71 +1702,123 @@ function DetalleCitaPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <div className="text-lg font-bold text-stone-900">
-              {formatoHora(cita.inicio)} – {formatoHora(cita.fin)}
-            </div>
-            <div className="text-sm text-stone-500">
-              {cita.cliente?.nombre ?? "Cliente"}
-            </div>
-          </div>
-          <span
-            className={
-              "shrink-0 rounded-full px-2 py-1 text-xs " +
-              (cita.estado === "cancelada"
-                ? "bg-red-100 text-red-700"
-                : cita.estado === "completada"
-                  ? "bg-green-100 text-green-700"
-                  : cita.estado === "no_presentada"
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-stone-100 text-stone-700")
-            }
-          >
-            {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
-          </span>
+          <div className="text-lg font-bold text-stone-900">{ETIQUETA_ESTADO[cita.estado] ?? cita.estado}</div>
+          <button onClick={onCerrar} className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600">
+            <IconX className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="space-y-1 text-sm text-stone-700">
+        <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-stone-50 p-3">
           <div>
-            <span className="text-stone-400">Servicio: </span>
-            {cita.servicio?.nombre ?? "—"}
-            {nombresExtras(cita).length > 0 && (
-              <span className="text-stone-500"> + {nombresExtras(cita).join(", ")}</span>
-            )}
+            <div className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Inicio</div>
+            <div className="text-base font-semibold text-stone-900">{formatoHora(cita.inicio)}</div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-stone-400">Barbero: </span>
-            {cita.profesional && (
-              <AvatarProfesional
-                fotoUrl={cita.profesional.foto_url}
-                nombre={cita.profesional.nombre}
-                className="h-5 w-5"
-              />
-            )}
-            {cita.profesional?.nombre ?? "Sin asignar"}
-            {cita.profesional_elegido_por_cliente && (
-              <span
-                className="ml-1 text-red-500"
-                title="El cliente pidió a este profesional en concreto"
-              >
-                ♥
-              </span>
-            )}
-            {cita.estado === "completada" && cita.metodo_pago && (
-              <span className="ml-1 text-emerald-600" title="Pagada">
-                $
-              </span>
-            )}
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Fecha</div>
+            <div className="text-base font-semibold text-stone-900">{formatoFechaCorta(cita.inicio)}</div>
           </div>
-          {cita.cliente?.telefono && (
+        </div>
+
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-200 text-sm font-semibold text-stone-600">
+            {inicialesCliente(cita.cliente?.nombre ?? "?")}
+          </div>
+          <div className="min-w-0">
+            {esAdmin && cita.cliente ? (
+              <Link href={`/admin/clientes/${cita.cliente.id}`} className="truncate text-sm font-semibold text-stone-900 hover:underline">
+                {cita.cliente.nombre}
+              </Link>
+            ) : (
+              <div className="truncate text-sm font-semibold text-stone-900">{cita.cliente?.nombre ?? "Cliente"}</div>
+            )}
+            {telefono && <div className="text-xs text-stone-500">{telefono}</div>}
+          </div>
+        </div>
+
+        {telefono && (
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <a
+              href={`tel:${telefono}`}
+              className="flex flex-col items-center gap-1 rounded-lg border border-stone-200 py-2 text-xs font-medium text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+            >
+              <IconPhone className="h-4 w-4" />
+              Llamar
+            </a>
+            <a
+              href={`https://wa.me/${telefono.replace(/[^0-9]/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex flex-col items-center gap-1 rounded-lg border border-stone-200 py-2 text-xs font-medium text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+            >
+              <IconChat className="h-4 w-4" />
+              WhatsApp
+            </a>
+            <a
+              href={`sms:${telefono}`}
+              className="flex flex-col items-center gap-1 rounded-lg border border-stone-200 py-2 text-xs font-medium text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+            >
+              <IconSend className="h-4 w-4" />
+              SMS
+            </a>
+          </div>
+        )}
+
+        <div className="mb-3 space-y-1.5 border-t border-stone-100 pt-3 text-sm">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-stone-400">Teléfono: </span>
-              {cita.cliente.telefono}
+              <div className="font-medium text-stone-900">
+                {cita.servicio?.nombre ?? "—"}
+                {nombresExtras(cita).length > 0 && <span className="text-stone-500"> + {nombresExtras(cita).join(", ")}</span>}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                {formatoHora(cita.inicio)} - {formatoHora(cita.fin)}
+                {cita.profesional && (
+                  <>
+                    {" · "}
+                    <AvatarProfesional fotoUrl={cita.profesional.foto_url} nombre={cita.profesional.nombre} className="h-4 w-4" />
+                    {cita.profesional.nombre}
+                  </>
+                )}
+                {cita.profesional_elegido_por_cliente && (
+                  <span className="text-red-500" title="El cliente pidió a este profesional en concreto">
+                    ♥
+                  </span>
+                )}
+              </div>
             </div>
-          )}
+            <div className="shrink-0 font-mono text-sm text-stone-700">{euros(precioEstimadoCentimos(cita))}</div>
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        {cita.estado === "completada" && (
+          <div className="mb-3 border-t border-stone-100 pt-3">
+            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-stone-400">Pagos</div>
+            {puedeVerRecibo ? (
+              <button
+                onClick={() => setVerRecibo(true)}
+                className="flex w-full items-center justify-between rounded-lg border border-stone-200 px-3 py-2 text-sm hover:border-stone-300 hover:bg-stone-50"
+              >
+                <span className={cita.recibo_anulado_at ? "text-red-600" : "text-emerald-700"}>
+                  {cita.recibo_anulado_at ? "Anulado" : "Pagado"}
+                </span>
+                <span className="text-stone-500">Ver recibo →</span>
+              </button>
+            ) : (
+              <p className="text-sm text-stone-500">Sin cobrar todavía.</p>
+            )}
+          </div>
+        )}
+
+        <a
+          href={urlICSDeCita(cita)}
+          download={`cita-${cita.id}.ics`}
+          className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-700"
+        >
+          <IconCalendar className="h-4 w-4" />
+          Añadir al calendario
+        </a>
+
+        <div className="flex flex-wrap gap-2">
           {(cita.estado === "confirmada" || cita.estado === "completada") && (
             <button
               onClick={onAvisarDisponible}
@@ -1671,11 +1854,210 @@ function DetalleCitaPanel({
               </button>
             </>
           )}
+          {cita.estado !== "confirmada" && cita.cliente && cita.servicio && (
+            <button
+              onClick={onReservarDeNuevo}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink transition hover:bg-brand-yellow-dark"
+            >
+              Reservar de nuevo
+            </button>
+          )}
         </div>
 
         <button
           onClick={onCerrar}
           className="mt-4 rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200"
+        >
+          Cerrar
+        </button>
+      </div>
+
+      {verRecibo && (
+        <ReciboPanel
+          citaId={cita.id}
+          esAdmin={esAdmin}
+          onCerrar={(cambio) => {
+            setVerRecibo(false);
+            if (cambio) onRecargarAgenda();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Recibo completo de una cita ya cobrada (ver lib/recibo.ts), con las
+// acciones de anular/archivar (solo admin) y enviar por WhatsApp (pedido
+// de Diego, 25/09/2026 — con capturas de Booksy de referencia). Se abre
+// por encima del panel de detalle, no lo sustituye, así que su propio
+// onClick para en el div interior igual que el resto de paneles.
+function ReciboPanel({
+  citaId,
+  esAdmin,
+  onCerrar,
+}: {
+  citaId: string;
+  esAdmin: boolean;
+  // true = algo cambió (se anuló o se reactivó) y la Agenda de fuera debe recargarse.
+  onCerrar: (cambio: boolean) => void;
+}) {
+  const [recibo, setRecibo] = useState<DatosRecibo | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cambioRealizado, setCambioRealizado] = useState(false);
+  const [anulando, setAnulando] = useState(false);
+  const [motivoAnular, setMotivoAnular] = useState<string | null>(null);
+  const [enviandoWhatsapp, setEnviandoWhatsapp] = useState(false);
+  const [avisoWhatsapp, setAvisoWhatsapp] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    fetch(`/api/admin/citas/${citaId}/recibo`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelado) return;
+        if (j.recibo) setRecibo(j.recibo);
+        else setError(j.error || "No se pudo cargar el recibo.");
+      })
+      .catch(() => !cancelado && setError("No se pudo conectar con el servidor."))
+      .finally(() => !cancelado && setCargando(false));
+    return () => {
+      cancelado = true;
+    };
+  }, [citaId]);
+
+  async function confirmarAnular() {
+    if (!motivoAnular?.trim()) return;
+    setAnulando(true);
+    try {
+      const res = await fetch(`/api/admin/citas/${citaId}/anular-recibo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo: motivoAnular.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "No se pudo anular el recibo.");
+        return;
+      }
+      setCambioRealizado(true);
+      setMotivoAnular(null);
+      setRecibo((actual) => (actual ? { ...actual, anulado: { atISO: new Date().toISOString(), por: null, motivo: motivoAnular.trim() } } : actual));
+    } finally {
+      setAnulando(false);
+    }
+  }
+
+  async function reactivar() {
+    setAnulando(true);
+    try {
+      const res = await fetch(`/api/admin/citas/${citaId}/anular-recibo`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "No se pudo reactivar el recibo.");
+        return;
+      }
+      setCambioRealizado(true);
+      setRecibo((actual) => (actual ? { ...actual, anulado: null } : actual));
+    } finally {
+      setAnulando(false);
+    }
+  }
+
+  async function enviarWhatsapp() {
+    setEnviandoWhatsapp(true);
+    setAvisoWhatsapp(null);
+    try {
+      const res = await fetch(`/api/admin/citas/${citaId}/enviar-recibo-whatsapp`, { method: "POST" });
+      const json = await res.json();
+      setAvisoWhatsapp(res.ok ? "Enviado por WhatsApp." : json.error || "No se pudo enviar.");
+    } catch {
+      setAvisoWhatsapp("No se pudo conectar con el servidor.");
+    } finally {
+      setEnviandoWhatsapp(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      onClick={() => onCerrar(cambioRealizado)}
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        {cargando && <p className="text-sm text-stone-500">Cargando recibo…</p>}
+        {!cargando && error && !recibo && <p className="text-sm text-red-600">{error}</p>}
+
+        {recibo && (
+          <ReciboView
+            recibo={recibo}
+            acciones={
+              <div className="space-y-2 border-t border-stone-100 pt-3">
+                {error && <p className="text-sm text-red-600">{error}</p>}
+                {avisoWhatsapp && <p className="text-sm text-stone-600">{avisoWhatsapp}</p>}
+
+                <button
+                  onClick={enviarWhatsapp}
+                  disabled={enviandoWhatsapp}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-400 disabled:opacity-50"
+                >
+                  <IconSend className="h-4 w-4" />
+                  {enviandoWhatsapp ? "Enviando…" : "Enviar por WhatsApp"}
+                </button>
+
+                {esAdmin && !recibo.anulado && motivoAnular === null && (
+                  <button
+                    onClick={() => setMotivoAnular("")}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                  >
+                    <IconArchive className="h-4 w-4" />
+                    Anular y archivar
+                  </button>
+                )}
+                {esAdmin && !recibo.anulado && motivoAnular !== null && (
+                  <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <label className="block text-xs font-medium text-red-700">
+                      Motivo de la anulación (obligatorio)
+                      <input
+                        autoFocus
+                        value={motivoAnular}
+                        onChange={(e) => setMotivoAnular(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-red-300 p-2 text-sm"
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={confirmarAnular}
+                        disabled={anulando || !motivoAnular.trim()}
+                        className="flex-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {anulando ? "Anulando…" : "Confirmar anulación"}
+                      </button>
+                      <button
+                        onClick={() => setMotivoAnular(null)}
+                        className="rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-200"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {esAdmin && recibo.anulado && (
+                  <button
+                    onClick={reactivar}
+                    disabled={anulando}
+                    className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-400 disabled:opacity-50"
+                  >
+                    {anulando ? "Reactivando…" : "Reactivar recibo"}
+                  </button>
+                )}
+              </div>
+            }
+          />
+        )}
+
+        <button
+          onClick={() => onCerrar(cambioRealizado)}
+          className="mt-4 w-full rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-stone-200"
         >
           Cerrar
         </button>

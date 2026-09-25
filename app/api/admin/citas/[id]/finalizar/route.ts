@@ -284,6 +284,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       fin: fin.toISOString(),
       estado: "completada",
       metodo_pago: metodoPagoFinal,
+      // Momento exacto del cobro, para poder mostrarlo en el recibo (ver
+      // lib/recibo.ts) — distinto de `inicio` (la hora de la cita).
+      pagado_at: new Date().toISOString(),
       bono_id: bonoIdParaCita,
       ...(precioFinalCentimos !== undefined ? { precio_final_centimos: precioFinalCentimos } : {}),
       // Siempre se escriben las dos juntas (o ninguna): si esta cita ya

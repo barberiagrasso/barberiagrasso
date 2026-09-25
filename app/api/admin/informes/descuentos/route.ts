@@ -53,6 +53,13 @@ export async function GET(request: NextRequest) {
       "id, inicio, precio_final_centimos, descuento_porcentaje, descuento_motivo, cliente:clientes(nombre), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre)"
     )
     .not("descuento_porcentaje", "is", null)
+    // Un descuento solo se aplica desde el checkout de "Finalizar cita",
+    // así que en la práctica esto ya implicaba estado = completada — pero
+    // no estaba comprobado explícitamente aquí, y una cita completada se
+    // puede anular/archivar después (ver lib/recibo.ts): sin este filtro,
+    // el informe seguía contando un descuento cuyo cobro ya no es real.
+    .eq("estado", "completada")
+    .is("recibo_anulado_at", null)
     .gte("inicio", rango.desdeUTC.toISOString())
     .lte("inicio", rango.hastaUTC.toISOString())
     .order("inicio", { ascending: false });

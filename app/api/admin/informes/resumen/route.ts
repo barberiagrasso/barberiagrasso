@@ -30,6 +30,10 @@ interface CitaFila {
   // lib/precios.ts. Si es null, el precio real de esta cita es el
   // automático (servicio + complementos).
   precio_final_centimos: number | null;
+  // Recibo anulado y archivado (ver lib/recibo.ts): aunque la cita siga
+  // "completada", si se anuló su recibo no debe contar como dinero real
+  // en ningún informe — pedido explícito de Diego (25/09/2026).
+  recibo_anulado_at: string | null;
   profesional: { nombre: string } | { nombre: string }[] | null;
   servicio:
     | { nombre: string; precio_centimos: number }
@@ -139,7 +143,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
 
   const SELECT =
-    "id, sede_id, profesional_id, origen, estado, inicio, saldo_canjeado_centimos, precio_final_centimos, profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos), sede:sedes(nombre)";
+    "id, sede_id, profesional_id, origen, estado, inicio, saldo_canjeado_centimos, precio_final_centimos, recibo_anulado_at, profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos), sede:sedes(nombre)";
 
   let query = supabase
     .from("citas")
@@ -149,7 +153,9 @@ export async function GET(request: NextRequest) {
   if (sedeId && sedeId !== "todas") query = query.eq("sede_id", sedeId);
   const { data: citasCrudas } = await query;
   const citas = (citasCrudas ?? []) as unknown as CitaFila[];
-  const citasCompletadas = citas.filter((c) => c.estado === "completada");
+  const citasCompletadas = citas.filter(
+    (c) => c.estado === "completada" && !c.recibo_anulado_at,
+  );
 
   const { extrasPorCita, productosPorCita, ingresosTotalCentimos } =
     await calcularIngresos(supabase, citasCompletadas);
@@ -167,11 +173,12 @@ export async function GET(request: NextRequest) {
     let queryAnterior = supabase
       .from("citas")
       .select(
-        "id, estado, saldo_canjeado_centimos, precio_final_centimos, servicio:servicios(precio_centimos)",
+        "id, estado, saldo_canjeado_centimos, precio_final_centimos, recibo_anulado_at, servicio:servicios(precio_centimos)",
       )
       .gte("inicio", anterior.desdeUTC.toISOString())
       .lte("inicio", anterior.hastaUTC.toISOString())
-      .eq("estado", "completada");
+      .eq("estado", "completada")
+      .is("recibo_anulado_at", null);
     if (sedeId && sedeId !== "todas")
       queryAnterior = queryAnterior.eq("sede_id", sedeId);
     const { data: citasAnteriorCrudas } = await queryAnterior;

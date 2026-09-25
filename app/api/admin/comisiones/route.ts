@@ -142,6 +142,11 @@ export async function GET(request: NextRequest) {
       "id, profesional_id, saldo_canjeado_centimos, precio_final_centimos, bono_id, descuento_porcentaje, profesional:profesionales(nombre, foto_url), servicio:servicios(precio_centimos)"
     )
     .eq("estado", "completada")
+    // Un recibo anulado y archivado (ver lib/recibo.ts) no debe generar
+    // comisión — pedido de Diego (25/09/2026): "si no se completa una
+    // cita [o se anula su cobro], que no cuente la facturación... ni
+    // para barberos ni para la administración".
+    .is("recibo_anulado_at", null)
     .gte("inicio", rango.desdeUTC.toISOString())
     .lte("inicio", rango.hastaUTC.toISOString())
     .not("profesional_id", "is", null); // sin barbero asignado no hay a quién pagarle comisión

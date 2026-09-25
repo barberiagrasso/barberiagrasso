@@ -34,6 +34,9 @@ interface Cita {
   origen: string;
   profesional_elegido_por_cliente?: boolean;
   metodo_pago?: string | null;
+  // Recibo anulado y archivado (ver lib/recibo.ts) — deja de contar en
+  // facturación/comisiones aunque la cita siga "completada".
+  recibo_anulado_at?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null } | null;
   profesional: { id: string; nombre: string; foto_url?: string | null } | null;
@@ -594,7 +597,10 @@ function VistaSemanal({
                     </span>
                   )}
                   {cita.estado === "completada" && cita.metodo_pago && (
-                    <span className="text-emerald-600" title="Pagada">
+                    <span
+                      className={cita.recibo_anulado_at ? "text-red-500 line-through" : "text-emerald-600"}
+                      title={cita.recibo_anulado_at ? "Recibo anulado" : "Pagada"}
+                    >
                       $
                     </span>
                   )}

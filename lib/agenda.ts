@@ -81,7 +81,7 @@ export async function cargarDatosAgenda(
     supabase
       .from("citas")
       .select(
-        "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, metodo_pago, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id, servicio:servicios(nombre))",
+        "id, inicio, fin, estado, origen, notas, profesional_elegido_por_cliente, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, recibo_anulado_at, cliente:clientes(id, nombre, telefono), servicio:servicios(id, nombre, duracion_minutos, precio_centimos, color), profesional:profesionales(id, nombre), extras:cita_extras(servicio_id, precio_centimos, servicio:servicios(nombre))",
       )
       .eq("sede_id", sedeId)
       .gte("inicio", inicioDia)

@@ -13,6 +13,7 @@ export type OrigenError =
   | "cron_backup"
   | "fidelizacion"
   | "aviso_disponibilidad"
+  | "recibo_whatsapp"
   | "recuperacion_password"
   | "aviso_alta"
   | "servidor";

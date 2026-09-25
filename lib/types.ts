@@ -117,6 +117,17 @@ export interface Cita {
   // completada, o completada antes de que existiera este campo.
   metodo_pago?: string | null;
   precio_final_centimos?: number | null;
+  // Se rellena en el checkout de "Finalizar cita" junto con
+  // metodo_pago/precio_final_centimos — momento exacto en que se cobró
+  // (distinto de `inicio`, la hora de la cita). Citas completadas antes
+  // de este campo se quedan con null.
+  pagado_at?: string | null;
+  // Anular y archivar un recibo (pedido de Diego, 25/09/2026): deja de
+  // contar en facturación/comisiones pero no borra la cita ni su
+  // historial — ver lib/recibo.ts. null/undefined = recibo activo.
+  recibo_anulado_at?: string | null;
+  recibo_anulado_por?: string | null;
+  recibo_anulado_motivo?: string | null;
   created_at: string;
 }
 
