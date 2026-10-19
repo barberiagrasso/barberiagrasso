@@ -139,7 +139,7 @@ export default function ConversacionesPanel() {
               <button
                 disabled={enviando || !respuesta.trim()}
                 onClick={enviarRespuesta}
-                className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+                className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
               >
                 Enviar
               </button>

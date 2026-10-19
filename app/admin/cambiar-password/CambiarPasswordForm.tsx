@@ -65,7 +65,7 @@ export default function CambiarPasswordForm({ obligatorio, destino }: { obligato
 
       <button
         disabled={cargando}
-        className="w-full rounded-full bg-brand-yellow p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:opacity-50"
+        className="w-full rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-50"
       >
         {cargando ? "Un momento…" : "Guardar contraseña"}
       </button>

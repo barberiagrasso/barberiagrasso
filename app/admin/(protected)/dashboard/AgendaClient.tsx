@@ -448,7 +448,7 @@ export default function AgendaClient({
 
             <button
               onClick={() => setMostrarNueva((v) => !v)}
-              className="ml-auto rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white"
+              className="ml-auto rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity"
             >
               {mostrarNueva ? "Cerrar" : "+ Nueva cita"}
             </button>
@@ -874,7 +874,7 @@ function NuevaCitaForm({
       <button
         disabled={!horaInicioISO || !telefono || !nombreParaGuardar || enviando}
         onClick={crear}
-        className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+        className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
       >
         {enviando ? "Guardando…" : "Guardar cita"}
       </button>

@@ -28,18 +28,22 @@ export function ResumenDia({ citas }: { citas: CitaResumen[] }) {
     return acc + (typeof c.precio_final_centimos === "number" ? c.precio_final_centimos : automatico);
   }, 0);
 
+  // Tratamiento "destacado" (esquina superior izquierda cortada, resto recta,
+  // sin borde — el color de fondo hace el trabajo): es la firma visual que
+  // reservamos para paneles de "vistazo rápido" como este, no para tarjetas
+  // normales de listado (esas siguen con su rounded-lg de siempre).
   return (
     <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-      <div className="rounded-lg border border-stone-200 bg-white p-3">
-        <div className="text-[11px] uppercase tracking-wide text-stone-400">Citas hoy</div>
+      <div className="rounded-tl-md bg-stone-100 p-4">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Citas hoy</div>
         <div className="text-lg font-bold text-stone-900">{activas.length}</div>
       </div>
-      <div className="rounded-lg border border-stone-200 bg-white p-3">
-        <div className="text-[11px] uppercase tracking-wide text-stone-400">Completadas</div>
+      <div className="rounded-tl-md bg-stone-100 p-4">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Completadas</div>
         <div className="text-lg font-bold text-stone-900">{completadas.length}</div>
       </div>
-      <div className="col-span-2 rounded-lg border border-stone-200 bg-white p-3 sm:col-span-1">
-        <div className="text-[11px] uppercase tracking-wide text-stone-400">Cobrado hoy</div>
+      <div className="col-span-2 rounded-tl-md bg-stone-100 p-4 sm:col-span-1">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Cobrado hoy</div>
         <div className="text-lg font-bold text-emerald-700">{euros(cobradoCentimos)}</div>
       </div>
     </div>

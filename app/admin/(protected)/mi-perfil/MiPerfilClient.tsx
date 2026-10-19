@@ -90,7 +90,7 @@ export function MiPerfilClient({
           <button
             onClick={() => inputRef.current?.click()}
             disabled={subiendo}
-            className="rounded-full bg-brand-yellow px-4 py-2 text-xs font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-none bg-brand-black px-4 py-2 text-xs font-semibold uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {subiendo ? "Subiendo…" : foto ? "Cambiar foto" : "Subir foto"}
           </button>

@@ -1307,7 +1307,7 @@ function MenuCreacion({
             </button>
             <button
               onClick={() => onCambiarFase("cita")}
-              className="w-full rounded-lg bg-brand-yellow px-3 py-2 text-left text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark"
+              className="w-full rounded-none bg-brand-black px-3 py-2 text-left text-sm font-medium text-brand-white hover:opacity-85 transition-opacity"
             >
               Nueva cita
             </button>
@@ -1345,7 +1345,7 @@ function MenuCreacion({
               <button
                 disabled={enviando}
                 onClick={guardarBloqueo}
-                className="flex-1 rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="flex-1 rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
               >
                 {enviando ? "Guardando…" : "Bloquear"}
               </button>
@@ -1458,7 +1458,7 @@ function MenuCreacion({
               <button
                 disabled={!servicioId || !telefono || !nombreParaGuardar || !horaFinValida || enviando}
                 onClick={guardarCita}
-                className="flex-1 rounded-lg bg-brand-yellow px-3 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+                className="flex-1 rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
               >
                 {enviando ? "Guardando…" : "Guardar cita"}
               </button>
@@ -1601,7 +1601,7 @@ function EditarBloqueoModal({
             <button
               disabled={guardando || eliminando}
               onClick={guardar}
-              className="flex-1 rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="flex-1 rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
             >
               {guardando ? "Guardando…" : "Guardar"}
             </button>
@@ -1872,7 +1872,7 @@ function DetalleCitaPanel({
           {cita.estado !== "confirmada" && cita.cliente && cita.servicio && (
             <button
               onClick={onReservarDeNuevo}
-              className="flex items-center gap-1.5 rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink transition hover:bg-brand-yellow-dark"
+              className="flex items-center gap-1.5 rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white transition-opacity hover:opacity-85"
             >
               Reservar de nuevo
             </button>

@@ -118,7 +118,7 @@ function FilaBonoTipo({
         <button
           disabled={guardando}
           onClick={guardar}
-          className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+          className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
         >
           {guardando ? "Guardando…" : "Guardar"}
         </button>

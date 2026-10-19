@@ -51,7 +51,7 @@ export default function PlantillasClient() {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => setCreando((v) => !v)} className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white">
+      <button onClick={() => setCreando((v) => !v)} className="rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity">
         {creando ? "Cerrar" : "+ Registrar plantilla aprobada"}
       </button>
       {creando && (
@@ -163,7 +163,7 @@ function NuevaPlantillaForm({ onCreada }: { onCreada: () => void }) {
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button disabled={enviando} onClick={crear} className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">
+      <button disabled={enviando} onClick={crear} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">
         {enviando ? "Guardando…" : "Guardar plantilla"}
       </button>
     </div>
@@ -200,7 +200,7 @@ function ProbarPlantilla({ plantillaId }: { plantillaId: string }) {
       <button
         disabled={enviando || !telefono}
         onClick={enviar}
-        className="rounded bg-stone-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        className="rounded-none bg-brand-black px-3 py-1.5 text-xs font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
       >
         {enviando ? "Enviando…" : "Enviar prueba"}
       </button>

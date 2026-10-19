@@ -45,7 +45,7 @@ export default function AdminNav({ rol }: { rol: string }) {
     // (y en el rol "admin" empujaba el resto de la cabecera). Ahora es
     // una sola tira que se desplaza en horizontal si no cabe — el patrón
     // habitual de pestañas en paneles (GitHub, Linear, Stripe...).
-    <nav className="flex gap-1 overflow-x-auto font-body text-sm">
+    <nav className="flex gap-1 overflow-x-auto rounded-full bg-white/[0.06] p-1 font-body text-sm">
       {items.map((item) => {
         const activo = pathname?.startsWith(item.href);
         return (
@@ -53,10 +53,10 @@ export default function AdminNav({ rol }: { rol: string }) {
             key={item.href}
             href={item.href}
             className={
-              "shrink-0 whitespace-nowrap border-b-2 px-3 py-3 transition-colors " +
+              "shrink-0 whitespace-nowrap rounded-full px-4 py-2 transition-colors " +
               (activo
-                ? "border-brand-yellow bg-brand-yellow/10 font-semibold text-brand-yellow"
-                : "border-transparent text-brand-white-dim hover:bg-white/[0.06] hover:text-brand-white")
+                ? "bg-brand-yellow font-semibold text-brand-yellow-ink"
+                : "text-brand-white-dim hover:bg-white/[0.08] hover:text-brand-white")
             }
           >
             {item.label}

@@ -68,7 +68,7 @@ export default function ProductosClient({ productos: inicial }: { productos: Pro
       <div>
         <button
           onClick={() => setCreando((v) => !v)}
-          className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white"
+          className="rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity"
         >
           {creando ? "Cerrar" : "+ Nuevo producto"}
         </button>
@@ -221,7 +221,7 @@ function FilaProducto({
       </select>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-3">
-        <button disabled={guardando} onClick={guardar} className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">
+        <button disabled={guardando} onClick={guardar} className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">
           {guardando ? "Guardando…" : "Guardar"}
         </button>
         <button onClick={() => setEditando(false)} className="text-sm text-stone-500 underline">
@@ -282,7 +282,7 @@ function NuevoProductoForm({ onCreado }: { onCreado: () => void }) {
         ))}
       </select>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button disabled={enviando} onClick={crear} className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">
+      <button disabled={enviando} onClick={crear} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">
         {enviando ? "Creando…" : "Crear producto"}
       </button>
     </div>

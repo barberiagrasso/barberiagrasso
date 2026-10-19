@@ -107,7 +107,7 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
 
   return (
     <div className="space-y-4">
-      <button onClick={() => setCreando((v) => !v)} className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white">
+      <button onClick={() => setCreando((v) => !v)} className="rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity">
         {creando ? "Cerrar" : "+ Nuevo profesional"}
       </button>
       {creando && (
@@ -118,7 +118,7 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
             placeholder="Nombre del barbero"
             className="rounded-lg border border-stone-300 p-2 text-sm"
           />
-          <button onClick={crear} className="rounded-lg bg-brand-yellow px-3 py-2 text-sm font-medium text-brand-yellow-ink">
+          <button onClick={crear} className="rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity">
             Crear
           </button>
         </div>
@@ -252,7 +252,7 @@ function DetalleProfesional({
       <button
         disabled={guardando}
         onClick={guardarAsignaciones}
-        className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+        className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
       >
         {guardando ? "Guardando…" : "Guardar sedes y servicios"}
       </button>
@@ -430,7 +430,7 @@ function DestinosPuntuales({ profesionalId, sedes }: { profesionalId: string; se
           <button
             disabled={guardando}
             onClick={guardar}
-            className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+            className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
           >
             {guardando ? "Guardando…" : "Guardar destino puntual"}
           </button>
@@ -600,7 +600,7 @@ function EditorHorario({ profesionalId, sedeId }: { profesionalId: string; sedeI
       <button
         disabled={guardando}
         onClick={guardar}
-        className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+        className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
       >
         {guardando ? "Guardando…" : "Guardar horario"}
       </button>

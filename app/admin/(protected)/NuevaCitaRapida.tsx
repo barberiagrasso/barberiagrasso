@@ -260,7 +260,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
         onClick={() => setAbierto(true)}
         aria-label="Nueva cita rápida"
         title="Nueva cita rápida"
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-yellow text-brand-yellow-ink shadow-lg shadow-black/20 transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-black text-brand-white shadow-lg shadow-black/20 transition-transform hover:scale-105 active:scale-95"
       >
         <span className="text-3xl leading-none">+</span>
       </button>
@@ -283,7 +283,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
                   <button onClick={reiniciar} className="rounded-lg border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:border-stone-400">
                     Crear otra
                   </button>
-                  <button onClick={cerrar} className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark">
+                  <button onClick={cerrar} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity">
                     Cerrar
                   </button>
                 </div>
@@ -496,7 +496,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
                 <button
                   disabled={!puedeConfirmar}
                   onClick={confirmar}
-                  className="w-full rounded-lg bg-brand-yellow px-4 py-2.5 text-sm font-medium text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+                  className="w-full rounded-none bg-brand-black px-4 py-2.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
                 >
                   {enviando ? "Guardando…" : "Guardar cita"}
                 </button>

@@ -402,7 +402,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
               <button
                 onClick={guardarTramos}
                 disabled={guardando}
-                className="rounded-full bg-brand-yellow px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+                className="rounded-none bg-brand-black px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
               >
                 {guardando ? "Guardando…" : "Guardar cambios"}
               </button>
@@ -452,7 +452,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
               <button
                 onClick={guardarPct}
                 disabled={guardandoPct}
-                className="rounded-full bg-brand-yellow px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+                className="rounded-none bg-brand-black px-4 py-1.5 text-sm font-semibold uppercase tracking-wide text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
               >
                 {guardandoPct ? "Guardando…" : "Guardar"}
               </button>

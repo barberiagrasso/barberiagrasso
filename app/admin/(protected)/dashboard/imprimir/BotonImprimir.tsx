@@ -10,7 +10,7 @@ export default function BotonImprimir() {
   return (
     <button
       onClick={() => window.print()}
-      className="flex items-center gap-1.5 rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white print:hidden"
+      className="flex items-center gap-1.5 rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity print:hidden"
     >
       <IconPrinter className="h-4 w-4" />
       Imprimir esta hoja

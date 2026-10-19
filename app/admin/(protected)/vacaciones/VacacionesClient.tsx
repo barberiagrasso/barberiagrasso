@@ -417,7 +417,7 @@ export default function VacacionesClient({
               <button
                 disabled={enviando || (esAdmin && !barberoElegido)}
                 onClick={enviarSolicitud}
-                className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:opacity-50"
+                className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity"
               >
                 {enviando ? "Enviando…" : esAdmin ? "Guardar vacaciones" : "Solicitar estos días"}
               </button>
@@ -529,7 +529,7 @@ export default function VacacionesClient({
                 onChange={(e) => setBloqueoMotivo(e.target.value)}
                 className="w-full rounded-lg border border-stone-300 p-1.5 text-sm"
               />
-              <button onClick={crearBloqueo} className="rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-medium text-white">
+              <button onClick={crearBloqueo} className="rounded-none bg-brand-black px-3 py-1.5 text-xs font-medium text-brand-white hover:opacity-85 transition-opacity">
                 Bloquear
               </button>
             </div>

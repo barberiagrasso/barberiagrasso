@@ -59,7 +59,7 @@ export default function CampanasClient({ sedes, plantillas }: { sedes: Sede[]; p
 
   return (
     <div className="space-y-6">
-      <button onClick={() => setCreando((v) => !v)} className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white">
+      <button onClick={() => setCreando((v) => !v)} className="rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity">
         {creando ? "Cerrar" : "+ Nueva campaña"}
       </button>
       {creando && (
@@ -94,13 +94,13 @@ export default function CampanasClient({ sedes, plantillas }: { sedes: Sede[]; p
                   disabled={!c.plantilla || !c.plantilla.activa}
                   onClick={() => enviar(c.id)}
                   title={!c.plantilla ? "Asigna una plantilla aprobada antes de enviar" : undefined}
-                  className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 transition-opacity"
                 >
                   Enviar ahora
                 </button>
               )}
               {c.estado === "fallida" && (
-                <button onClick={() => enviar(c.id)} className="rounded-lg bg-brand-yellow px-3 py-1.5 text-sm font-medium text-brand-yellow-ink">
+                <button onClick={() => enviar(c.id)} className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 transition-opacity">
                   Reintentar pendientes
                 </button>
               )}
@@ -258,7 +258,7 @@ function NuevaCampanaForm({
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button disabled={enviando} onClick={crear} className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">
+      <button disabled={enviando} onClick={crear} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">
         {enviando ? "Guardando…" : "Guardar como borrador"}
       </button>
     </div>
