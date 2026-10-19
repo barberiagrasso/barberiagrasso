@@ -222,3 +222,14 @@ export function IconMic(props: IconProps) {
     </svg>
   );
 }
+
+export function IconShare(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="18" cy="5" r="2.5" />
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="19" r="2.5" />
+      <path d="M8.2 10.7 15.8 6.3M8.2 13.3l7.6 4.4" />
+    </svg>
+  );
+}

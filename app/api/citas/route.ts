@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
       pagarConSaldo,
       profesionalElegidoPorCliente: Boolean(body.profesionalElegidoPorCliente),
+      notaCliente: typeof body.notaCliente === "string" ? body.notaCliente.slice(0, 500) : null,
     });
 
     return NextResponse.json({ cita, profesionalNombre });

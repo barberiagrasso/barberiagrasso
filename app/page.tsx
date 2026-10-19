@@ -4,6 +4,7 @@ import { requireCliente } from "@/lib/clienteAuth";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 import { AsistenteReservaInicio } from "@/components/reservar/AsistenteReservaInicio";
+import { BotonCompartir } from "@/components/brand/BotonCompartir";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,14 @@ export default async function Home() {
         >
           Mi perfil y mis citas
         </Link>
+
+        <div className="mt-5">
+          <BotonCompartir
+            path="/"
+            titulo="Barbería Grasso"
+            texto="Reserva tu cita en Barbería Grasso desde el móvil."
+          />
+        </div>
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolverCandidatosConDestinosPuntuales } from "@/lib/availability";
+import { valoracionesPorColumna } from "@/lib/resenas";
 
 export const dynamic = "force-dynamic";
 
@@ -108,7 +109,18 @@ export async function GET(request: NextRequest) {
       ? await supabase.from("profesionales").select("id, foto_url").in("id", ids)
       : { data: [] as { id: string; foto_url: string | null }[] };
   const fotoPorId = new Map((fotos ?? []).map((f) => [f.id, f.foto_url]));
-  const profesionales = profesionalesSinFoto.map((p) => ({ ...p, foto_url: fotoPorId.get(p.id) ?? null }));
+
+  // Valoración media (★ y nº de opiniones), comparación con la ficha de
+  // negocio de Booksy — pedido de Diego 19/10/2026. null si todavía no
+  // tiene ninguna, para que el paso de elegir profesional no muestre un
+  // "0,0 ★" engañoso.
+  const valoraciones = await valoracionesPorColumna(supabase, "profesional_id", ids);
+
+  const profesionales = profesionalesSinFoto.map((p) => ({
+    ...p,
+    foto_url: fotoPorId.get(p.id) ?? null,
+    valoracion: valoraciones.get(p.id) ?? null,
+  }));
 
   return NextResponse.json({ profesionales });
 }

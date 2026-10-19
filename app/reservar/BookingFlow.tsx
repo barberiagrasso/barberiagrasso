@@ -73,6 +73,10 @@ interface ProfesionalOpcion {
   id: string;
   nombre: string;
   foto_url?: string | null;
+  // Valoración media de este profesional (★ y nº de opiniones), ver
+  // lib/resenas.ts — null si todavía no tiene ninguna. Comparación con
+  // Booksy, pedido de Diego 19/10/2026.
+  valoracion?: { media: number; total: number } | null;
 }
 
 interface ClienteInicial {
@@ -196,6 +200,39 @@ function TarjetaOpcion({
     >
       {children}
     </button>
+  );
+}
+
+// Checklist de "normas y servicios del local" de una sede (tarjetas,
+// accesibilidad, wifi, apto para niños), configurable desde
+// /admin/mi-barberia — comparación con Booksy, pedido de Diego
+// 19/10/2026. Solo pinta las casillas que están marcadas que sí, para
+// no llenar la tarjeta de sede de negativos.
+function EtiquetasSede({
+  sede,
+}: {
+  sede: Pick<Sede, "acepta_tarjeta" | "acceso_movilidad_reducida" | "wifi" | "apto_ninos">;
+}) {
+  const etiquetas = [
+    sede.acepta_tarjeta && "Tarjeta",
+    sede.acceso_movilidad_reducida && "Acceso adaptado",
+    sede.wifi && "Wifi",
+    sede.apto_ninos && "Apto para niños",
+  ].filter((e): e is string => Boolean(e));
+
+  if (etiquetas.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {etiquetas.map((e) => (
+        <span
+          key={e}
+          className="rounded-full border border-current/20 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide opacity-70"
+        >
+          {e}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -398,6 +435,10 @@ export default function BookingFlow({
   const [nombre, setNombre] = useState(clienteInicial?.nombre ?? "");
   const [telefono, setTelefono] = useState(clienteInicial?.telefono ?? "");
   const [email, setEmail] = useState(clienteInicial?.email ?? "");
+  // Comentario libre del cliente para el último paso ("¿algún
+  // comentario o petición para tu visita?"), inspirado en Booksy —
+  // pedido de Diego 19/10/2026. Opcional, se guarda junto a la cita.
+  const [notaCliente, setNotaCliente] = useState("");
   // Antes venía premarcada por defecto: el RGPD exige que el
   // consentimiento para comunicaciones comerciales sea un acto positivo
   // del usuario, no una casilla ya marcada de fábrica (pedido de Diego,
@@ -762,6 +803,7 @@ export default function BookingFlow({
           cliente: { nombre, telefono, email: email || null },
           aceptaComercial,
           complementoIds,
+          notaCliente: notaCliente.trim() || null,
           pagarConSaldo: pagarConSaldo && saldoCubreTotal,
           // Si profesionalId sigue siendo null aquí es que se quedó en
           // "Cualquiera": el barbero de arriba es el que tocó al buscar
@@ -812,6 +854,7 @@ export default function BookingFlow({
                     {sede.direccion}
                   </div>
                 )}
+                <EtiquetasSede sede={sede} />
               </TarjetaOpcion>
             ))}
 
@@ -971,6 +1014,9 @@ export default function BookingFlow({
                       className="h-6 w-6"
                     />
                     {p.nombre}
+                    {p.valoracion && (
+                      <span className="opacity-70">★{p.valoracion.media.toFixed(1)}</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -1295,6 +1341,14 @@ export default function BookingFlow({
                 placeholder="Email (opcional)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+              />
+              <textarea
+                className="w-full resize-none rounded-lg border border-brand-line bg-transparent p-3 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                placeholder="¿Algún comentario o petición para tu visita? (opcional)"
+                rows={2}
+                maxLength={500}
+                value={notaCliente}
+                onChange={(e) => setNotaCliente(e.target.value)}
               />
             </div>
 

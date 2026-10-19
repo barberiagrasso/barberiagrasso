@@ -16,7 +16,7 @@ export default async function ReservarPage() {
   const [{ data: sedes }, { data: servicios }] = await Promise.all([
     supabase
       .from("sedes")
-      .select("id, nombre, slug, direccion, telefono, activo")
+      .select("id, nombre, slug, direccion, telefono, activo, acepta_tarjeta, acceso_movilidad_reducida, wifi, apto_ninos")
       .order("nombre"),
     supabase
       .from("servicios")

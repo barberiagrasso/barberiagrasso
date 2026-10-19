@@ -18,6 +18,7 @@ export type OrigenError =
   | "asistente_reserva"
   | "recuperacion_password"
   | "aviso_alta"
+  | "resena"
   | "servidor";
 
 /**

@@ -10,6 +10,14 @@ export interface Sede {
   activo: boolean;
   // Enlace directo a la ficha de Google Maps de la sede (opcional).
   maps_url?: string | null;
+  // Checklist de "normas y servicios del local" (ver migración
+  // anadir-normas-servicios-sede.sql) — configurable desde
+  // /admin/mi-barberia, pestaña "Sedes", y visible al cliente en el
+  // paso "Elige tu sede" de /reservar.
+  acepta_tarjeta?: boolean;
+  acceso_movilidad_reducida?: boolean;
+  wifi?: boolean;
+  apto_ninos?: boolean;
 }
 
 export interface Servicio {

@@ -95,6 +95,16 @@ export default async function PerfilPage() {
     pagosPorCita.get(p.cita_id)!.push(p);
   }
 
+  // Valoraciones ya enviadas por el cliente (ver lib/resenas.ts/
+  // app/api/resenas/route.ts) — se traen en bloque para saber, cita por
+  // cita, si hay que ofrecer "Valorar" o ya enseñar las estrellas
+  // puestas. Solo tiene sentido pedirlas para citas completadas.
+  const { data: resenasCrudas } = await admin
+    .from("resenas")
+    .select("cita_id, estrellas, comentario")
+    .in("cita_id", idsSeguro);
+  const resenaPorCita = new Map((resenasCrudas ?? []).map((r) => [r.cita_id, r]));
+
   const historial: CitaNormalizada[] = citasCrudas.map((cita) => {
     const servicio = uno(cita.servicio);
     const extras = cita.extras ?? [];
@@ -127,6 +137,12 @@ export default async function PerfilPage() {
               pagos: (pagosPorCita.get(cita.id) ?? []) as unknown as Parameters<typeof construirRecibo>[0]["pagos"],
             })
           : null,
+      resena: resenaPorCita.get(cita.id)
+        ? {
+            estrellas: resenaPorCita.get(cita.id)!.estrellas,
+            comentario: resenaPorCita.get(cita.id)!.comentario,
+          }
+        : null,
     };
   });
 

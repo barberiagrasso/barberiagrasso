@@ -10,18 +10,24 @@ export default async function MiBarberiaPage() {
   const esAdmin = admin.rol === "admin";
   const supabase = createAdminClient();
 
-  const [{ data: servicios }, { data: productos }, { data: sedesEquipo }, { data: serviciosEquipo }, bonoTipos] =
+  const [{ data: servicios }, { data: productos }, { data: sedesEquipo }, { data: serviciosEquipo }, bonoTipos, { data: sedesConNormas }] =
     await Promise.all([
       supabase.from("servicios").select("*").order("categoria", { nullsFirst: true }).order("orden"),
       supabase.from("productos").select("*").order("categoria", { nullsFirst: true }).order("orden"),
-      // Las pestañas "Bonos" y "Equipo" (dentro de este mismo componente)
-      // solo las ve rol "admin" — para un barbero no hace falta pedir
-      // estos tres extra, así que se ahorran las consultas.
+      // Las pestañas "Bonos", "Equipo" y "Sedes" (dentro de este mismo
+      // componente) solo las ve rol "admin" — para un barbero no hace
+      // falta pedir estos cuatro extra, así que se ahorran las consultas.
       esAdmin ? supabase.from("sedes").select("id, nombre").order("nombre") : Promise.resolve({ data: [] }),
       esAdmin
         ? supabase.from("servicios").select("id, nombre, categoria").eq("activo", true).order("nombre")
         : Promise.resolve({ data: [] }),
       esAdmin ? listarBonoTipos(supabase) : Promise.resolve([]),
+      esAdmin
+        ? supabase
+            .from("sedes")
+            .select("id, nombre, acepta_tarjeta, acceso_movilidad_reducida, wifi, apto_ninos")
+            .order("nombre")
+        : Promise.resolve({ data: [] }),
     ]);
 
   return (
@@ -38,6 +44,7 @@ export default async function MiBarberiaPage() {
         esAdmin={esAdmin}
         sedesEquipo={sedesEquipo ?? []}
         serviciosEquipo={serviciosEquipo ?? []}
+        sedesConNormas={sedesConNormas ?? []}
       />
     </div>
   );

@@ -78,6 +78,12 @@ interface CrearReservaParams {
   // manda, se calcula sumando la duración del servicio (+ complementos) a
   // horaInicioISO, igual que en el resto de la app.
   horaFinISO?: string;
+  // Comentario libre que el propio cliente escribe en el último paso de
+  // la reserva ("¿algún comentario o petición para tu visita?", pedido de
+  // Diego tras comparar con Booksy, 19/10/2026). Se guarda en citas.notas
+  // junto a la nota automática de complementos (si hay ambas, una debajo
+  // de la otra) para que el barbero las vea de un vistazo en la Agenda.
+  notaCliente?: string | null;
 }
 
 export class ReservaError extends Error {}
@@ -449,6 +455,11 @@ export async function crearReserva(params: CrearReservaParams) {
     }
   }
 
+  // Nota libre escrita por el cliente (si la escribió), recortada y sin
+  // espacios de más. Se combina con la nota automática de complementos.
+  const notaClienteLimpia = (params.notaCliente ?? "").trim().slice(0, 500) || null;
+  const notaFinal = [notaComplementos, notaClienteLimpia].filter(Boolean).join("\n") || null;
+
   // 2. Crear la cita
   const { data: cita, error: errorCita } = await supabase
     .from("citas")
@@ -460,7 +471,7 @@ export async function crearReserva(params: CrearReservaParams) {
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
       origen: params.origen,
-      notas: notaComplementos,
+      notas: notaFinal,
       saldo_canjeado_centimos: params.pagarConSaldo ? totalCentimos : 0,
       profesional_elegido_por_cliente: params.profesionalElegidoPorCliente ?? false,
     })

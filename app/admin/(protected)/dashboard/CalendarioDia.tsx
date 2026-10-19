@@ -48,6 +48,11 @@ interface Cita {
   precio_final_centimos?: number | null;
   saldo_canjeado_centimos?: number;
   recibo_anulado_at?: string | null;
+  // Nota de la cita: complementos añadidos y/o el comentario libre que
+  // el propio cliente escribió al reservar ("¿algún comentario o
+  // petición para tu visita?", ver lib/booking.ts) — se muestran juntas,
+  // una debajo de otra, en el panel de detalle.
+  notas?: string | null;
   cliente: { id: string; nombre: string; telefono: string | null } | null;
   servicio: { id: string; nombre: string; color?: string | null; precio_centimos?: number; duracion_minutos?: number } | null;
   profesional: { id: string; nombre: string; foto_url?: string | null } | null;
@@ -1788,6 +1793,12 @@ function DetalleCitaPanel({
             </div>
             <div className="shrink-0 font-mono text-sm text-stone-700">{euros(precioEstimadoCentimos(cita))}</div>
           </div>
+          {cita.notas && (
+            <div className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
+              <span className="font-medium text-stone-400">Nota: </span>
+              {cita.notas}
+            </div>
+          )}
         </div>
 
         {cita.estado === "completada" && (

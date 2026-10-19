@@ -5,6 +5,7 @@ import ServiciosClient from "../servicios/ServiciosClient";
 import ProductosClient from "../productos/ProductosClient";
 import ProfesionalesClient from "../profesionales/ProfesionalesClient";
 import BonosClient from "./BonosClient";
+import SedesClient from "./SedesClient";
 
 interface Servicio {
   id: string;
@@ -29,6 +30,14 @@ interface Sede {
   id: string;
   nombre: string;
 }
+interface SedeConNormas {
+  id: string;
+  nombre: string;
+  acepta_tarjeta: boolean;
+  acceso_movilidad_reducida: boolean;
+  wifi: boolean;
+  apto_ninos: boolean;
+}
 interface ServicioEquipo {
   id: string;
   nombre: string;
@@ -43,7 +52,7 @@ interface BonoTipo {
   dias_validez: number;
 }
 
-type Pestana = "servicios" | "productos" | "bonos" | "equipo";
+type Pestana = "servicios" | "productos" | "bonos" | "equipo" | "sedes";
 
 /**
  * "Mi barbería": agrupa lo que antes eran tres pestañas sueltas del menú
@@ -65,6 +74,7 @@ export default function MiBarberiaClient({
   esAdmin,
   sedesEquipo,
   serviciosEquipo,
+  sedesConNormas,
 }: {
   servicios: Servicio[];
   productos: Producto[];
@@ -72,6 +82,7 @@ export default function MiBarberiaClient({
   esAdmin: boolean;
   sedesEquipo: Sede[];
   serviciosEquipo: ServicioEquipo[];
+  sedesConNormas: SedeConNormas[];
 }) {
   const [pestana, setPestana] = useState<Pestana>("servicios");
 
@@ -82,6 +93,7 @@ export default function MiBarberiaClient({
     { id: "productos", label: "Productos" },
     ...(esAdmin ? [{ id: "bonos" as Pestana, label: "Bonos" }] : []),
     ...(esAdmin ? [{ id: "equipo" as Pestana, label: "Equipo" }] : []),
+    ...(esAdmin ? [{ id: "sedes" as Pestana, label: "Sedes" }] : []),
   ];
 
   return (
@@ -105,6 +117,7 @@ export default function MiBarberiaClient({
       {pestana === "productos" && <ProductosClient productos={productos} />}
       {pestana === "bonos" && esAdmin && <BonosClient tipos={bonoTipos} />}
       {pestana === "equipo" && esAdmin && <ProfesionalesClient sedes={sedesEquipo} servicios={serviciosEquipo} />}
+      {pestana === "sedes" && esAdmin && <SedesClient sedes={sedesConNormas} />}
     </div>
   );
 }

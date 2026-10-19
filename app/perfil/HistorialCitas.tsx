@@ -30,6 +30,10 @@ export interface CitaNormalizada {
   // enseñar "Ver recibo" sin tener que pedirlo aparte al servidor, ya
   // viene calculado desde app/perfil/page.tsx.
   recibo: DatosRecibo | null;
+  // Valoración con estrellas ya enviada para esta cita (ver
+  // app/api/resenas/route.ts), o null si todavía no se valoró — solo
+  // tiene sentido para una cita "completada".
+  resena: { estrellas: number; comentario: string | null } | null;
 }
 
 interface FranjaSimple {
@@ -406,6 +410,18 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
                 )}
               </div>
             )}
+
+            {cita.estado === "completada" && (
+              <div className={"mt-3 border-t pt-3 " + (activa ? "border-brand-black/15" : "border-brand-line")}>
+                <SeccionValorar
+                  cita={cita}
+                  oscuro={!activa}
+                  onValorada={(resena) =>
+                    setHistorial((actual) => actual.map((c) => (c.id === cita.id ? { ...c, resena } : c)))
+                  }
+                />
+              </div>
+            )}
           </div>
         );
       })}
@@ -426,6 +442,109 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Valorar una cita completada (estrellas 1-5 + comentario opcional),
+// comparación con Booksy — pedido de Diego 19/10/2026. Una vez enviada
+// la valoración no se puede editar desde aquí (mismo criterio que la
+// base de datos: una sola fila por cita, ver supabase/crear-resenas.sql),
+// así que tras guardar solo se enseñan las estrellas puestas, de lectura.
+function SeccionValorar({
+  cita,
+  oscuro,
+  onValorada,
+}: {
+  cita: CitaNormalizada;
+  oscuro: boolean;
+  onValorada: (resena: { estrellas: number; comentario: string | null }) => void;
+}) {
+  const [estrellas, setEstrellas] = useState(0);
+  const [hover, setHover] = useState(0);
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (cita.resena) {
+    return (
+      <div className={"font-body text-sm " + (oscuro ? "text-brand-white-dim" : "text-brand-black/70")}>
+        <span className="tracking-wide text-brand-yellow">{"★".repeat(cita.resena.estrellas)}</span>
+        <span className="opacity-40">{"★".repeat(5 - cita.resena.estrellas)}</span>
+        {cita.resena.comentario && <p className="mt-1 italic">&ldquo;{cita.resena.comentario}&rdquo;</p>}
+      </div>
+    );
+  }
+
+  async function enviar() {
+    if (estrellas < 1) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/resenas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ citaId: cita.id, estrellas, comentario: comentario.trim() || null }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || "No se pudo guardar la valoración.");
+        return;
+      }
+      onValorada({ estrellas, comentario: comentario.trim() || null });
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className={"font-body text-xs " + (oscuro ? "text-brand-white-dim" : "text-brand-black/70")}>
+        ¿Qué tal tu visita?
+      </p>
+      <div className="flex gap-1 text-xl">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => setEstrellas(n)}
+            onMouseEnter={() => setHover(n)}
+            onMouseLeave={() => setHover(0)}
+            aria-label={`${n} estrella${n > 1 ? "s" : ""}`}
+            className={(hover || estrellas) >= n ? "text-brand-yellow" : oscuro ? "text-brand-white-dim/40" : "text-brand-black/20"}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      {estrellas > 0 && (
+        <>
+          <textarea
+            value={comentario}
+            onChange={(e) => setComentario(e.target.value)}
+            placeholder="Comentario (opcional)"
+            rows={2}
+            maxLength={1000}
+            className={
+              "w-full resize-none rounded-lg border p-2 font-body text-sm focus:outline-none " +
+              (oscuro
+                ? "border-brand-line bg-transparent text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow"
+                : "border-brand-black/15 bg-white text-brand-black placeholder:text-brand-black/40 focus:border-brand-yellow-dark")
+            }
+          />
+          <button
+            type="button"
+            onClick={enviar}
+            disabled={enviando}
+            className="rounded-full bg-brand-yellow px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+          >
+            {enviando ? "Enviando…" : "Enviar valoración"}
+          </button>
+        </>
+      )}
+      {error && <p className="font-body text-xs text-red-400">{error}</p>}
     </div>
   );
 }
