@@ -12,9 +12,12 @@ const TZ = process.env.BUSINESS_TIMEZONE || "Europe/Madrid";
 // y, a partir de ahí, vuelve a avanzar de 30 en 30 — ver
 // generarSlotsParaDia más abajo, que es quien de verdad implementa esto.
 const SLOT_STEP_MINUTES = 30;
-// Margen mínimo de antelación para reservar hoy mismo (evita reservas
-// "para dentro de 2 minutos" que nadie llegaría a atender).
-const LEAD_TIME_MINUTES = 30;
+// Margen mínimo de antelación para reservar hoy mismo. Pedido de Diego
+// (03/10/2026): la próxima cita que pueda coger un cliente debe ser
+// inminente, sin ningún margen entre que la reserva y la cita — así que
+// se deja en 0. Solo quedan fuera los huecos que ya han empezado (eso lo
+// sigue haciendo el propio bucle de abajo, no este margen).
+const LEAD_TIME_MINUTES = 0;
 
 // Umbrales (nº de horas distintas con hueco libre ese día, contando
 // "cualquiera" como la unión de todo el equipo) que deciden el color de

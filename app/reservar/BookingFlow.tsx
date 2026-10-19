@@ -814,6 +814,10 @@ export default function BookingFlow({
                 )}
               </TarjetaOpcion>
             ))}
+
+            <EnlaceVolver onClick={() => router.push("/")}>
+              ← Volver al menú
+            </EnlaceVolver>
           </div>
         )}
 

@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export type OrigenError =
   | "reserva"
   | "cancelacion"
+  | "reprogramacion"
   | "webhook_whatsapp"
   | "cron_recordatorios"
   | "cron_retencion"

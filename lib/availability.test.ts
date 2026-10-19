@@ -204,7 +204,7 @@ describe("generarSlotsParaDia", () => {
     expect(slots.some((s) => s.profesional_id === CANDIDATO_B.id)).toBe(true);
   });
 
-  it("respeta la antelación mínima: no ofrece huecos que empiecen dentro de los próximos 30 minutos", () => {
+  it("no exige ningún margen de antelación: ofrece huecos inminentes, solo excluye los que ya han empezado", () => {
     const slots = generarSlotsParaDia({
       fecha: FECHA,
       candidatos: [CANDIDATO_A],
@@ -214,10 +214,15 @@ describe("generarSlotsParaDia", () => {
       duracionMinutos: 30,
       ahora: new Date("2026-01-15T08:05:00.000Z"), // 09:05 local
     });
-    // Límite = 09:05 + 30min = 09:35 local. De la cuadrícula de 30' desde
-    // las 9:00 (09:00/09:30/10:00/10:30), solo 10:00 y 10:30 empiezan a
-    // partir de las 09:35.
-    expect(slots.map((s) => s.hora_inicio)).toEqual(["2026-01-15T09:00:00.000Z", "2026-01-15T09:30:00.000Z"]);
+    // Sin margen (LEAD_TIME_MINUTES = 0): de la cuadrícula de 30' desde las
+    // 9:00 (09:00/09:30/10:00/10:30 local), el de las 09:00 ya ha empezado
+    // (son las 09:05) y queda fuera; 09:30, 10:00 y 10:30 son inminentes o
+    // futuros y sí se ofrecen.
+    expect(slots.map((s) => s.hora_inicio)).toEqual([
+      "2026-01-15T08:30:00.000Z",
+      "2026-01-15T09:00:00.000Z",
+      "2026-01-15T09:30:00.000Z",
+    ]);
   });
 
   it("un servicio que ya ha empezado antes de ahora nunca se ofrece, aunque el turno siga abierto", () => {

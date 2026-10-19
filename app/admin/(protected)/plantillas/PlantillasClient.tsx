@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 
 interface Plantilla {
   id: string;
-  tipo: "recordatorio" | "campana" | "retencion_inactivo" | "retencion_cumple" | "recuperacion_password" | "bienvenida";
+  tipo:
+    | "recordatorio"
+    | "campana"
+    | "retencion_inactivo"
+    | "retencion_cumple"
+    | "recuperacion_password"
+    | "bienvenida"
+    | "cita_nueva_cliente";
   nombre: string;
   nombre_meta: string;
   idioma: string;
@@ -131,6 +138,7 @@ function NuevaPlantillaForm({ onCreada }: { onCreada: () => void }) {
         <option value="retencion_cumple">Retención: cumpleaños (automática)</option>
         <option value="recuperacion_password">Recuperar contraseña (código)</option>
         <option value="bienvenida">Bienvenida al registrarse</option>
+        <option value="cita_nueva_cliente">Cita creada por el panel a cliente nuevo</option>
       </select>
       <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre para reconocerla en el panel" className="w-full rounded border border-stone-300 p-2 text-sm" />
       <input

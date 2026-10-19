@@ -42,6 +42,7 @@ function AccesoForm() {
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmacion, setPasswordConfirmacion] = useState("");
   const [codigo, setCodigo] = useState("");
   const [passwordNueva, setPasswordNueva] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +65,10 @@ function AccesoForm() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    if (modo === "registro" && password !== passwordConfirmacion) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setCargando(true);
     setError(null);
     try {
@@ -227,6 +232,16 @@ function AccesoForm() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
             />
+            {modo === "registro" && (
+              <input
+                required
+                type="password"
+                placeholder="Repite la contraseña"
+                value={passwordConfirmacion}
+                onChange={(e) => setPasswordConfirmacion(e.target.value)}
+                className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+              />
+            )}
 
             {modo === "login" && (
               <button

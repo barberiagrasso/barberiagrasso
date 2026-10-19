@@ -20,6 +20,10 @@ interface CitaCruda {
   id: string;
   inicio: string;
   estado: string;
+  sede_id: string;
+  servicio_id: string;
+  profesional_id: string | null;
+  profesional_elegido_por_cliente: boolean;
   pagado_at: string | null;
   metodo_pago: string | null;
   precio_final_centimos: number | null;
@@ -32,7 +36,7 @@ interface CitaCruda {
   sede: { nombre: string; direccion: string | null } | { nombre: string; direccion: string | null }[] | null;
   servicio: { nombre: string; precio_centimos: number } | { nombre: string; precio_centimos: number }[] | null;
   profesional: { nombre: string; foto_url?: string | null } | { nombre: string; foto_url?: string | null }[] | null;
-  extras: { precio_centimos: number; servicio: { nombre: string } | { nombre: string }[] | null }[] | null;
+  extras: { precio_centimos: number; duracion_minutos: number; servicio: { nombre: string } | { nombre: string }[] | null }[] | null;
 }
 
 // Supabase devuelve las relaciones "a uno" como objeto normalmente, pero
@@ -63,7 +67,7 @@ export default async function PerfilPage() {
   const { data: citas } = await admin
     .from("citas")
     .select(
-      "id, inicio, estado, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, sede:sedes(nombre, direccion), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, servicio:servicios(nombre))"
+      "id, inicio, estado, sede_id, servicio_id, profesional_id, profesional_elegido_por_cliente, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, sede:sedes(nombre, direccion), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, duracion_minutos, servicio:servicios(nombre))"
     )
     .eq("cliente_id", cliente.id)
     .order("inicio", { ascending: false });
@@ -101,6 +105,10 @@ export default async function PerfilPage() {
       id: cita.id,
       inicio: cita.inicio,
       estado: cita.estado,
+      sedeId: cita.sede_id,
+      servicioId: cita.servicio_id,
+      profesionalId: cita.profesional_elegido_por_cliente ? cita.profesional_id : null,
+      duracionExtraMinutos: extras.reduce((acc, e) => acc + (e.duracion_minutos ?? 0), 0),
       sedeNombre: uno(cita.sede)?.nombre ?? null,
       servicioNombre: servicio?.nombre ?? "Servicio",
       precioTotalCentimos: total,

@@ -511,7 +511,11 @@ export async function crearReserva(params: CrearReservaParams) {
   await sincronizarClienteHubSpot(supabase, clienteId);
   await sincronizarCitaHubSpot(supabase, cita.id);
 
-  return { cita, clienteId, profesionalNombre: profesionalNombreElegido };
+  // esNuevo: "cliente_elegido" es la primera vez que vemos este teléfono
+  // (nunca había una ficha suya) — lo usa el panel para saber si avisar
+  // por WhatsApp de que es su primera cita con nosotros (ver
+  // avisarCitaNuevaCliente en app/api/admin/citas/route.ts).
+  return { cita, clienteId, profesionalNombre: profesionalNombreElegido, esNuevo };
 }
 
 /**

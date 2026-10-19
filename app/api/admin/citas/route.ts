@@ -3,6 +3,11 @@ import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { crearReserva, ReservaError } from "@/lib/booking";
 import { cargarDatosAgenda } from "@/lib/agenda";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { resolverVariablesPlantilla } from "@/lib/plantillaVariables";
+import { registrarError } from "@/lib/errorLog";
+
+const TZ = process.env.BUSINESS_TIMEZONE || "Europe/Madrid";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { cita, profesionalNombre } = await crearReserva({
+    const { cita, profesionalNombre, esNuevo } = await crearReserva({
       sedeId: body.sedeId,
       servicioId: body.servicioId,
       profesionalId: body.profesionalId || null,
@@ -76,6 +81,23 @@ export async function POST(request: NextRequest) {
       saltarValidacionSlot: Boolean(body.saltarValidacionSlot),
       horaFinISO: typeof body.horaFinISO === "string" ? body.horaFinISO : undefined,
     });
+
+    // Cliente que nunca había reservado con nosotros y la cita se la ha
+    // hecho la barbería (nunca ha escrito él mismo por WhatsApp ni por la
+    // app) — pedido de Diego (03/10/2026): como hacía Booksy, se le avisa
+    // por WhatsApp de la cita y de que se descargue la app. Nunca bloquea
+    // la creación de la cita, que ya está hecha.
+    if (esNuevo) {
+      const admin = createAdminClient();
+      const { data: servicio } = await admin.from("servicios").select("nombre").eq("id", body.servicioId).maybeSingle();
+      await avisarCitaNuevaCliente({
+        nombre: body.cliente.nombre,
+        telefono: body.cliente.telefono,
+        servicioNombre: servicio?.nombre,
+        inicioISO: cita.inicio,
+      });
+    }
+
     return NextResponse.json({ cita, profesionalNombre });
   } catch (err) {
     if (err instanceof ReservaError) {
@@ -83,5 +105,51 @@ export async function POST(request: NextRequest) {
     }
     console.error("Error creando reserva desde el panel", err);
     return NextResponse.json({ error: "No se pudo crear la cita." }, { status: 500 });
+  }
+}
+
+async function avisarCitaNuevaCliente({
+  nombre,
+  telefono,
+  servicioNombre,
+  inicioISO,
+}: {
+  nombre: string;
+  telefono: string;
+  servicioNombre?: string;
+  inicioISO: string;
+}) {
+  try {
+    const admin = createAdminClient();
+    const { data: plantilla } = await admin
+      .from("plantillas_whatsapp")
+      .select("*")
+      .eq("tipo", "cita_nueva_cliente")
+      .eq("activa", true)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+
+    if (!plantilla) {
+      // No es un error de verdad: simplemente Diego no ha registrado
+      // todavía esta plantilla en /admin/plantillas.
+      return;
+    }
+
+    const hora = new Date(inicioISO).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
+    const fecha = new Date(inicioISO).toLocaleDateString("es-ES", { timeZone: TZ, day: "2-digit", month: "2-digit" });
+    const variables = resolverVariablesPlantilla(plantilla.variables ?? [], {
+      nombre,
+      servicio: servicioNombre ?? "",
+      hora,
+      fecha,
+    });
+    await sendWhatsAppTemplate(telefono, plantilla.nombre_meta, plantilla.idioma, variables);
+  } catch (err) {
+    await registrarError({
+      origen: "aviso_alta",
+      mensaje: `No se pudo avisar por WhatsApp a ${nombre} de su primera cita (creada desde el panel).`,
+      detalle: err,
+    });
   }
 }
