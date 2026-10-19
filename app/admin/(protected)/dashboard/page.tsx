@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/adminAuth";
 import { cargarDatosAgenda } from "@/lib/agenda";
 import AgendaClient from "./AgendaClient";
+import { ResumenDia } from "./ResumenDia";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,13 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-bold text-stone-900">Agenda</h1>
+      <h1 className="mb-1 text-xl font-bold text-stone-900">Agenda</h1>
+      {datosIniciales && (
+        <p className="mb-3 text-xs text-stone-400">
+          Resumen de hoy en {sedes?.find((s) => s.id === sedeInicialId)?.nombre ?? "tu primera sede"}:
+        </p>
+      )}
+      {datosIniciales && <ResumenDia citas={datosIniciales.citas} />}
       <AgendaClient
         sedes={sedes ?? []}
         servicios={servicios ?? []}

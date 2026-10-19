@@ -9,6 +9,7 @@ import {
   IconCheck,
   IconAlertCircle,
   IconX,
+  IconPrinter,
 } from "@/components/ui/Icons";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
@@ -411,6 +412,16 @@ export default function AgendaClient({
                 >
                   ›
                 </button>
+                <a
+                  href={`/admin/dashboard/imprimir?sede=${sedeId}&fecha=${fecha}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-600 hover:border-stone-400"
+                  title="Abrir hoja de ese día lista para imprimir"
+                >
+                  <IconPrinter className="h-4 w-4" />
+                  Imprimir
+                </a>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-stone-700">

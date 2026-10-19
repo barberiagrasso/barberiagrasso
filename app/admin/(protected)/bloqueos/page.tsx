@@ -17,10 +17,12 @@ export default async function BloqueosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-stone-900">Vacaciones y días libres</h1>
+      <h1 className="mb-1 text-xl font-bold text-stone-900">Cierres del calendario</h1>
       <p className="mb-4 text-sm text-stone-500">
-        Bloquea los días u horas que quieras para un empleado (o para toda la sede, por ejemplo un
-        festivo) — mientras dure el bloqueo, ni la app ni WhatsApp ofrecerán esas horas.
+        Bloquea horas o días para un barbero en concreto, o para toda una sede de golpe (un
+        festivo, una reforma...) — mientras dure el bloqueo, ni la app ni WhatsApp ofrecerán esas
+        horas. Distinto de &quot;Vacaciones&quot;: aquello es la solicitud y aprobación de días
+        libres de cada barbero; esto es el bloqueo directo del calendario, lo use quien lo use.
       </p>
       <BloqueosClient sedes={sedes ?? []} />
     </div>

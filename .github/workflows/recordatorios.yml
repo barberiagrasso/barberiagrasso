@@ -35,3 +35,12 @@ jobs:
           curl --fail --show-error \
             -X POST "${{ secrets.APP_URL }}/api/cron/recordatorios" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Avisar si algo ha fallado
+        if: failure()
+        run: |
+          curl --silent --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/aviso-fallo" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"origen":"cron_recordatorios"}' || true

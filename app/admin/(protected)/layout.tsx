@@ -6,6 +6,7 @@ import AdminNav from "./AdminNav";
 import SignOutButton from "./SignOutButton";
 import NuevaCitaRapida from "./NuevaCitaRapida";
 import WhatsAppFlotante from "./WhatsAppFlotante";
+import InactividadAutoLogout from "./InactividadAutoLogout";
 
 // Cuántos días hacia atrás se cuentan los fallos del asistente para el
 // aviso — lo suficiente para no perder de vista uno del fin de semana sin
@@ -68,7 +69,8 @@ export default async function ProtectedAdminLayout({
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <header className="border-b border-black/10 bg-brand-black">
+      <InactividadAutoLogout />
+      <header className="border-b border-black/10 bg-brand-black print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-2">
             <GrassoMark className="h-6 w-6 text-brand-yellow" />
@@ -97,7 +99,7 @@ export default async function ProtectedAdminLayout({
         (fallosRecientes ?? 0) > 0 ||
         (erroresSinResolver ?? 0) > 0 ||
         (admin.rol === "admin" && (vacacionesPendientes ?? 0) > 0)) && (
-        <div className="border-b border-amber-300 bg-amber-50 px-4 py-2">
+        <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 print:hidden">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-1 text-sm text-amber-900">
             {admin.rol === "admin" && (vacacionesPendientes ?? 0) > 0 && (
               <Link
@@ -140,9 +142,11 @@ export default async function ProtectedAdminLayout({
           </div>
         </div>
       )}
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-      <NuevaCitaRapida sedes={sedes ?? []} servicios={servicios ?? []} />
-      <WhatsAppFlotante />
+      <main className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:p-0">{children}</main>
+      <div className="print:hidden">
+        <NuevaCitaRapida sedes={sedes ?? []} servicios={servicios ?? []} />
+        <WhatsAppFlotante />
+      </div>
     </div>
   );
 }

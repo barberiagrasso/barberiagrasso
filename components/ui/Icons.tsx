@@ -223,6 +223,16 @@ export function IconMic(props: IconProps) {
   );
 }
 
+export function IconPrinter(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7 8.5V4h10v4.5" />
+      <rect x="3.5" y="8.5" width="17" height="8" rx="1.5" />
+      <rect x="7" y="13.5" width="10" height="6.5" rx="1" />
+    </svg>
+  );
+}
+
 export function IconShare(props: IconProps) {
   return (
     <svg {...base} {...props}>

@@ -9,6 +9,8 @@ interface Producto {
   precio_centimos: number;
   orden: number;
   activo: boolean;
+  stock: number | null;
+  stock_minimo: number | null;
 }
 
 // Los grupos ya usados en el catálogo inicial, para que Diego pueda
@@ -123,6 +125,8 @@ function FilaProducto({
   const [precio, setPrecio] = useState(euros(producto.precio_centimos));
   const [categoria, setCategoria] = useState(producto.categoria ?? "");
   const [orden, setOrden] = useState(String(producto.orden));
+  const [stock, setStock] = useState(producto.stock === null ? "" : String(producto.stock));
+  const [stockMinimo, setStockMinimo] = useState(producto.stock_minimo === null ? "" : String(producto.stock_minimo));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +138,8 @@ function FilaProducto({
       precio_centimos: Math.round(parseFloat(precio.replace(",", ".")) * 100),
       categoria: categoria || null,
       orden: parseInt(orden, 10) || 0,
+      stock: stock.trim() === "" ? null : parseInt(stock, 10) || 0,
+      stock_minimo: stockMinimo.trim() === "" ? null : parseInt(stockMinimo, 10) || 0,
     });
     setGuardando(false);
     if (res.ok) {
@@ -155,7 +161,22 @@ function FilaProducto({
           <div className={"font-medium " + (producto.activo ? "text-stone-900" : "text-stone-400 line-through")}>
             {producto.nombre}
           </div>
-          <div className="text-sm text-stone-500">{euros(producto.precio_centimos)}€</div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
+            <span>{euros(producto.precio_centimos)}€</span>
+            {producto.stock !== null && (
+              <span
+                className={
+                  "rounded px-1.5 py-0.5 text-xs font-medium " +
+                  (producto.stock_minimo !== null && producto.stock <= producto.stock_minimo
+                    ? "bg-red-100 text-red-700"
+                    : "bg-stone-100 text-stone-600")
+                }
+              >
+                Stock: {producto.stock}
+                {producto.stock_minimo !== null && producto.stock <= producto.stock_minimo ? " — ¡bajo!" : ""}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <button onClick={() => setEditando(true)} className="text-brand-yellow-dark underline">
@@ -175,6 +196,20 @@ function FilaProducto({
         <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" className="col-span-2 rounded border border-stone-300 p-2 text-sm sm:col-span-1" />
         <input value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Precio (€)" className="rounded border border-stone-300 p-2 text-sm" />
         <input value={orden} onChange={(e) => setOrden(e.target.value)} placeholder="Orden" className="rounded border border-stone-300 p-2 text-sm" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          value={stock}
+          onChange={(e) => setStock(e.target.value)}
+          placeholder="Stock (vacío = no controlar)"
+          className="rounded border border-stone-300 p-2 text-sm"
+        />
+        <input
+          value={stockMinimo}
+          onChange={(e) => setStockMinimo(e.target.value)}
+          placeholder="Aviso si baja de…"
+          className="rounded border border-stone-300 p-2 text-sm"
+        />
       </div>
       <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full rounded border border-stone-300 p-2 text-sm">
         <option value="">Sin categoría</option>

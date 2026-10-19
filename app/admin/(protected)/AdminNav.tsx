@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 // el menú ni puede entrar a la URL directamente. "Mi barbería" sí la ven
 // los dos roles: dentro, su propia pestaña "Equipo" es la que se oculta
 // para un barbero (ver MiBarberiaClient.tsx).
-const SOLO_ADMIN = new Set(["/admin/campanas", "/admin/plantillas", "/admin/informes"]);
+const SOLO_ADMIN = new Set(["/admin/campanas", "/admin/plantillas", "/admin/informes", "/admin/bloqueos", "/admin/auditoria"]);
 
 // Menú más corto que antes (pedido de Diego): Servicios, Productos y
 // Equipo se agruparon en una sola pestaña ("Mi barbería", con sus
@@ -26,10 +26,12 @@ const NAV = [
   { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
   { href: "/admin/vacaciones", label: "Vacaciones" },
+  { href: "/admin/bloqueos", label: "Cierres" },
   { href: "/admin/campanas", label: "Campañas" },
   { href: "/admin/plantillas", label: "Plantillas" },
   { href: "/admin/informes", label: "Informes" },
   { href: "/admin/opiniones", label: "Opiniones" },
+  { href: "/admin/auditoria", label: "Auditoría" },
   { href: "/admin/errores", label: "Errores" },
 ];
 

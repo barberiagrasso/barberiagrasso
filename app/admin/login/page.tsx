@@ -24,7 +24,9 @@ function AdminLoginForm() {
   const [error, setError] = useState<string | null>(
     params.get("error") === "no-autorizado"
       ? "Tu usuario existe pero no tiene permisos de administrador todavía."
-      : null
+      : params.get("error") === "inactividad"
+        ? "Se cerró tu sesión por inactividad. Vuelve a entrar."
+        : null
   );
   const [cargando, setCargando] = useState(false);
 

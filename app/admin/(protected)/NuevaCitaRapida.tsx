@@ -76,7 +76,7 @@ function colorPuntoNivel(nivel: ResumenDiaDisponibilidad["nivel"] | undefined): 
 type EstadoCliente =
   | { tipo: "vacio" }
   | { tipo: "buscando" }
-  | { tipo: "encontrado"; nombre: string; saldoFidelizacionCentimos: number }
+  | { tipo: "encontrado"; nombre: string; saldoFidelizacionCentimos: number; noShowsRecientes: number }
   | { tipo: "nuevo" };
 
 function formatearPrecio(centimos: number) {
@@ -191,7 +191,12 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
         .then((r) => r.json())
         .then((j) => {
           if (j.nombre) {
-            setEstadoCliente({ tipo: "encontrado", nombre: j.nombre, saldoFidelizacionCentimos: j.saldoFidelizacionCentimos ?? 0 });
+            setEstadoCliente({
+              tipo: "encontrado",
+              nombre: j.nombre,
+              saldoFidelizacionCentimos: j.saldoFidelizacionCentimos ?? 0,
+              noShowsRecientes: j.noShowsRecientes ?? 0,
+            });
           } else {
             setEstadoCliente({ tipo: "nuevo" });
           }
@@ -443,6 +448,13 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
                       <p className="text-sm text-emerald-700">
                         Cliente encontrado: <strong>{estadoCliente.nombre}</strong> — confírmalo con él/ella antes de guardar.
                       </p>
+                      {estadoCliente.noShowsRecientes > 0 && (
+                        <p className="rounded-md bg-amber-50 px-2 py-1 text-sm text-amber-800">
+                          ⚠ No se presentó {estadoCliente.noShowsRecientes}{" "}
+                          {estadoCliente.noShowsRecientes === 1 ? "vez" : "veces"} en los últimos 90 días. Puede
+                          convenir confirmarle la cita por WhatsApp antes de guardarla.
+                        </p>
+                      )}
                       {estadoCliente.saldoFidelizacionCentimos > 0 && (
                         <label
                           className={

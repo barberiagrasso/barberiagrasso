@@ -60,6 +60,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ese segmento no incluye a ningún cliente con consentimiento comercial." }, { status: 400 });
   }
 
+  // programada_para (opcional): si Diego la deja vacía, la campaña se
+  // queda como borrador normal hasta que pulse "Enviar ahora" él mismo;
+  // con una fecha puesta, /api/cron/campanas-programadas la manda sola
+  // en cuanto llega esa hora (ver lib/campanas.ts).
+  const programadaPara =
+    typeof body.programadaPara === "string" && body.programadaPara ? new Date(body.programadaPara).toISOString() : null;
+
   const supabase = createAdminClient();
   const { data: campana, error } = await supabase
     .from("campanas")
@@ -70,6 +77,7 @@ export async function POST(request: NextRequest) {
       segmento,
       plantilla_id: body.plantillaId || null,
       estado: "borrador",
+      programada_para: programadaPara,
     })
     .select("*")
     .single();

@@ -25,6 +25,8 @@ interface Producto {
   precio_centimos: number;
   orden: number;
   activo: boolean;
+  stock: number | null;
+  stock_minimo: number | null;
 }
 interface Sede {
   id: string;

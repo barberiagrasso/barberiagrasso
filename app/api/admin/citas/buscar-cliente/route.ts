@@ -28,12 +28,30 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("nombre, saldo_fidelizacion_centimos")
+    .select("id, nombre, saldo_fidelizacion_centimos")
     .eq("telefono", telefono)
     .maybeSingle();
+
+  // Aviso de no-shows recientes (pedido de Diego, revisión de paneles
+  // 19/10/2026): al registrar una cita nueva por el panel, saber de un
+  // vistazo si este cliente concreto ha fallado varias veces últimamente
+  // ayuda a decidir si conviene confirmársela antes por WhatsApp. Los
+  // últimos 90 días, para no arrastrar un aviso de algo ya muy antiguo.
+  let noShowsRecientes = 0;
+  if (cliente) {
+    const hace90Dias = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+    const { count } = await supabase
+      .from("citas")
+      .select("id", { count: "exact", head: true })
+      .eq("cliente_id", cliente.id)
+      .eq("estado", "no_presentada")
+      .gte("inicio", hace90Dias);
+    noShowsRecientes = count ?? 0;
+  }
 
   return NextResponse.json({
     nombre: cliente?.nombre ?? null,
     saldoFidelizacionCentimos: cliente?.saldo_fidelizacion_centimos ?? 0,
+    noShowsRecientes,
   });
 }

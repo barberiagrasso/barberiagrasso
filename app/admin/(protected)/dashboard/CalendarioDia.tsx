@@ -1708,7 +1708,11 @@ function DetalleCitaPanel({
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="text-lg font-bold text-stone-900">{ETIQUETA_ESTADO[cita.estado] ?? cita.estado}</div>
-          <button onClick={onCerrar} className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600">
+          <button
+            onClick={onCerrar}
+            aria-label="Cerrar"
+            className="-m-1.5 rounded-full p-2.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+          >
             <IconX className="h-4 w-4" />
           </button>
         </div>

@@ -322,6 +322,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   await supabase.from("cita_productos").delete().eq("cita_id", id);
   if (productosParaGuardar.length > 0) {
     await supabase.from("cita_productos").insert(productosParaGuardar.map((p) => ({ cita_id: id, ...p })));
+    // Descuenta stock (solo para los productos que lo llevan controlado,
+    // ver descontar_stock_producto en
+    // supabase/anadir-descuento-stock-automatico.sql). Esto solo se
+    // ejecuta una vez por cita: esta pantalla únicamente actúa sobre citas
+    // "confirmada" (ver comprobación más arriba) y deja de estar
+    // disponible en cuanto queda "completada", así que no hay riesgo de
+    // descontar dos veces por una re-edición. Si fallara, no se deshace
+    // el cobro ya registrado: solo se registra el error para revisarlo.
+    for (const p of productosParaGuardar) {
+      const { error: errorStock } = await supabase.rpc("descontar_stock_producto", {
+        p_producto_id: p.producto_id,
+        p_cantidad: p.cantidad,
+      });
+      if (errorStock) {
+        await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock de un producto.", detalle: errorStock });
+      }
+    }
   }
 
   // Mismo criterio: se sustituye del todo. Si esta cita no se paga con

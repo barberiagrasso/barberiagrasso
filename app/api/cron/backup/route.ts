@@ -31,6 +31,8 @@ const TABLAS = [
   "retencion_envios",
   "fallos_asistente",
   "errores_sistema",
+  "resenas",
+  "auditoria_admin",
 ] as const;
 
 const TAMANO_PAGINA = 1000;

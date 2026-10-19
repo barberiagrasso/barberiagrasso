@@ -19,6 +19,11 @@ interface Campana {
   plantilla: { nombre: string; nombre_meta: string; activa: boolean } | null;
   destinatarios: { total: number; enviados: number; fallidos: number };
   created_at: string;
+  programada_para: string | null;
+}
+
+function formatoFechaHora(iso: string) {
+  return new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", dateStyle: "medium", timeStyle: "short" });
 }
 
 const ETIQUETA_ESTADO: Record<string, string> = {
@@ -79,6 +84,7 @@ export default function CampanasClient({ sedes, plantillas }: { sedes: Sede[]; p
                 {c.destinatarios.enviados > 0 ? ` · ${c.destinatarios.enviados} enviados` : ""}
                 {c.destinatarios.fallidos > 0 ? ` · ${c.destinatarios.fallidos} fallidos` : ""}
                 {c.plantilla ? ` · plantilla: ${c.plantilla.nombre}` : " · sin plantilla asignada"}
+                {c.estado === "borrador" && c.programada_para ? ` · programada para ${formatoFechaHora(c.programada_para)}` : ""}
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -122,6 +128,7 @@ function NuevaCampanaForm({
   const [etiqueta, setEtiqueta] = useState("");
   const [sinVisitasDesde, setSinVisitasDesde] = useState("");
   const [plantillaId, setPlantillaId] = useState(plantillas[0]?.id ?? "");
+  const [programadaPara, setProgramadaPara] = useState("");
   const [preview, setPreview] = useState<{ total: number; muestra: string[] } | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +164,13 @@ function NuevaCampanaForm({
     const res = await fetch("/api/admin/campanas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, mensaje, segmento: segmentoActual(), plantillaId: plantillaId || null }),
+      body: JSON.stringify({
+        nombre,
+        mensaje,
+        segmento: segmentoActual(),
+        plantillaId: plantillaId || null,
+        programadaPara: programadaPara || null,
+      }),
     });
     setEnviando(false);
     if (!res.ok) {
@@ -228,6 +241,20 @@ function NuevaCampanaForm({
             ))}
           </select>
         )}
+      </div>
+
+      <div>
+        <h3 className="mb-1 text-sm font-medium text-stone-700">Programar envío (opcional)</h3>
+        <input
+          type="datetime-local"
+          value={programadaPara}
+          onChange={(e) => setProgramadaPara(e.target.value)}
+          className="rounded border border-stone-300 p-2 text-sm"
+        />
+        <p className="mt-1 text-xs text-stone-400">
+          Si lo dejas vacío, la campaña se queda en borrador hasta que pulses &quot;Enviar ahora&quot;. Con una
+          fecha y hora puestas, se manda ella sola.
+        </p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

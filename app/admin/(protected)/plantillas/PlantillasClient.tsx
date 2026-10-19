@@ -47,6 +47,8 @@ export default function PlantillasClient() {
     cargar();
   }
 
+  const [probandoId, setProbandoId] = useState<string | null>(null);
+
   return (
     <div className="space-y-4">
       <button onClick={() => setCreando((v) => !v)} className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white">
@@ -74,6 +76,9 @@ export default function PlantillasClient() {
               </div>
             </div>
             <div className="flex items-center gap-3 text-xs">
+              <button onClick={() => setProbandoId(probandoId === p.id ? null : p.id)} className="text-blue-700 underline">
+                Probar
+              </button>
               <button onClick={() => alternarActiva(p)} className={p.activa ? "text-red-700 underline" : "text-green-700 underline"}>
                 {p.activa ? "Desactivar" : "Activar"}
               </button>
@@ -81,6 +86,7 @@ export default function PlantillasClient() {
                 Eliminar
               </button>
             </div>
+            {probandoId === p.id && <ProbarPlantilla plantillaId={p.id} />}
           </div>
         ))}
         {plantillas.length === 0 && (
@@ -160,6 +166,47 @@ function NuevaPlantillaForm({ onCreada }: { onCreada: () => void }) {
       <button disabled={enviando} onClick={crear} className="rounded-lg bg-brand-yellow px-4 py-2 text-sm font-medium text-brand-yellow-ink disabled:opacity-50">
         {enviando ? "Guardando…" : "Guardar plantilla"}
       </button>
+    </div>
+  );
+}
+
+function ProbarPlantilla({ plantillaId }: { plantillaId: string }) {
+  const [telefono, setTelefono] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState<{ ok: boolean; mensaje: string } | null>(null);
+
+  async function enviar() {
+    if (!telefono) return;
+    setEnviando(true);
+    setResultado(null);
+    const res = await fetch(`/api/admin/plantillas/${plantillaId}/probar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telefono }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setEnviando(false);
+    setResultado(res.ok ? { ok: true, mensaje: "Enviado. Revisa el WhatsApp de ese número." } : { ok: false, mensaje: json.error || "No se pudo enviar." });
+  }
+
+  return (
+    <div className="mt-2 flex w-full flex-wrap items-center gap-2 border-t border-stone-100 pt-2">
+      <input
+        value={telefono}
+        onChange={(e) => setTelefono(e.target.value)}
+        placeholder="Número de prueba (ej: 612345678)"
+        className="w-48 rounded border border-stone-300 p-1.5 text-xs"
+      />
+      <button
+        disabled={enviando || !telefono}
+        onClick={enviar}
+        className="rounded bg-stone-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+      >
+        {enviando ? "Enviando…" : "Enviar prueba"}
+      </button>
+      {resultado && (
+        <span className={"text-xs " + (resultado.ok ? "text-green-700" : "text-red-600")}>{resultado.mensaje}</span>
+      )}
     </div>
   );
 }

@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
       precio_centimos: body.precio_centimos,
       orden: body.orden ?? 0,
       activo: body.activo ?? true,
+      stock: body.stock ?? null,
+      stock_minimo: body.stock_minimo ?? null,
     })
     .select("*")
     .single();

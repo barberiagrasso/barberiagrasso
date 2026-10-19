@@ -1,0 +1,33 @@
+# Manda sola, a su hora, cualquier campaña que Diego haya dejado
+# "programada" en vez de mandarla al instante (ver pestaña Campañas del
+# panel). Reutiliza los mismos dos secretos que el resto de workflows
+# (CRON_SECRET y APP_URL) — no hace falta configurar nada nuevo si ya
+# te funcionan recordatorios/retención/backup.
+
+name: Campañas programadas
+
+on:
+  schedule:
+    # Cada 15 minutos: suficiente margen para una campaña programada a
+    # una hora concreta, sin lanzar el workflow cada minuto.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {} # permite lanzarlo a mano desde la pestaña Actions, para probar
+
+jobs:
+  llamar-campanas-programadas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a /api/cron/campanas-programadas
+        run: |
+          curl --fail --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/campanas-programadas" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Avisar si algo ha fallado
+        if: failure()
+        run: |
+          curl --silent --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/aviso-fallo" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"origen":"servidor"}' || true

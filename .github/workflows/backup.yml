@@ -40,3 +40,12 @@ jobs:
           name: backup-${{ github.run_id }}
           path: backup.json.gz
           retention-days: 30
+
+      - name: Avisar si algo ha fallado
+        if: failure()
+        run: |
+          curl --silent --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/aviso-fallo" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"origen":"cron_backup"}' || true

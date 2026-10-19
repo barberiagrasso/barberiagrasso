@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { cancelarCita, ReservaError } from "@/lib/booking";
 import { acumularPorCitaCompletada, reembolsarSaldoDeCita } from "@/lib/fidelizacion";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (err instanceof ReservaError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
     }
+    await registrarAuditoria({
+      adminId: admin.id,
+      adminNombre: admin.nombre ?? "—",
+      accion: "cancelar_cita",
+      entidad: "cita",
+      entidadId: id,
+    });
     return NextResponse.json({ ok: true });
   }
   if (body?.estado) {
@@ -53,6 +61,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     } else if (body.estado === "no_presentada") {
       await reembolsarSaldoDeCita(supabase, citaActualizada);
     }
+    await registrarAuditoria({
+      adminId: admin.id,
+      adminNombre: admin.nombre ?? "—",
+      accion: `estado:${body.estado}`,
+      entidad: "cita",
+      entidadId: id,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -103,6 +118,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .eq("id", id);
     if (error) return NextResponse.json({ error: "No se pudo mover la cita." }, { status: 500 });
     await sincronizarCitaHubSpot(supabase, id);
+    await registrarAuditoria({
+      adminId: admin.id,
+      adminNombre: admin.nombre ?? "—",
+      accion: "mover_cita",
+      entidad: "cita",
+      entidadId: id,
+      detalle: { nuevoInicio: nuevoInicio.toISOString(), nuevoProfesionalId },
+    });
     return NextResponse.json({ ok: true });
   }
 
