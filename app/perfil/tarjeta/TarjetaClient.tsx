@@ -178,7 +178,7 @@ export default function TarjetaClient({ nombre, saldoFidelizacionCentimos, walle
       <button
         onClick={descargar}
         disabled={!lista || descargando}
-        className="w-full rounded-full bg-brand-yellow px-4 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+        className="w-full rounded-none bg-brand-white px-4 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black hover:opacity-85 disabled:opacity-50 transition-opacity"
       >
         {descargando ? "Preparando…" : "Descargar tarjeta (imagen)"}
       </button>

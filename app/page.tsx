@@ -53,7 +53,7 @@ export default async function Home() {
 
         <Link
           href="/reservar"
-          className="mt-10 rounded-full bg-brand-yellow px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-colors hover:bg-brand-yellow-dark"
+          className="mt-10 rounded-none bg-brand-white px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-opacity hover:opacity-85"
         >
           Reservar cita
         </Link>

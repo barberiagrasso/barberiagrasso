@@ -147,7 +147,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
         <button
           onClick={guardar}
           disabled={guardando}
-          className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-full bg-brand-yellow px-4 py-2.5 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-none bg-brand-white px-4 py-2.5 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <IconCheck className="h-4 w-4" />
           {guardando ? "Guardando…" : "Guardar cambios"}

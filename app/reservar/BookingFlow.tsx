@@ -316,7 +316,7 @@ function BotonPrimario({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-full bg-brand-yellow px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:cursor-not-allowed disabled:opacity-40"
+      className="rounded-none bg-brand-white px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -1425,7 +1425,7 @@ export default function BookingFlow({
               </Link>
               <Link
                 href="/perfil"
-                className="rounded-full bg-brand-yellow px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark"
+                className="rounded-none bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
               >
                 Ir a mi perfil
               </Link>

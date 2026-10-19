@@ -183,7 +183,7 @@ export default async function PerfilPage() {
 
         <Link
           href="/perfil/tarjeta"
-          className="mb-6 flex items-center justify-between rounded-xl border border-brand-yellow/30 bg-brand-black-soft p-4 hover:border-brand-yellow/60"
+          className="mb-6 flex items-center justify-between rounded-tl-md bg-brand-black-soft p-5 transition-opacity hover:opacity-90"
         >
           <div>
             <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tu saldo de fidelización</p>

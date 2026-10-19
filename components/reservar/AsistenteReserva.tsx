@@ -111,7 +111,7 @@ function TarjetaPropuesta({ opcion, onElegir }: { opcion: OpcionPropuestaCita; o
         <span className="font-mono text-sm font-semibold">{formatearPrecio(opcion.precioTotalCentimos, opcion.precioEsVariable)}</span>
         <button
           onClick={onElegir}
-          className="rounded-full bg-brand-yellow px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark"
+          className="rounded-none bg-brand-white px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
         >
           Elegir esta cita
         </button>
@@ -251,7 +251,7 @@ export function AsistenteReserva({ onElegirOpcion }: Props) {
             onClick={enviar}
             disabled={cargando}
             aria-label="Enviar"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-yellow text-brand-yellow-ink transition-colors hover:bg-brand-yellow-dark disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-white text-brand-black transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <IconSend className="h-3.5 w-3.5" />
           </button>

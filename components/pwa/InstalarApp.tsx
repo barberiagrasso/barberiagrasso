@@ -105,7 +105,7 @@ export default function InstalarApp() {
             </p>
             <button
               onClick={instalar}
-              className="mt-2 rounded-full bg-brand-yellow px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark"
+              className="mt-2 rounded-none bg-brand-white px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-black hover:opacity-85 transition-opacity"
             >
               Instalar
             </button>

@@ -373,7 +373,7 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
                         setConfirmandoId(null);
                         setCambiandoId(cita.id);
                       }}
-                      className="rounded-full bg-brand-yellow px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark"
+                      className="rounded-none bg-brand-white px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-black hover:opacity-85 transition-opacity"
                     >
                       Cambiar hora
                     </button>
@@ -538,7 +538,7 @@ function SeccionValorar({
             type="button"
             onClick={enviar}
             disabled={enviando}
-            className="rounded-full bg-brand-yellow px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-yellow-ink hover:bg-brand-yellow-dark disabled:opacity-50"
+            className="rounded-none bg-brand-white px-4 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-black hover:opacity-85 disabled:opacity-50 transition-opacity"
           >
             {enviando ? "Enviando…" : "Enviar valoración"}
           </button>
