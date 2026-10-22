@@ -16,9 +16,8 @@ import {
   ID_SIN_ASIGNAR,
 } from "@/lib/calendarioDia";
 import {
+  IconBan,
   IconBell,
-  IconCheck,
-  IconAlertCircle,
   IconX,
   IconPhone,
   IconChat,
@@ -1707,7 +1706,20 @@ function DetalleCitaPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="text-lg font-bold text-stone-900">{ETIQUETA_ESTADO[cita.estado] ?? cita.estado}</div>
+          <div
+            className={
+              "text-lg font-bold uppercase tracking-wide " +
+              (cita.estado === "completada"
+                ? "text-emerald-600"
+                : cita.estado === "no_presentada"
+                  ? "text-amber-600"
+                  : cita.estado === "cancelada"
+                    ? "text-red-600"
+                    : "text-stone-900")
+            }
+          >
+            {ETIQUETA_ESTADO[cita.estado] ?? cita.estado}
+          </div>
           <button
             onClick={onCerrar}
             aria-label="Cerrar"
@@ -1833,58 +1845,71 @@ function DetalleCitaPanel({
           Añadir al calendario
         </a>
 
-        <div className="flex flex-wrap gap-2">
-          {(cita.estado === "confirmada" || cita.estado === "completada") && (
-            <button
-              onClick={onAvisarDisponible}
-              disabled={avisando === cita.id}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-            >
-              <IconBell className="h-4 w-4" />
-              {avisando === cita.id ? "Avisando…" : "Avisar disponible"}
-            </button>
-          )}
-          {cita.estado === "confirmada" && (
-            <>
+        {(cita.estado === "confirmada" || cita.estado === "completada") && (
+          <button
+            onClick={onAvisarDisponible}
+            disabled={avisando === cita.id}
+            className="mb-4 flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:text-blue-700 disabled:opacity-50"
+          >
+            <IconBell className="h-4 w-4" />
+            {avisando === cita.id ? "Avisando…" : "Avisar disponible"}
+          </button>
+        )}
+
+        {/* Pie al estilo Booksy (pedido de Diego, 23/10/2026): importe bien
+            grande y debajo la acción principal, COBRAR, que abre el cobro
+            (FinalizarCitaModal: método de pago, descuentos, bonos,
+            productos y recibo). Antes ese mismo paso se llamaba
+            "Completada" y los barberos no lo asociaban con cobrar. */}
+        {cita.estado === "confirmada" && (
+          <div className="border-t border-stone-100 pt-4">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-xs text-stone-500">Precio de la cita</div>
+                <div className="text-2xl font-bold text-stone-900">{euros(precioEstimadoCentimos(cita))}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-stone-500">A pagar</div>
+                <div className="text-2xl font-bold text-stone-900">{euros(precioEstimadoCentimos(cita))}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
               <button
-                onClick={onFinalizar}
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700"
+                onClick={() => {
+                  // Sin confirmación era muy fácil cancelar una cita sin
+                  // querer al tocar el icono.
+                  if (window.confirm("¿Cancelar esta cita?")) onCambiarEstado("cancelada");
+                }}
+                aria-label="Cancelar cita"
+                title="Cancelar cita"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-stone-200 text-red-600 transition hover:border-red-200 hover:bg-red-50"
               >
-                <IconCheck className="h-4 w-4" />
-                Completada
+                <IconBan className="h-5 w-5" />
               </button>
               <button
                 onClick={() => onCambiarEstado("no_presentada")}
-                className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-600"
+                className="flex h-12 flex-1 items-center justify-center rounded-xl border border-stone-200 px-2 text-sm font-semibold uppercase tracking-wide text-stone-800 transition hover:bg-stone-50"
               >
-                <IconAlertCircle className="h-4 w-4" />
                 No presentada
               </button>
               <button
-                onClick={() => onCambiarEstado("cancelada")}
-                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700"
+                onClick={onFinalizar}
+                className="flex h-12 flex-1 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-stone-800"
               >
-                <IconX className="h-4 w-4" />
-                Cancelar
+                Cobrar
               </button>
-            </>
-          )}
-          {cita.estado !== "confirmada" && cita.cliente && cita.servicio && (
-            <button
-              onClick={onReservarDeNuevo}
-              className="flex items-center gap-1.5 rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white transition-opacity hover:opacity-85"
-            >
-              Reservar de nuevo
-            </button>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
 
-        <button
-          onClick={onCerrar}
-          className="mt-4 rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200"
-        >
-          Cerrar
-        </button>
+        {cita.estado !== "confirmada" && cita.cliente && cita.servicio && (
+          <button
+            onClick={onReservarDeNuevo}
+            className="flex h-12 w-full items-center justify-center rounded-xl border border-stone-200 text-sm font-semibold uppercase tracking-wide text-stone-800 transition hover:bg-stone-50"
+          >
+            Reservar de nuevo
+          </button>
+        )}
       </div>
 
       {verRecibo && (

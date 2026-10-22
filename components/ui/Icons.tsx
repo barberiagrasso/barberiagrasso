@@ -104,6 +104,17 @@ export function IconX(props: IconProps) {
   );
 }
 
+// Círculo tachado ("prohibido") — botón de cancelar cita en el panel de
+// detalle de la Agenda, como en Booksy.
+export function IconBan(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M6 6l12 12" />
+    </svg>
+  );
+}
+
 export function IconBell(props: IconProps) {
   return (
     <svg {...base} {...props}>

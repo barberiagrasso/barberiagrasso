@@ -662,7 +662,8 @@ function VistaSemanal({
                         <button
                           onClick={() => onFinalizar(cita)}
                           className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white"
-                          title="Marcar como completada"
+                          title="Cobrar"
+                          aria-label="Cobrar"
                         >
                           <IconCheck className="h-3 w-3" />
                         </button>

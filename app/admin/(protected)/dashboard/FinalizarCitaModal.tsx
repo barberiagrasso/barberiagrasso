@@ -95,7 +95,7 @@ function Etiqueta({ icono: Icono, texto }: { icono: typeof IconCard; texto: stri
 }
 
 /**
- * Pantalla que se abre al pulsar "Completada" en una cita: el checkout de
+ * Pantalla que se abre al pulsar "Cobrar" en una cita (antes "Completada"): el checkout de
  * verdad del barbero. En un único guardado deja corregir todo lo que hizo
  * falta de la reserva original — el servicio, quién la hizo, el horario
  * real, los complementos y productos vendidos, el método de pago, y si
@@ -480,7 +480,7 @@ export default function FinalizarCitaModal({
       <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-start justify-between gap-3 border-b border-stone-100 px-5 py-4">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-stone-400">Finalizar cita</div>
+            <div className="text-xs font-medium uppercase tracking-wide text-stone-400">Cobrar cita</div>
             <h2 className="text-lg font-bold text-stone-900">{cita.cliente?.nombre ?? "Cliente"}</h2>
           </div>
           <button
@@ -933,10 +933,9 @@ export default function FinalizarCitaModal({
           <button
             disabled={guardando || !pagoRepartidoValido}
             onClick={guardar}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-stone-800 disabled:opacity-50"
           >
-            <IconCheck className="h-4 w-4" />
-            {guardando ? "Guardando…" : "Marcar como completada"}
+            {guardando ? "Cobrando…" : `Cobrar ${euros(totalACobrarCentimos)} €`}
           </button>
           <button onClick={onCerrar} className="rounded-xl px-4 py-2.5 text-sm font-medium text-stone-500 hover:bg-stone-100">
             Cancelar
