@@ -30,6 +30,73 @@ import { ReciboView } from "@/components/recibo/ReciboView";
 import { euros } from "@/lib/formato";
 import type { DatosRecibo } from "@/lib/recibo";
 
+// --- Gestos táctiles de la agenda (pedido de Diego, 23/10/2026) ---------
+// La agenda se mueve como la de Booksy: el dedo desplaza la cuadrícula en
+// cualquier dirección, también por encima de las citas. Mover algo de
+// sitio (una cita, el descanso, o crear un bloque nuevo) exige mantener
+// pulsado medio segundo sin moverse; un deslizamiento normal es siempre
+// scroll. Antes, tocar una cita y mover el dedo la cambiaba de hora al
+// instante, y sobre las citas no se podía desplazar la agenda.
+const ESPERA_PULSACION_LARGA_MS = 500;
+// Ancho de la columna de horas (la de la izquierda) y mínimo de cada
+// columna de barbero en la agenda de día.
+const ANCHO_EJE_HORAS = 64;
+const ANCHO_COLUMNA_MIN = 120;
+const UMBRAL_CANCELAR_ESPERA_PX = 10;
+
+// Mientras se arrastra algo con el dedo, el navegador no debe desplazar
+// la agenda por debajo. Se libera solo al soltar o cancelar el gesto.
+let liberarScrollActivo: (() => void) | null = null;
+function bloquearScrollTactil() {
+  if (liberarScrollActivo) return;
+  const impedir = (ev: TouchEvent) => ev.preventDefault();
+  const liberar = () => {
+    window.removeEventListener("touchmove", impedir);
+    window.removeEventListener("pointerup", liberar);
+    window.removeEventListener("pointercancel", liberar);
+    liberarScrollActivo = null;
+  };
+  window.addEventListener("touchmove", impedir, { passive: false });
+  window.addEventListener("pointerup", liberar);
+  window.addEventListener("pointercancel", liberar);
+  liberarScrollActivo = liberar;
+}
+
+// Con ratón o lápiz, `empezar` se llama al momento. Con el dedo, solo si
+// se mantiene pulsado ESPERA_PULSACION_LARGA_MS sin apenas moverse; si
+// se mueve antes, es un scroll y no se hace nada (el navegador desplaza
+// la agenda solo). Un toque corto tampoco hace nada aquí: llega el click
+// normal del elemento.
+function conPulsacionLarga(e: React.PointerEvent, empezar: () => void) {
+  if (e.pointerType !== "touch") {
+    e.preventDefault();
+    empezar();
+    return;
+  }
+  const xInicial = e.clientX;
+  const yInicial = e.clientY;
+  function alMover(ev: PointerEvent) {
+    if (Math.hypot(ev.clientX - xInicial, ev.clientY - yInicial) > UMBRAL_CANCELAR_ESPERA_PX) {
+      cancelar();
+    }
+  }
+  function cancelar() {
+    window.clearTimeout(idTimer);
+    window.removeEventListener("pointermove", alMover);
+    window.removeEventListener("pointerup", cancelar);
+    window.removeEventListener("pointercancel", cancelar);
+  }
+  const idTimer = window.setTimeout(() => {
+    cancelar();
+    bloquearScrollTactil();
+    navigator.vibrate?.(15);
+    empezar();
+  }, ESPERA_PULSACION_LARGA_MS);
+  window.addEventListener("pointermove", alMover);
+  window.addEventListener("pointerup", cancelar);
+  window.addEventListener("pointercancel", cancelar);
+}
+
 interface Cita {
   id: string;
   inicio: string;
@@ -339,7 +406,6 @@ export default function CalendarioDia({
     limiteFin: number,
   ) {
     if (!esAdmin || guardandoDescanso) return;
-    e.preventDefault();
     e.stopPropagation();
     const duracionMin = finMin - inicioMin;
     const yInicial = e.clientY;
@@ -396,9 +462,12 @@ export default function CalendarioDia({
       window.removeEventListener("pointercancel", alCancelar);
     }
 
-    window.addEventListener("pointermove", alMover);
-    window.addEventListener("pointerup", alSoltar);
-    window.addEventListener("pointercancel", alCancelar);
+    conPulsacionLarga(e, () => {
+      setArrastrando({ profesionalId, inicioMin, duracionMin });
+      window.addEventListener("pointermove", alMover);
+      window.addEventListener("pointerup", alSoltar);
+      window.addEventListener("pointercancel", alCancelar);
+    });
   }
 
   // Arrastre de una cita para cambiarla de hora (solo admin, y solo
@@ -435,7 +504,6 @@ export default function CalendarioDia({
     if (!esAdmin || cita.estado !== "confirmada" || moviendoCitaId) return;
     if (!cita.profesional?.id) return; // "Sin asignar": no tiene sentido arrastrarla dentro de esa columna
     const profesionalId: string = cita.profesional.id; // ya con tipo no-opcional, para que las funciones anidadas de más abajo no lo vuelvan a ver como "string | undefined"
-    e.preventDefault();
     e.stopPropagation();
     ultimoArrastreCitaRef.current = false;
     const inicioMinOriginal = minutosEnMadrid(cita.inicio);
@@ -499,9 +567,20 @@ export default function CalendarioDia({
       window.removeEventListener("pointercancel", alCancelar);
     }
 
-    window.addEventListener("pointermove", alMover);
-    window.addEventListener("pointerup", alSoltar);
-    window.addEventListener("pointercancel", alCancelar);
+    // Con el dedo, un toque corto abre el detalle por el click normal del
+    // botón y un deslizamiento desplaza la agenda; solo una pulsación
+    // larga empieza a mover la cita.
+    conPulsacionLarga(e, () => {
+      setArrastrandoCita({
+        citaId: cita.id,
+        profesionalId,
+        inicioMin: inicioMinOriginal,
+        duracionMin,
+      });
+      window.addEventListener("pointermove", alMover);
+      window.addEventListener("pointerup", alSoltar);
+      window.addEventListener("pointercancel", alCancelar);
+    });
   }
 
   // Crear algo nuevo arrastrando sobre un hueco vacío de la agenda —
@@ -529,8 +608,6 @@ export default function CalendarioDia({
   // al instante, como siempre.
   const PASO_CREACION_MIN = 5;
   const DURACION_BLOQUEO_DEFECTO_MIN = 30;
-  const ESPERA_PULSACION_LARGA_MS = 500;
-  const UMBRAL_CANCELAR_ESPERA_PX = 10;
   const [creacion, setCreacion] = useState<{
     profesionalId: string;
     inicioMin: number;
@@ -658,7 +735,13 @@ export default function CalendarioDia({
       // (className="touch-pan-y" en la columna es quien lo permite); si
       // eso pasa, el propio navegador cancela este puntero solo.
       window.addEventListener("pointermove", alMoverEspera);
-      idTimer = window.setTimeout(empezarDeVerdad, ESPERA_PULSACION_LARGA_MS);
+      idTimer = window.setTimeout(() => {
+        // Ya es un gesto de crear, no de desplazarse: que la agenda no se
+        // mueva por debajo mientras se arrastra el bloque nuevo.
+        bloquearScrollTactil();
+        navigator.vibrate?.(15);
+        empezarDeVerdad();
+      }, ESPERA_PULSACION_LARGA_MS);
     } else {
       // Ratón o lápiz: empieza al instante, como siempre.
       e.preventDefault();
@@ -712,6 +795,47 @@ export default function CalendarioDia({
     maxFinVisual,
   );
 
+  // Una sola zona de scroll en ambas direcciones (como Booksy): nombres
+  // de barberos fijos arriba, horas fijas a la izquierda, y al deslizar
+  // de lado encaja columna a columna. Antes había dos zonas anidadas (una
+  // horizontal y otra vertical) y las columnas solo dejaban deslizar en
+  // vertical: para ir de lado había que arrastrar justo los nombres, y la
+  // columna de horas se perdía.
+  const [zonaScroll, setZonaScroll] = useState<HTMLDivElement | null>(null);
+  const [anchoZona, setAnchoZona] = useState(0);
+  useEffect(() => {
+    if (!zonaScroll) return;
+    const medir = () => setAnchoZona(zonaScroll.clientWidth);
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(zonaScroll);
+    return () => observador.disconnect();
+  }, [zonaScroll]);
+  // En el móvil se ven 2 barberos a la vez (como Booksy), 3 en tablet y
+  // 4 en ordenador; si caben todos, ocupan todo el ancho sin scroll lateral.
+  const columnasALaVista = anchoZona < 640 ? 2 : anchoZona < 1024 ? 3 : 4;
+  const anchoColumna =
+    anchoZona > 0
+      ? Math.max(
+          ANCHO_COLUMNA_MIN,
+          (anchoZona - ANCHO_EJE_HORAS) / Math.min(columnasALaVista, Math.max(columnas.length, 1)),
+        )
+      : 160;
+
+  // Al abrir el día de hoy, la agenda se coloca sola en la hora actual
+  // (con un poco de margen por encima), en vez de al principio del día.
+  // Solo una vez por día mostrado, para no "saltar" mientras se trabaja.
+  const diaYaColocado = useRef<string | null>(null);
+  useEffect(() => {
+    if (!zonaScroll || diaYaColocado.current === fecha) return;
+    diaYaColocado.current = fecha;
+    if (!esHoy) {
+      zonaScroll.scrollTop = 0;
+      return;
+    }
+    zonaScroll.scrollTop = Math.max(0, (posicionAhora - minInicioVisual - 60) * PX_POR_MINUTO);
+  }, [zonaScroll, fecha, esHoy, posicionAhora, minInicioVisual]);
+
   if (cargando && citas.length === 0) {
     return <p className="text-sm text-stone-500">Cargando…</p>;
   }
@@ -725,15 +849,20 @@ export default function CalendarioDia({
 
   return (
     <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="overflow-x-auto">
-        <div style={{ minWidth: 64 + columnas.length * 160 }}>
-          {/* --- Cabecera: nombre de cada barbero --- */}
-          <div className="sticky top-0 z-20 flex border-b border-stone-200 bg-white">
-            <div className="w-16 shrink-0" />
+      <div
+        ref={setZonaScroll}
+        className="max-h-[75vh] snap-x snap-mandatory overflow-auto overscroll-contain select-none"
+        style={{ scrollPaddingLeft: ANCHO_EJE_HORAS, WebkitTouchCallout: "none" }}
+      >
+        <div style={{ width: ANCHO_EJE_HORAS + columnas.length * anchoColumna, minWidth: "100%" }}>
+          {/* --- Cabecera: nombre de cada barbero (fija arriba al bajar) --- */}
+          <div className="sticky top-0 z-30 flex border-b border-stone-200 bg-white">
+            <div className="sticky left-0 z-10 shrink-0 bg-white" style={{ width: ANCHO_EJE_HORAS }} />
             {columnas.map((col) => (
               <div
                 key={col.id}
-                className="flex flex-1 items-center justify-center gap-1.5 border-l border-stone-100 p-2 text-center text-sm font-medium text-stone-900"
+                className="flex min-w-0 shrink-0 items-center justify-center gap-1.5 border-l border-stone-100 p-2 text-center text-sm font-medium text-stone-900"
+                style={{ width: anchoColumna }}
               >
                 {col.id !== ID_SIN_ASIGNAR && (
                   <AvatarProfesional
@@ -747,10 +876,10 @@ export default function CalendarioDia({
             ))}
           </div>
 
-          {/* --- Cuerpo: eje de horas + una columna por barbero --- */}
-          <div className="max-h-[75vh] overflow-y-auto">
+          {/* --- Cuerpo: eje de horas (fijo a la izquierda) + una columna por barbero --- */}
+          <div>
             <div className="relative flex" style={{ height: alturaTotal }}>
-              <div className="sticky left-0 z-10 w-16 shrink-0 bg-white">
+              <div className="sticky left-0 z-20 shrink-0 bg-white" style={{ width: ANCHO_EJE_HORAS }}>
                 {marcas.map((m) => (
                   <div
                     key={m}
@@ -773,14 +902,17 @@ export default function CalendarioDia({
                   }
                   onContextMenu={(e) => e.preventDefault()}
                   className={
-                    // touch-pan-y (no touch-none): deja que el scroll
-                    // vertical nativo funcione con normalidad al arrastrar
-                    // el dedo por la columna — la creación de un bloque
-                    // nuevo solo se activa con una pulsación larga sin
-                    // apenas movimiento (ver iniciarCreacion más arriba).
-                    "relative flex-1 touch-pan-y border-l border-stone-100" +
+                    // touch-action pan-x pan-y (ver style): el dedo
+                    // desplaza la agenda en cualquier dirección — la
+                    // creación de un bloque nuevo solo se activa con una
+                    // pulsación larga sin apenas movimiento (ver
+                    // iniciarCreacion más arriba). snap-start: al
+                    // deslizar de lado, encaja en el borde de un barbero;
+                    // snap-always: avanza de uno en uno, como Booksy.
+                    "relative isolate shrink-0 snap-start snap-always border-l border-stone-100" +
                     (col.id !== ID_SIN_ASIGNAR ? " cursor-crosshair" : "")
                   }
+                  style={{ width: anchoColumna, touchAction: "pan-x pan-y" }}
                 >
                   {/* Franjas "cerrado" (antes de abrir / después de cerrar): puramente
                       visuales, con rayado, para orientarse — nunca se puede arrastrar
@@ -862,7 +994,7 @@ export default function CalendarioDia({
                           );
                         }}
                         className={
-                          "absolute inset-x-0 z-10 flex touch-none items-center justify-center border-y border-stone-700 bg-stone-800/90 text-[11px] font-medium text-white " +
+                          "absolute inset-x-0 z-10 flex items-center justify-center border-y border-stone-700 bg-stone-800/90 text-[11px] font-medium text-white " +
                           (esAdmin
                             ? "cursor-grab select-none active:cursor-grabbing"
                             : "")
@@ -983,7 +1115,7 @@ export default function CalendarioDia({
                         }}
                         disabled={moviendoCitaId === cita.id}
                         className={
-                          "absolute inset-x-1 touch-none overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md disabled:opacity-60 " +
+                          "absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md disabled:opacity-60 " +
                           claseBloque(cita.estado) +
                           (sePuedeArrastrar
                             ? " cursor-grab active:cursor-grabbing"
