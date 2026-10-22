@@ -13,7 +13,12 @@ export default async function ReservarPage() {
 
   const supabase = createPublicClient();
 
-  const [{ data: sedes }, { data: servicios }] = await Promise.all([
+  const [
+    { data: sedes },
+    { data: servicios },
+    { data: profesionalSedes },
+    { data: profesionalServicios },
+  ] = await Promise.all([
     supabase
       .from("sedes")
       .select("id, nombre, slug, direccion, telefono, activo, acepta_tarjeta, acceso_movilidad_reducida, wifi, apto_ninos")
@@ -24,7 +29,38 @@ export default async function ReservarPage() {
         "id, nombre, descripcion, duracion_minutos, precio_centimos, activo, categoria, orden, precio_variable",
       )
       .order("orden"),
+    supabase
+      .from("profesional_sedes")
+      .select("profesional_id, sede_id, profesionales!inner(activo)")
+      .eq("profesionales.activo", true),
+    supabase.from("profesional_servicios").select("profesional_id, servicio_id"),
   ]);
+
+  // Qué servicios tienen al menos un barbero activo en cada sede. Un
+  // servicio dado de alta sin ningún barbero asignado no se puede
+  // reservar (el calendario sale entero en gris y no aparece ningún
+  // barbero), así que no se le enseña al cliente en esa sede. Si estas
+  // consultas fallan, se pasa null y se muestran todos, como antes.
+  let serviciosReservablesPorSede: Record<string, string[]> | null = null;
+  if (profesionalSedes && profesionalServicios) {
+    const serviciosPorProfesional = new Map<string, string[]>();
+    for (const fila of profesionalServicios) {
+      const lista = serviciosPorProfesional.get(fila.profesional_id) ?? [];
+      lista.push(fila.servicio_id);
+      serviciosPorProfesional.set(fila.profesional_id, lista);
+    }
+    const porSede = new Map<string, Set<string>>();
+    for (const fila of profesionalSedes) {
+      const conjunto = porSede.get(fila.sede_id) ?? new Set<string>();
+      for (const servicioId of serviciosPorProfesional.get(fila.profesional_id) ?? []) {
+        conjunto.add(servicioId);
+      }
+      porSede.set(fila.sede_id, conjunto);
+    }
+    serviciosReservablesPorSede = Object.fromEntries(
+      [...porSede].map(([sedeId, ids]) => [sedeId, [...ids]]),
+    );
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-brand-black px-4 py-10 sm:py-14">
@@ -56,6 +92,7 @@ export default async function ReservarPage() {
           <BookingFlow
             sedes={sedes ?? []}
             servicios={servicios ?? []}
+            serviciosReservablesPorSede={serviciosReservablesPorSede}
             clienteInicial={{
               nombre: cliente.nombre,
               telefono: cliente.telefono,

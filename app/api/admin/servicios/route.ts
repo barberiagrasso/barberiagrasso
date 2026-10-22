@@ -71,5 +71,20 @@ export async function POST(request: NextRequest) {
     const mensaje = error.code === "23505" ? "Ya existe un servicio con ese nombre." : "No se pudo crear el servicio.";
     return NextResponse.json({ error: mensaje }, { status: 400 });
   }
+
+  // Un servicio sin ningún barbero asignado no se puede reservar: en la
+  // reserva no salía ningún barbero y el calendario quedaba entero en
+  // gris. Por eso, al crearlo, se asigna a todos los barberos activos
+  // (la misma suposición que el script inicial de datos reales). Si
+  // alguno no lo hace, se le desmarca después en Equipo.
+  const { data: activos } = await supabase.from("profesionales").select("id").eq("activo", true);
+  if (activos && activos.length > 0) {
+    const { error: errorAsignar } = await supabase
+      .from("profesional_servicios")
+      .insert(activos.map((p) => ({ profesional_id: p.id, servicio_id: servicio.id })));
+    if (errorAsignar) {
+      console.error("Servicio creado, pero no se pudieron asignar los barberos", errorAsignar);
+    }
+  }
   return NextResponse.json({ servicio });
 }

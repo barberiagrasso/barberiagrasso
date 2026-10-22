@@ -127,6 +127,10 @@ interface ClienteInicial {
 interface Props {
   sedes: Sede[];
   servicios: Servicio[];
+  // Ids de los servicios que tienen al menos un barbero activo en cada
+  // sede (ver app/reservar/page.tsx). null = no se pudo calcular, y se
+  // muestran todos.
+  serviciosReservablesPorSede?: Record<string, string[]> | null;
   // Datos del cliente ya logueado, para no hacérselos volver a escribir.
   // Se dejan en campos editables por si alguna vez reserva para otra
   // persona (p. ej. un hijo).
@@ -438,6 +442,7 @@ function Stepper({ paso }: { paso: Paso }) {
 export default function BookingFlow({
   sedes,
   servicios,
+  serviciosReservablesPorSede = null,
   clienteInicial,
 }: Props) {
   const router = useRouter();
@@ -464,6 +469,9 @@ export default function BookingFlow({
   // Petición de huecos en curso: si el cliente toca otro día u otro
   // barbero antes de que llegue la respuesta, se cancela la anterior.
   const peticionSlots = useRef<AbortController | null>(null);
+  // Para qué sede|servicio|barbero ya se saltó solo al mes siguiente por
+  // no quedar huecos en el actual (ver el efecto del resumen del mes).
+  const saltoAutomaticoHecho = useRef<string | null>(null);
   const hoy = useMemo(() => new Date(), []);
   const [mesVisible, setMesVisible] = useState(() => ({
     anio: hoy.getFullYear(),
@@ -513,13 +521,25 @@ export default function BookingFlow({
     ? sedeSeleccionada.nombre
     : sedes.map((s) => s.nombre).join(" · ");
   const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
+  // Servicios que se ofrecen en la sede elegida: solo los que tienen
+  // algún barbero que los haga allí. Un servicio sin barberos dejaba al
+  // cliente en un calendario todo en gris y sin ningún barbero. Si para
+  // esa sede no hay datos (o no se pudieron cargar), se muestran todos
+  // en vez de dejar la lista vacía.
+  const serviciosDeSede = useMemo(() => {
+    if (!sedeId || !serviciosReservablesPorSede) return servicios;
+    const reservables = serviciosReservablesPorSede[sedeId];
+    if (!reservables || reservables.length === 0) return servicios;
+    const ids = new Set(reservables);
+    return servicios.filter((s) => ids.has(s.id));
+  }, [servicios, serviciosReservablesPorSede, sedeId]);
   const { principales, grupos } = useMemo(
-    () => agruparServicios(servicios),
-    [servicios],
+    () => agruparServicios(serviciosDeSede),
+    [serviciosDeSede],
   );
   const complementosDisponibles = useMemo(
-    () => servicios.filter(esComplemento),
-    [servicios],
+    () => serviciosDeSede.filter(esComplemento),
+    [serviciosDeSede],
   );
   const complementosElegidos = useMemo(
     () => complementosDisponibles.filter((c) => complementoIds.includes(c.id)),
@@ -777,12 +797,37 @@ export default function BookingFlow({
         // Si el día que ya estaba elegido deja de tener huecos con este
         // barbero o mes, se deselecciona en vez de dejar una hora
         // "elegida" que ya no existe.
-        if (fecha && !mapa[fecha]?.seleccionable) {
+        const fechaSigueValida = Boolean(fecha && mapa[fecha]?.seleccionable);
+        if (fecha && !fechaSigueValida) {
           peticionSlots.current?.abort();
           setFecha(null);
           setSlots([]);
           setSlotElegido(null);
           setCargandoSlots(false);
+        }
+        if (fechaSigueValida) return;
+
+        // Para ahorrarle toques al cliente: si no tiene ningún día
+        // elegido, se le marca ya el primer día con hueco y se cargan sus
+        // horas. Si en el mes en curso no queda ningún hueco, se pasa
+        // solo al mes siguiente (una única vez por servicio y barbero,
+        // para no rebotar si el cliente vuelve atrás a propósito).
+        const hoyISO = hoyLocalISO();
+        const primerDiaLibre = Object.values(mapa)
+          .filter((d) => d.seleccionable && d.fecha >= hoyISO)
+          .map((d) => d.fecha)
+          .sort()[0];
+        if (primerDiaLibre) {
+          elegirFecha(primerDiaLibre);
+          return;
+        }
+        const claveSalto = `${sedeId}|${servicioId}|${profesionalId ?? ""}`;
+        const esMesActual =
+          mesVisible.anio === hoy.getFullYear() &&
+          mesVisible.mes === hoy.getMonth() + 1;
+        if (esMesActual && saltoAutomaticoHecho.current !== claveSalto) {
+          saltoAutomaticoHecho.current = claveSalto;
+          cambiarMes(1);
         }
       })
       .catch((err) => {
