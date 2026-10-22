@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
@@ -67,6 +67,41 @@ function agruparServicios(servicios: Servicio[]) {
     items: porCategoria.get(nombre)!,
   }));
   return { principales, grupos };
+}
+
+// Carga JSON de una API propia sin que la pantalla se pueda quedar
+// colgada: corta a los TIEMPO_LIMITE_MS y reintenta una vez sola antes
+// de dar error (en móvil con poca cobertura, o con el servidor "en frío"
+// tras un rato sin visitas, la primera petición a veces se pierde). Si el
+// componente cancela la petición (el cliente cambió de barbero o de mes
+// antes de que llegara la respuesta), se lanza un AbortError que quien
+// llama ignora, para que una respuesta vieja nunca pise a la nueva.
+const TIEMPO_LIMITE_MS = 12000;
+async function cargarJson<T>(url: string, signal: AbortSignal, intentos = 2): Promise<T> {
+  let ultimoError: unknown;
+  for (let i = 0; i < intentos; i++) {
+    if (signal.aborted) throw new DOMException("Cancelada", "AbortError");
+    const limite = new AbortController();
+    const temporizador = setTimeout(() => limite.abort(), TIEMPO_LIMITE_MS);
+    const alCancelar = () => limite.abort();
+    signal.addEventListener("abort", alCancelar);
+    try {
+      const res = await fetch(url, { signal: limite.signal, cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return (await res.json()) as T;
+    } catch (err) {
+      if (signal.aborted) throw new DOMException("Cancelada", "AbortError");
+      ultimoError = err;
+    } finally {
+      clearTimeout(temporizador);
+      signal.removeEventListener("abort", alCancelar);
+    }
+  }
+  throw ultimoError;
+}
+
+function esCancelacion(err: unknown) {
+  return err instanceof DOMException && err.name === "AbortError";
 }
 
 interface ProfesionalOpcion {
@@ -419,9 +454,16 @@ export default function BookingFlow({
   const [complementoIds, setComplementoIds] = useState<string[]>([]);
   const [profesionalId, setProfesionalId] = useState<string | null>(null); // null = cualquiera
   const [profesionales, setProfesionales] = useState<ProfesionalOpcion[]>([]);
+  const [cargandoProfesionales, setCargandoProfesionales] = useState(false);
+  const [errorProfesionales, setErrorProfesionales] = useState(false);
+  const [reintentoProfesionales, setReintentoProfesionales] = useState(0);
   const [fecha, setFecha] = useState<string | null>(null);
   const [slots, setSlots] = useState<FranjaDisponible[]>([]);
   const [cargandoSlots, setCargandoSlots] = useState(false);
+  const [errorSlots, setErrorSlots] = useState(false);
+  // Petición de huecos en curso: si el cliente toca otro día u otro
+  // barbero antes de que llegue la respuesta, se cancela la anterior.
+  const peticionSlots = useRef<AbortController | null>(null);
   const hoy = useMemo(() => new Date(), []);
   const [mesVisible, setMesVisible] = useState(() => ({
     anio: hoy.getFullYear(),
@@ -431,6 +473,8 @@ export default function BookingFlow({
     Record<string, ResumenDiaDisponibilidad>
   >({});
   const [cargandoMes, setCargandoMes] = useState(false);
+  const [errorMes, setErrorMes] = useState(false);
+  const [reintentoMes, setReintentoMes] = useState(0);
   const [slotElegido, setSlotElegido] = useState<FranjaDisponible | null>(null);
   const [nombre, setNombre] = useState(clienteInicial?.nombre ?? "");
   const [telefono, setTelefono] = useState(clienteInicial?.telefono ?? "");
@@ -514,21 +558,49 @@ export default function BookingFlow({
     if (pagarConSaldo && !saldoCubreTotal) setPagarConSaldo(false);
   }, [pagarConSaldo, saldoCubreTotal]);
 
-  async function elegirServicioYContinuar(id: string) {
+  function elegirServicioYContinuar(id: string) {
+    if (id !== servicioId) {
+      // El barbero elegido para otro servicio puede no hacer este.
+      setProfesionalId(null);
+      setFecha(null);
+      setSlots([]);
+      setSlotElegido(null);
+    }
     setServicioId(id);
     setComplementoIds([]);
     const servicio = servicios.find((s) => s.id === id);
     // Si el servicio elegido ya es un complemento (se reserva solo), no
     // tiene sentido ofrecer añadirle otro complemento encima.
     setPaso(servicio && esComplemento(servicio) ? "fecha" : "complementos");
-    if (sedeId) {
-      const res = await fetch(
-        `/api/profesionales?sedeId=${sedeId}&servicioId=${id}`,
-      );
-      const json = await res.json();
-      setProfesionales(json.profesionales ?? []);
-    }
   }
+
+  // Lista de barberos de la sede que hacen el servicio elegido. Empieza a
+  // cargarse en cuanto se elige el servicio (mientras el cliente mira los
+  // extras), así normalmente ya está lista al llegar a "Barbero, día y
+  // hora". Antes era una petición suelta sin control de errores: si
+  // fallaba o tardaba, solo salía "Cualquiera" y no se volvía a intentar.
+  useEffect(() => {
+    if (!sedeId || !servicioId) return;
+    const control = new AbortController();
+    setProfesionales([]);
+    setCargandoProfesionales(true);
+    setErrorProfesionales(false);
+    const params = new URLSearchParams({ sedeId, servicioId });
+    cargarJson<{ profesionales?: ProfesionalOpcion[] }>(
+      `/api/profesionales?${params.toString()}`,
+      control.signal,
+    )
+      .then((json) => {
+        setProfesionales(json.profesionales ?? []);
+        setCargandoProfesionales(false);
+      })
+      .catch((err) => {
+        if (esCancelacion(err)) return;
+        setErrorProfesionales(true);
+        setCargandoProfesionales(false);
+      });
+    return () => control.abort();
+  }, [sedeId, servicioId, reintentoProfesionales]);
 
   function alternarComplemento(id: string) {
     setComplementoIds((actuales) =>
@@ -542,8 +614,12 @@ export default function BookingFlow({
   // evitar que, al cambiar de barbero y refrescar huecos en el mismo clic,
   // se use por error el valor de profesionalId de antes de la actualización.
   async function buscarSlots(fechaValor: string, profId: string | null) {
+    peticionSlots.current?.abort();
+    const control = new AbortController();
+    peticionSlots.current = control;
     setSlotElegido(null);
     setCargandoSlots(true);
+    setErrorSlots(false);
     setSlots([]);
     const params = new URLSearchParams({
       sedeId: sedeId!,
@@ -553,10 +629,18 @@ export default function BookingFlow({
     if (profId) params.set("profesionalId", profId);
     if (duracionExtraMinutos > 0)
       params.set("duracionExtraMinutos", String(duracionExtraMinutos));
-    const res = await fetch(`/api/disponibilidad?${params.toString()}`);
-    const json = await res.json();
-    setCargandoSlots(false);
-    setSlots(json.slots ?? []);
+    try {
+      const json = await cargarJson<{ slots?: FranjaDisponible[] }>(
+        `/api/disponibilidad?${params.toString()}`,
+        control.signal,
+      );
+      setSlots(json.slots ?? []);
+      setCargandoSlots(false);
+    } catch (err) {
+      if (esCancelacion(err)) return;
+      setErrorSlots(true);
+      setCargandoSlots(false);
+    }
   }
 
   function elegirFecha(valor: string) {
@@ -627,6 +711,9 @@ export default function BookingFlow({
         return;
       }
       const [anioNuevo, mesNuevo] = json.fecha.split("-").map(Number);
+      peticionSlots.current?.abort();
+      setCargandoSlots(false);
+      setErrorSlots(false);
       setMesVisible({ anio: anioNuevo, mes: mesNuevo });
       setFecha(json.fecha);
       setSlots(json.slots ?? []);
@@ -657,40 +744,53 @@ export default function BookingFlow({
   // mes visible (para las barritas verde/amarilla/roja del calendario).
   // Si el día ya elegido deja de tener huecos con el nuevo barbero o mes,
   // se deselecciona en vez de dejar una hora "elegida" que ya no existe.
-  async function buscarResumenMes(
-    anio: number,
-    mes: number,
-    profId: string | null,
-  ) {
-    setCargandoMes(true);
-    const params = new URLSearchParams({
-      sedeId: sedeId!,
-      servicioId: servicioId!,
-      anio: String(anio),
-      mes: String(mes),
-    });
-    if (profId) params.set("profesionalId", profId);
-    if (duracionExtraMinutos > 0)
-      params.set("duracionExtraMinutos", String(duracionExtraMinutos));
-    const res = await fetch(`/api/disponibilidad/mes?${params.toString()}`);
-    const json = await res.json();
-    setCargandoMes(false);
-    const mapa: Record<string, ResumenDiaDisponibilidad> = {};
-    for (const d of json.dias ?? []) mapa[d.fecha] = d;
-    setResumenMes(mapa);
-    if (fecha && !mapa[fecha]?.seleccionable) {
-      setFecha(null);
-      setSlots([]);
-      setSlotElegido(null);
-    }
-  }
-
+  // Antes no controlaba errores ni respuestas cruzadas: si la petición
+  // fallaba, el calendario se quedaba con todos los días en gris sin
+  // avisar (parecía "pillado"), y si el cliente cambiaba rápido de
+  // barbero o de mes, una respuesta vieja podía pisar a la nueva. Ahora
+  // cada cambio cancela la petición anterior, y si falla se ofrece
+  // "Reintentar" en vez de dejar el calendario vacío.
   useEffect(() => {
     if (paso !== "fecha" || !sedeId || !servicioId) return;
-    // Si el día que ya estaba elegido ya no es válido en este mes/barbero
-    // (por ejemplo, al cambiar de barbero y quedarse sin huecos), se limpia
-    // dentro de buscarResumenMes.
-    void buscarResumenMes(mesVisible.anio, mesVisible.mes, profesionalId);
+    const control = new AbortController();
+    setCargandoMes(true);
+    setErrorMes(false);
+    setResumenMes({});
+    const params = new URLSearchParams({
+      sedeId,
+      servicioId,
+      anio: String(mesVisible.anio),
+      mes: String(mesVisible.mes),
+    });
+    if (profesionalId) params.set("profesionalId", profesionalId);
+    if (duracionExtraMinutos > 0)
+      params.set("duracionExtraMinutos", String(duracionExtraMinutos));
+    cargarJson<{ dias?: ResumenDiaDisponibilidad[] }>(
+      `/api/disponibilidad/mes?${params.toString()}`,
+      control.signal,
+    )
+      .then((json) => {
+        const mapa: Record<string, ResumenDiaDisponibilidad> = {};
+        for (const d of json.dias ?? []) mapa[d.fecha] = d;
+        setResumenMes(mapa);
+        setCargandoMes(false);
+        // Si el día que ya estaba elegido deja de tener huecos con este
+        // barbero o mes, se deselecciona en vez de dejar una hora
+        // "elegida" que ya no existe.
+        if (fecha && !mapa[fecha]?.seleccionable) {
+          peticionSlots.current?.abort();
+          setFecha(null);
+          setSlots([]);
+          setSlotElegido(null);
+          setCargandoSlots(false);
+        }
+      })
+      .catch((err) => {
+        if (esCancelacion(err)) return;
+        setErrorMes(true);
+        setCargandoMes(false);
+      });
+    return () => control.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     paso,
@@ -699,6 +799,8 @@ export default function BookingFlow({
     profesionalId,
     sedeId,
     servicioId,
+    duracionExtraMinutos,
+    reintentoMes,
   ]);
 
   const indiceMesVisible = indiceMes(mesVisible.anio, mesVisible.mes);
@@ -844,6 +946,13 @@ export default function BookingFlow({
               <TarjetaOpcion
                 key={sede.id}
                 onClick={() => {
+                  if (sede.id !== sedeId) {
+                    // El barbero y el día elegidos eran de la otra sede.
+                    setProfesionalId(null);
+                    setFecha(null);
+                    setSlots([]);
+                    setSlotElegido(null);
+                  }
                   setSedeId(sede.id);
                   setPaso("servicio");
                 }}
@@ -1019,6 +1128,22 @@ export default function BookingFlow({
                     )}
                   </button>
                 ))}
+                {cargandoProfesionales &&
+                  [0, 1, 2].map((i) => (
+                    <span
+                      key={`cargando-prof-${i}`}
+                      aria-hidden
+                      className="h-9 w-24 animate-pulse rounded-full border border-brand-line bg-white/5"
+                    />
+                  ))}
+                {errorProfesionales && (
+                  <button
+                    onClick={() => setReintentoProfesionales((n) => n + 1)}
+                    className="rounded-full border border-brand-line px-3 py-2 font-mono text-xs text-brand-white-dim transition-colors hover:border-brand-yellow/60"
+                  >
+                    No se cargaron los barberos · Reintentar
+                  </button>
+                )}
               </div>
               {profesionalId === null && (
                 <p className="mt-1 font-body text-xs text-brand-white-dim">
@@ -1040,7 +1165,6 @@ export default function BookingFlow({
                 </button>
                 <p className="font-mono text-xs uppercase tracking-wider text-brand-white-dim">
                   {nombreMes(mesVisible.anio, mesVisible.mes)} {mesVisible.anio}
-                  {cargandoMes && "…"}
                 </p>
                 <button
                   onClick={() => cambiarMes(1)}
@@ -1077,7 +1201,9 @@ export default function BookingFlow({
                       onClick={() => elegirFecha(fechaCelda)}
                       className={
                         "flex flex-col items-center gap-1 rounded-lg border px-1 py-2 font-mono text-xs transition-colors " +
-                        (!seleccionable
+                        (cargandoMes && !esPasado
+                          ? "animate-pulse border-brand-line/50 text-brand-white-dim/60"
+                          : !seleccionable
                           ? "border-transparent text-brand-white-dim/30"
                           : elegido
                             ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
@@ -1110,6 +1236,24 @@ export default function BookingFlow({
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Baja
                 </span>
               </div>
+              {cargandoMes && (
+                <p className="mt-3 font-body text-sm text-brand-white-dim">
+                  Buscando huecos libres…
+                </p>
+              )}
+              {errorMes && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
+                  <p className="font-body text-sm text-brand-white-dim">
+                    No se pudo cargar la disponibilidad.
+                  </p>
+                  <button
+                    onClick={() => setReintentoMes((n) => n + 1)}
+                    className="rounded-full border border-brand-yellow px-3 py-1.5 font-mono text-xs text-brand-yellow transition-colors hover:bg-brand-yellow hover:text-brand-yellow-ink"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
             </div>
 
             {fecha && cargandoSlots && (
@@ -1117,7 +1261,20 @@ export default function BookingFlow({
                 Buscando huecos…
               </p>
             )}
-            {fecha && !cargandoSlots && horasUnicas.length === 0 && (
+            {fecha && !cargandoSlots && errorSlots && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
+                <p className="font-body text-sm text-brand-white-dim">
+                  No se pudieron cargar las horas de ese día.
+                </p>
+                <button
+                  onClick={() => buscarSlots(fecha, profesionalId)}
+                  className="rounded-full border border-brand-yellow px-3 py-1.5 font-mono text-xs text-brand-yellow transition-colors hover:bg-brand-yellow hover:text-brand-yellow-ink"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+            {fecha && !cargandoSlots && !errorSlots && horasUnicas.length === 0 && (
               <div className="space-y-3 rounded-xl border border-brand-line bg-black/20 p-4">
                 <p className="font-body text-sm text-brand-white-dim">
                   No hay huecos ese día.
