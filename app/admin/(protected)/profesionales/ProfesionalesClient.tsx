@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { IconPencil } from "@/components/ui/Icons";
 
 interface Sede {
   id: string;
@@ -70,6 +71,53 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
       setNombreNuevo("");
       setCreando(false);
       cargar();
+    }
+  }
+
+  // Cambiar el nombre de un barbero ya creado (pedido de Diego,
+  // 23/10/2026: p. ej. "Daniel" → "Daniel Andrés"). Solo cambia el nombre
+  // que se ve en la agenda, la reserva y los recibos; el usuario de acceso
+  // al panel sigue siendo el mismo.
+  const [editandoNombreId, setEditandoNombreId] = useState<string | null>(null);
+  const [nombreEditado, setNombreEditado] = useState("");
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
+  const [errorNombre, setErrorNombre] = useState<string | null>(null);
+
+  function empezarAEditarNombre(p: Profesional) {
+    setEditandoNombreId(p.id);
+    setNombreEditado(p.nombre);
+    setErrorNombre(null);
+  }
+
+  async function guardarNombre(p: Profesional) {
+    const nombre = nombreEditado.trim();
+    if (!nombre) {
+      setErrorNombre("El nombre no puede quedar vacío.");
+      return;
+    }
+    if (nombre === p.nombre) {
+      setEditandoNombreId(null);
+      return;
+    }
+    setGuardandoNombre(true);
+    setErrorNombre(null);
+    try {
+      const res = await fetch(`/api/admin/profesionales/${p.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorNombre(json.error || "No se pudo guardar el nombre.");
+        return;
+      }
+      setEditandoNombreId(null);
+      cargar();
+    } catch {
+      setErrorNombre("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setGuardandoNombre(false);
     }
   }
 
@@ -151,12 +199,53 @@ export default function ProfesionalesClient({ sedes, servicios }: { sedes: Sede[
         {profesionales.map((p) => (
           <div key={p.id} className="rounded-lg border border-stone-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-              <span className="flex items-center gap-2">
-                <AvatarProfesional fotoUrl={p.foto_url} nombre={p.nombre} className="h-7 w-7" />
-                <span className={"font-medium " + (p.activo ? "text-stone-900" : "text-stone-400 line-through")}>
-                  {p.nombre}
+              {editandoNombreId === p.id ? (
+                <div className="w-full space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AvatarProfesional fotoUrl={p.foto_url} nombre={p.nombre} className="h-7 w-7" />
+                    <input
+                      value={nombreEditado}
+                      onChange={(e) => setNombreEditado(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") guardarNombre(p);
+                        if (e.key === "Escape") setEditandoNombreId(null);
+                      }}
+                      autoFocus
+                      aria-label="Nombre del barbero"
+                      className="min-w-0 flex-1 rounded-lg border border-stone-300 p-2 text-base"
+                    />
+                    <button
+                      onClick={() => guardarNombre(p)}
+                      disabled={guardandoNombre}
+                      className="rounded-none bg-brand-black px-3 py-2 text-sm font-medium text-brand-white transition-opacity hover:opacity-85 disabled:opacity-50"
+                    >
+                      {guardandoNombre ? "Guardando…" : "Guardar"}
+                    </button>
+                    <button
+                      onClick={() => setEditandoNombreId(null)}
+                      className="px-2 py-2 text-sm text-stone-500 hover:text-stone-700"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  {errorNombre && <p className="text-sm text-red-600">{errorNombre}</p>}
+                </div>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <AvatarProfesional fotoUrl={p.foto_url} nombre={p.nombre} className="h-7 w-7" />
+                  <span className={"font-medium " + (p.activo ? "text-stone-900" : "text-stone-400 line-through")}>
+                    {p.nombre}
+                  </span>
+                  <button
+                    onClick={() => empezarAEditarNombre(p)}
+                    aria-label={`Cambiar el nombre de ${p.nombre}`}
+                    title="Cambiar nombre"
+                    className="rounded-full p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+                  >
+                    <IconPencil className="h-4 w-4" />
+                  </button>
                 </span>
-              </span>
+              )}
               <div className="flex items-center gap-3 text-xs">
                 <button onClick={() => setExpandidoId(expandidoId === p.id ? null : p.id)} className="text-brand-yellow-dark underline">
                   {expandidoId === p.id ? "Cerrar" : "Sedes, servicios y horario"}

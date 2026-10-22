@@ -20,7 +20,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!body) return NextResponse.json({ error: "Cuerpo inválido." }, { status: 400 });
 
   const campos: Record<string, unknown> = {};
-  if ("nombre" in body) campos.nombre = body.nombre;
+  if ("nombre" in body) {
+    const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
+    if (!nombre) return NextResponse.json({ error: "El nombre no puede quedar vacío." }, { status: 400 });
+    campos.nombre = nombre;
+  }
   if ("activo" in body) campos.activo = body.activo;
   if (Object.keys(campos).length === 0) {
     return NextResponse.json({ error: "No hay campos que actualizar." }, { status: 400 });
