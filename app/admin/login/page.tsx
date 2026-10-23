@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import { emailSinteticoParaUsuarioEquipo } from "@/lib/usuarioEquipo";
 import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function AdminLoginPage() {
   return (
@@ -29,6 +30,7 @@ function AdminLoginForm() {
         : null
   );
   const [cargando, setCargando] = useState(false);
+  const destino = rutaSiguienteSegura(params.get("next"), "/admin/dashboard");
 
   async function iniciarSesion(e: React.FormEvent) {
     e.preventDefault();
@@ -42,17 +44,25 @@ function AdminLoginForm() {
     const emailReal = usuarioLimpio.includes("@")
       ? usuarioLimpio
       : emailSinteticoParaUsuarioEquipo(usuarioLimpio.toLowerCase());
-    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
-    setCargando(false);
-    if (error) {
-      setError("Email o contraseña incorrectos.");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
+      if (error) {
+        setError("Email o contraseña incorrectos.");
+        setCargando(false);
+        return;
+      }
+    } catch {
+      setError("No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.");
+      setCargando(false);
       return;
     }
     // Si llegaste aquí porque intentaste entrar a una pantalla concreta
     // sin sesión (p. ej. un enlace directo a una conversación de
     // WhatsApp), vuelve ahí en vez de mandarte siempre a la Agenda.
-    router.push(rutaSiguienteSegura(params.get("next"), "/admin/dashboard"));
-    router.refresh();
+    // La ruedecita sigue girando hasta que aparece esa pantalla (antes
+    // el botón volvía a "Entrar" mientras cargaba y parecía colgado), y
+    // ya no se llama a router.refresh(): cargaba la página dos veces.
+    router.replace(destino);
   }
 
   return (
@@ -84,8 +94,10 @@ function AdminLoginForm() {
           {error && <p className="font-body text-sm text-red-400">{error}</p>}
           <button
             disabled={cargando}
-            className="w-full rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-50"
+            aria-busy={cargando}
+            className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
           >
+            {cargando && <Spinner />}
             {cargando ? "Entrando…" : "Entrar"}
           </button>
         </form>

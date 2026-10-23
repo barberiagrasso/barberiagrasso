@@ -50,11 +50,14 @@ export async function comprobarLimite(clave: string, opciones: OpcionesLimite): 
       return { permitido: false };
     }
 
-    await admin.from("intentos_seguridad").insert({ clave });
-    // Limpieza oportunista: al mismo tiempo, borra el rastro viejo de
-    // ESTA clave (fuera de la ventana) para que la tabla no crezca sin
-    // límite. Es barato porque ya estamos filtrando por esa clave.
-    await admin.from("intentos_seguridad").delete().eq("clave", clave).lt("creado_at", desde);
+    // Registrar este intento y, a la vez, borrar el rastro viejo de ESTA
+    // clave (fuera de la ventana) para que la tabla no crezca sin límite.
+    // No dependen la una de la otra, así que van en paralelo: antes iban
+    // en cadena y alargaban cada inicio de sesión con un viaje de más.
+    await Promise.all([
+      admin.from("intentos_seguridad").insert({ clave }),
+      admin.from("intentos_seguridad").delete().eq("clave", clave).lt("creado_at", desde),
+    ]);
 
     return { permitido: true };
   } catch (err) {

@@ -7,6 +7,7 @@ import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 import InstalarApp from "@/components/pwa/InstalarApp";
 import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
+import { Spinner } from "@/components/ui/Spinner";
 
 type Modo = "login" | "registro" | "recuperar-telefono" | "recuperar-codigo";
 
@@ -82,13 +83,15 @@ function AccesoForm() {
       const json = await res.json();
       if (!res.ok) {
         setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
+        setCargando(false);
         return;
       }
-      router.push(next);
-      router.refresh();
+      // La ruedecita sigue girando hasta que aparece la pantalla
+      // siguiente (antes el botón volvía a "Entrar" mientras cargaba y
+      // parecía colgado). Sin router.refresh(): cargaba la página dos veces.
+      router.replace(next);
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
-    } finally {
       setCargando(false);
     }
   }
@@ -134,13 +137,15 @@ function AccesoForm() {
       const json = await res.json();
       if (!res.ok) {
         setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
+        setCargando(false);
         return;
       }
-      router.push(next);
-      router.refresh();
+      // La ruedecita sigue girando hasta que aparece la pantalla
+      // siguiente (antes el botón volvía a "Entrar" mientras cargaba y
+      // parecía colgado). Sin router.refresh(): cargaba la página dos veces.
+      router.replace(next);
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
-    } finally {
       setCargando(false);
     }
   }
@@ -261,8 +266,10 @@ function AccesoForm() {
 
             <button
               disabled={cargando}
-              className="w-full rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-50"
+              aria-busy={cargando}
+              className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
             >
+              {cargando && <Spinner />}
               {cargando ? "Un momento…" : modo === "login" ? "Entrar" : "Crear cuenta"}
             </button>
           </form>
@@ -287,8 +294,10 @@ function AccesoForm() {
 
             <button
               disabled={cargando}
-              className="w-full rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-50"
+              aria-busy={cargando}
+              className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
             >
+              {cargando && <Spinner />}
               {cargando ? "Un momento…" : "Enviar código por WhatsApp"}
             </button>
             <button type="button" onClick={irALogin} className="w-full font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow">
@@ -321,8 +330,10 @@ function AccesoForm() {
 
             <button
               disabled={cargando}
-              className="w-full rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-50"
+              aria-busy={cargando}
+              className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
             >
+              {cargando && <Spinner />}
               {cargando ? "Un momento…" : "Cambiar contraseña"}
             </button>
             <button

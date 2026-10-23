@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -23,10 +24,31 @@ import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
  * conserva el destino original para volver ahí en cuanto la cambie.
  */
 export async function requireAdmin(opciones?: { saltarCambioObligatorio?: boolean }) {
+  return requireAdminCacheado(Boolean(opciones?.saltarCambioObligatorio));
+}
+
+// Sesión de Supabase y fila de `admins`, una sola vez por petición. La
+// estructura del panel ((protected)/layout.tsx) y cada pantalla llaman a
+// requireAdmin() por su cuenta; antes eso eran dos viajes a Supabase Auth
+// y dos consultas a `admins` en cada carga (por eso el acceso tardaba).
+// Con cache() de React, la segunda llamada de la misma petición
+// reutiliza el resultado de la primera.
+const cargarSesionAdmin = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) return { supabase, user: null, admin: null };
+  const { data: admin } = await supabase
+    .from("admins")
+    .select("id, nombre, rol, profesional_id, debe_cambiar_password")
+    .eq("id", user.id)
+    .maybeSingle();
+  return { supabase, user, admin };
+});
+
+const requireAdminCacheado = cache(async (saltarCambioObligatorio: boolean) => {
+  const { supabase, user, admin } = await cargarSesionAdmin();
 
   // Calculado siempre (no solo si hace falta redirigir) para que la
   // llamada a redirect() de cada `if` de abajo quede como una
@@ -43,22 +65,16 @@ export async function requireAdmin(opciones?: { saltarCambioObligatorio?: boolea
     redirect(destinoLogin);
   }
 
-  const { data: admin } = await supabase
-    .from("admins")
-    .select("id, nombre, rol, profesional_id, debe_cambiar_password")
-    .eq("id", user.id)
-    .maybeSingle();
-
   if (!admin) {
     redirect("/admin/login?error=no-autorizado");
   }
 
-  if (admin.debe_cambiar_password && !opciones?.saltarCambioObligatorio) {
+  if (admin.debe_cambiar_password && !saltarCambioObligatorio) {
     redirect(destinoCambiarPassword);
   }
 
   return { user, admin, supabase };
-}
+});
 
 /**
  * Igual que requireAdmin(), pero además exige rol "admin": para las
