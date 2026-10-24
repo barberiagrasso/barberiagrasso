@@ -22,7 +22,8 @@ export default async function TarjetaPage() {
         </div>
         <TarjetaClient
           nombre={cliente.nombre}
-          saldoFidelizacionCentimos={cliente.saldo_fidelizacion_centimos ?? 0}
+          grassocoins={cliente.grassocoins ?? 0}
+          restoCentimos={cliente.grassocoins_resto_centimos ?? 0}
           walletAppleDisponible={appleWalletConfigurado()}
           walletGoogleDisponible={googleWalletConfigurado()}
         />

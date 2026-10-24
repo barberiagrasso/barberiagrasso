@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ResumenDiaDisponibilidad } from "@/lib/types";
 import { SelectorProfesionalConFoto } from "@/components/admin/SelectorProfesionalConFoto";
+import { costeGrassoCoinsCita, formatearGrassoCoins } from "@/lib/grassocoins";
 
 // =====================================================================
 // Botón flotante "+" (siempre visible en el espacio del equipo) para
@@ -22,6 +23,7 @@ interface Servicio {
   nombre: string;
   duracion_minutos: number;
   precio_centimos: number;
+  coste_grassocoins?: number | null;
 }
 interface Profesional {
   id: string;
@@ -76,12 +78,8 @@ function colorPuntoNivel(nivel: ResumenDiaDisponibilidad["nivel"] | undefined): 
 type EstadoCliente =
   | { tipo: "vacio" }
   | { tipo: "buscando" }
-  | { tipo: "encontrado"; nombre: string; saldoFidelizacionCentimos: number; noShowsRecientes: number }
+  | { tipo: "encontrado"; nombre: string; grassocoins: number; noShowsRecientes: number }
   | { tipo: "nuevo" };
-
-function formatearPrecio(centimos: number) {
-  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
-}
 
 export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; servicios: Servicio[] }) {
   const [abierto, setAbierto] = useState(false);
@@ -103,7 +101,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
   const [telefono, setTelefono] = useState("");
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [estadoCliente, setEstadoCliente] = useState<EstadoCliente>({ tipo: "vacio" });
-  const [pagarConSaldo, setPagarConSaldo] = useState(false);
+  const [canjearCoins, setCanjearCoins] = useState(false);
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +119,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
     setTelefono("");
     setNombreNuevo("");
     setEstadoCliente({ tipo: "vacio" });
-    setPagarConSaldo(false);
+    setCanjearCoins(false);
     setError(null);
     setExito(false);
   }
@@ -185,7 +183,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
       return;
     }
     setEstadoCliente({ tipo: "buscando" });
-    setPagarConSaldo(false);
+    setCanjearCoins(false);
     const idTimeout = setTimeout(() => {
       fetch(`/api/admin/citas/buscar-cliente?telefono=${encodeURIComponent(telefonoLimpio)}`)
         .then((r) => r.json())
@@ -194,7 +192,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
             setEstadoCliente({
               tipo: "encontrado",
               nombre: j.nombre,
-              saldoFidelizacionCentimos: j.saldoFidelizacionCentimos ?? 0,
+              grassocoins: j.grassocoins ?? 0,
               noShowsRecientes: j.noShowsRecientes ?? 0,
             });
           } else {
@@ -207,13 +205,15 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
   }, [telefono]);
 
   const servicioElegido = servicios.find((s) => s.id === servicioId);
-  const totalCentimos = servicioElegido?.precio_centimos ?? 0;
-  const saldoDisponibleCentimos = estadoCliente.tipo === "encontrado" ? estadoCliente.saldoFidelizacionCentimos : 0;
-  const saldoCubreTotal = totalCentimos > 0 && saldoDisponibleCentimos >= totalCentimos;
+  // GrassoCoins: la cita rápida no lleva extras, así que cuesta lo que
+  // cueste el servicio en coins (null = no se puede canjear).
+  const coinsDisponibles = estadoCliente.tipo === "encontrado" ? estadoCliente.grassocoins : 0;
+  const costeCoins = costeGrassoCoinsCita(servicioElegido);
+  const coinsCubrenCita = costeCoins !== null && coinsDisponibles >= costeCoins;
 
   useEffect(() => {
-    if (pagarConSaldo && !saldoCubreTotal) setPagarConSaldo(false);
-  }, [pagarConSaldo, saldoCubreTotal]);
+    if (canjearCoins && !coinsCubrenCita) setCanjearCoins(false);
+  }, [canjearCoins, coinsCubrenCita]);
 
   const horasUnicas = useMemo(
     () => Array.from(new Map(slots.map((s) => [s.hora_inicio, s])).values()),
@@ -242,7 +242,7 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
         horaInicioISO,
         cliente: { nombre: nombreParaGuardar, telefono },
         aceptaComercial: false,
-        pagarConSaldo: pagarConSaldo && saldoCubreTotal,
+        canjearGrassoCoins: canjearCoins && coinsCubrenCita,
       }),
     });
     const json = await res.json();
@@ -455,24 +455,26 @@ export default function NuevaCitaRapida({ sedes, servicios }: { sedes: Sede[]; s
                           convenir confirmarle la cita por WhatsApp antes de guardarla.
                         </p>
                       )}
-                      {estadoCliente.saldoFidelizacionCentimos > 0 && (
+                      {estadoCliente.grassocoins > 0 && (
                         <label
                           className={
-                            "flex items-start gap-2 text-sm " + (saldoCubreTotal ? "text-stone-700" : "text-stone-400")
+                            "flex items-start gap-2 text-sm " + (coinsCubrenCita ? "text-stone-700" : "text-stone-400")
                           }
                         >
                           <input
                             type="checkbox"
                             className="mt-0.5"
-                            checked={pagarConSaldo && saldoCubreTotal}
-                            disabled={!saldoCubreTotal}
-                            onChange={(e) => setPagarConSaldo(e.target.checked)}
+                            checked={canjearCoins && coinsCubrenCita}
+                            disabled={!coinsCubrenCita}
+                            onChange={(e) => setCanjearCoins(e.target.checked)}
                           />
                           <span>
-                            Saldo de fidelización: {formatearPrecio(estadoCliente.saldoFidelizacionCentimos)}
-                            {saldoCubreTotal
-                              ? " — pagar esta cita con su saldo"
-                              : " (no cubre el total de esta cita)"}
+                            Tiene {formatearGrassoCoins(estadoCliente.grassocoins)}
+                            {costeCoins === null
+                              ? " (este servicio no se canjea con coins)"
+                              : coinsCubrenCita
+                                ? ` — canjear esta cita por ${formatearGrassoCoins(costeCoins)}`
+                                : ` (este servicio cuesta ${formatearGrassoCoins(costeCoins)})`}
                           </span>
                         </label>
                       )}

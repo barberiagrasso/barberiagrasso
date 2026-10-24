@@ -42,6 +42,10 @@ interface Cita {
   servicio: { id: string; nombre: string } | null;
   profesional: { id: string; nombre: string; foto_url?: string | null } | null;
   extras?: { servicio_id: string }[];
+  // Cita ya pagada con fidelización al reservar (GrassoCoins, o el saldo
+  // antiguo): el servicio no se cobra, solo los productos si los hay.
+  saldo_canjeado_centimos?: number | null;
+  grassocoins_canjeados?: number | null;
 }
 interface BonoTipo {
   id: string;
@@ -483,9 +487,14 @@ export default function FinalizarCitaModal({
   }, [productos]);
 
   const colorServicioSeleccionado = servicios.find((s) => s.id === servicioId)?.color || "#a8a29e";
-  const totalACobrarCentimos = totalServicioCentimos + totalProductosCentimos;
+  const pagadaConFidelizacion = (cita.saldo_canjeado_centimos ?? 0) > 0;
+  const coinsCanjeadas = cita.grassocoins_canjeados ?? 0;
+  // Si la cita ya se canjeó con GrassoCoins al reservar, el servicio está
+  // pagado: aquí solo queda cobrar los productos que se vendan.
+  const totalACobrarCentimos = (pagadaConFidelizacion ? 0 : totalServicioCentimos) + totalProductosCentimos;
   // Hay que saber siempre cómo pagó el cliente, salvo que no haya nada que
-  // cobrar (un bono que lo cubre todo, o una cita de 0 €).
+  // cobrar (un bono que lo cubre todo, una cita canjeada sin productos, o
+  // una cita de 0 €).
   const faltaMetodoPago = !cubiertoDelTodoPorBono && totalACobrarCentimos > 0 && metodosPago.length === 0;
   const precioTocado = precioManualCentimos !== null && precioManualCentimos !== totalServicioAutomaticoCentimos;
 
@@ -507,6 +516,18 @@ export default function FinalizarCitaModal({
         </div>
 
         <div className="max-h-[75vh] divide-y divide-stone-100 overflow-y-auto px-5">
+          {pagadaConFidelizacion && (
+            <div className="py-4">
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="font-semibold">
+                  {coinsCanjeadas > 0
+                    ? `Pagada con ${coinsCanjeadas} ${coinsCanjeadas === 1 ? "GrassoCoin" : "GrassoCoins"}`
+                    : "Pagada con fidelización"}
+                </p>
+                <p className="mt-0.5">No cobres el servicio: el cliente ya lo canjeó al reservar. Solo se cobran los productos, si vendes alguno.</p>
+              </div>
+            </div>
+          )}
           <div className="py-4">
             <Etiqueta icono={IconScissors} texto="Servicio realizado" />
             <div className="flex items-center gap-2">

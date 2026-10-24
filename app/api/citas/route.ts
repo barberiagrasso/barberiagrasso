@@ -32,14 +32,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(RESPUESTA_DEMASIADOS_INTENTOS, { status: 429 });
   }
 
-  // Pagar con saldo mueve dinero de verdad de la cuenta de un cliente:
-  // exige sesión iniciada y, aunque el formulario ya viene relleno con
-  // los datos del cliente logueado, se ignora el teléfono que llegue en
-  // el cuerpo de la petición y se usa el de la sesión — así nadie puede
-  // gastar el saldo de otra persona escribiendo su teléfono a mano.
-  const pagarConSaldo = Boolean(body.pagarConSaldo);
+  // Canjear GrassoCoins gasta los puntos de un cliente: exige sesión
+  // iniciada y, aunque el formulario ya viene relleno con los datos del
+  // cliente logueado, se ignora el teléfono que llegue en el cuerpo de la
+  // petición y se usa el de la sesión — así nadie puede gastar las coins
+  // de otra persona escribiendo su teléfono a mano.
+  const canjearGrassoCoins = Boolean(body.canjearGrassoCoins);
   let datosCliente = body.cliente;
-  if (pagarConSaldo) {
+  if (canjearGrassoCoins) {
     try {
       const { cliente } = await requireClienteApi();
       datosCliente = { ...body.cliente, telefono: cliente.telefono };
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       canal: "app",
       origen,
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
-      pagarConSaldo,
+      canjearGrassoCoins,
       profesionalElegidoPorCliente: Boolean(body.profesionalElegidoPorCliente),
       notaCliente: typeof body.notaCliente === "string" ? body.notaCliente.slice(0, 500) : null,
     });

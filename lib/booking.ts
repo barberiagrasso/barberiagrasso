@@ -5,7 +5,8 @@ import { getAvailableSlots, comprobarHuecoLibre } from "@/lib/availability";
 import { buscarOCrearCliente, normalizarTelefono } from "@/lib/clientes";
 import { sincronizarClienteHubSpot, sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
-import { canjearSaldoEnCita, reembolsarSaldoDeCita, saldoDelCliente, SaldoInsuficienteError } from "@/lib/fidelizacion";
+import { canjearGrassoCoinsEnCita, reembolsarGrassoCoinsDeCita, grassoCoinsDelCliente, GrassoCoinsInsuficientesError } from "@/lib/fidelizacion";
+import { costeGrassoCoinsCita } from "@/lib/grassocoins";
 import { fechaDentroDeFlexibilidad, sumarDias } from "@/lib/listaEspera";
 import type { CanalConsentimiento } from "@/lib/types";
 import { minutosAgendaExtras } from "@/lib/duracionExtras";
@@ -57,11 +58,10 @@ interface CrearReservaParams {
   // reserva (p. ej. cejas, lavado). Amplían el hueco bloqueado en la
   // agenda y quedan anotados en la cita para que el barbero cobre bien.
   complementoIds?: string[];
-  // Si es true, el cliente paga el total de la cita con su saldo de
-  // fidelización en vez de en efectivo/tarjeta. Solo se admite si el
-  // saldo cubre el total exacto (ver lib/fidelizacion.ts) — no hay canje
-  // parcial.
-  pagarConSaldo?: boolean;
+  // Si es true, el cliente canjea la cita entera con sus GrassoCoins
+  // (servicio + extras, cada uno con su precio en coins) en vez de pagar
+  // en efectivo/tarjeta. Ver lib/fidelizacion.ts.
+  canjearGrassoCoins?: boolean;
   // true si quien reserva pidió expresamente este profesional (no
   // "Cualquiera") — para el icono de corazón de la Agenda. No se puede
   // deducir de profesionalId/slotElegido porque esos ya traen el barbero
@@ -311,14 +311,16 @@ export async function crearReserva(params: CrearReservaParams) {
   let duracionExtraMinutos = 0;
   let notaComplementos: string | null = null;
   let complementosParaGuardar: { servicio_id: string; precio_centimos: number; duracion_minutos: number }[] = [];
+  let costesCoinsComplementos: { coste_grassocoins: number | null }[] = [];
   if (complementoIds.length > 0) {
     const { data: complementos } = await supabase
       .from("servicios")
-      .select("id, nombre, duracion_minutos, precio_centimos")
+      .select("id, nombre, duracion_minutos, precio_centimos, coste_grassocoins")
       .in("id", complementoIds);
     if (complementos && complementos.length > 0) {
       duracionExtraMinutos = minutosAgendaExtras(complementos);
       notaComplementos = "Complementos: " + complementos.map((c) => `${c.nombre} (${(c.precio_centimos / 100).toFixed(2)}€)`).join(", ");
+      costesCoinsComplementos = complementos.map((c) => ({ coste_grassocoins: c.coste_grassocoins ?? null }));
       complementosParaGuardar = complementos.map((c) => ({
         servicio_id: c.id,
         precio_centimos: c.precio_centimos,
@@ -339,7 +341,7 @@ export async function crearReserva(params: CrearReservaParams) {
   // Las otras dos consultas (servicio/sede) no dependen de ninguna de las
   // dos, así que van siempre en el mismo Promise.all.
   const [{ data: servicio }, { data: override }] = await Promise.all([
-    supabase.from("servicios").select("duracion_minutos, precio_centimos").eq("id", params.servicioId).single(),
+    supabase.from("servicios").select("duracion_minutos, precio_centimos, coste_grassocoins").eq("id", params.servicioId).single(),
     supabase
       .from("sede_servicios")
       .select("duracion_minutos")
@@ -442,19 +444,23 @@ export async function crearReserva(params: CrearReservaParams) {
     });
   }
 
-  // Si el cliente quiere pagar con su saldo de fidelización, se comprueba
-  // ANTES de crear la cita que le cubre el total exacto — no se admite
-  // canje parcial ("descontar" solo una parte no está permitido). Esto
-  // evita crear y tener que deshacer la cita en el caso normal; el canje
-  // real (más abajo) se vuelve a comprobar en la propia base de datos por
-  // si el saldo cambiase justo en medio, por ejemplo por otra reserva
-  // simultánea del mismo cliente.
-  if (params.pagarConSaldo) {
-    const saldoActual = await saldoDelCliente(supabase, clienteId);
-    if (saldoActual < totalCentimos) {
-      throw new ReservaError("El saldo acumulado no cubre el total de esta cita.");
+  // Canje con GrassoCoins: se comprueba ANTES de crear la cita que el
+  // servicio y cada extra se pueden canjear y que al cliente le llegan
+  // las coins. El canje real (más abajo) se vuelve a comprobar en la base
+  // de datos por si cambiasen justo en medio (otra reserva simultánea).
+  const coinsACanjear = params.canjearGrassoCoins
+    ? costeGrassoCoinsCita(servicio, costesCoinsComplementos)
+    : null;
+  if (params.canjearGrassoCoins) {
+    if (coinsACanjear === null) {
+      throw new ReservaError("Este servicio (o alguno de sus extras) no se puede canjear con GrassoCoins.");
+    }
+    const coinsActuales = await grassoCoinsDelCliente(supabase, clienteId);
+    if (coinsActuales < coinsACanjear) {
+      throw new ReservaError("No tienes GrassoCoins suficientes para canjear esta cita.");
     }
   }
+  const canjeConCoins = coinsACanjear !== null && coinsACanjear > 0;
 
   // Nota libre escrita por el cliente (si la escribió), recortada y sin
   // espacios de más. Se combina con la nota automática de complementos.
@@ -473,7 +479,11 @@ export async function crearReserva(params: CrearReservaParams) {
       fin: fin.toISOString(),
       origen: params.origen,
       notas: notaFinal,
-      saldo_canjeado_centimos: params.pagarConSaldo ? totalCentimos : 0,
+      // Una cita canjeada con coins cuenta como "pagada con fidelización"
+      // en recibos, informes y comisiones (igual que el saldo antiguo):
+      // saldo_canjeado_centimos guarda su valor en euros.
+      saldo_canjeado_centimos: canjeConCoins ? totalCentimos : 0,
+      grassocoins_canjeados: canjeConCoins ? coinsACanjear : 0,
       profesional_elegido_por_cliente: params.profesionalElegidoPorCliente ?? false,
     })
     .select("*")
@@ -489,17 +499,17 @@ export async function crearReserva(params: CrearReservaParams) {
     );
   }
 
-  if (params.pagarConSaldo && totalCentimos > 0) {
+  if (canjeConCoins) {
     try {
-      await canjearSaldoEnCita(supabase, { clienteId, citaId: cita.id, importeCentimos: totalCentimos });
+      await canjearGrassoCoinsEnCita(supabase, { clienteId, citaId: cita.id, coins: coinsACanjear as number });
     } catch (err) {
-      // El saldo dejó de alcanzar justo entre la comprobación de arriba y
-      // este momento (carrera muy poco probable, pero posible). Se
-      // deshace la cita recién creada (cita_extras se borra en cascada)
-      // en vez de dejarla creada sin haberse cobrado de verdad.
+      // Las coins dejaron de alcanzar justo entre la comprobación de
+      // arriba y este momento (muy poco probable). Se deshace la cita
+      // recién creada (cita_extras se borra en cascada) en vez de dejarla
+      // sin canjear de verdad.
       await supabase.from("citas").delete().eq("id", cita.id);
-      if (err instanceof SaldoInsuficienteError) {
-        throw new ReservaError("El saldo acumulado no cubre el total de esta cita.");
+      if (err instanceof GrassoCoinsInsuficientesError) {
+        throw new ReservaError("No tienes GrassoCoins suficientes para canjear esta cita.");
       }
       throw err;
     }
@@ -561,10 +571,9 @@ export async function cancelarCita(citaId: string) {
   if (error || !cita) throw new ReservaError("No se pudo cancelar la cita.");
   await sincronizarCitaHubSpot(supabase, cita.id);
   await asignarListaEsperaPorHueco(cita);
-  // Si esta cita se había pagado con saldo de fidelización, se le
-  // devuelve íntegro al cliente: cancelar no debería costarle el saldo
-  // que ya tenía ganado.
-  await reembolsarSaldoDeCita(supabase, cita);
+  // Si esta cita se había canjeado con GrassoCoins, se le devuelven
+  // íntegras: cancelar no debería costarle las coins que ya tenía.
+  await reembolsarGrassoCoinsDeCita(supabase, cita);
   return cita;
 }
 

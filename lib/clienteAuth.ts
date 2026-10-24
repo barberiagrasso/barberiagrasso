@@ -38,7 +38,7 @@ export async function requireCliente() {
 
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("id, nombre, telefono, email, sede_habitual_id, fecha_nacimiento, saldo_fidelizacion_centimos")
+    .select("id, nombre, telefono, email, sede_habitual_id, fecha_nacimiento, grassocoins, grassocoins_resto_centimos")
     .eq("user_id", user.id)
     .maybeSingle();
 

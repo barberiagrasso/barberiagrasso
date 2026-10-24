@@ -1,6 +1,6 @@
 import "server-only";
 import jwt from "jsonwebtoken";
-import { formatearCentimos } from "@/lib/fidelizacion";
+import { formatearGrassoCoins } from "@/lib/grassocoins";
 
 // =====================================================================
 // Google Wallet real — genera el enlace "Añadir a Google Wallet" para la
@@ -48,7 +48,7 @@ function leerCuentaServicio(): CuentaServicioGoogle {
 interface DatosTarjetaCliente {
   clienteId: string;
   nombre: string;
-  saldoFidelizacionCentimos: number;
+  grassocoins: number;
 }
 
 /**
@@ -67,7 +67,7 @@ export function generarEnlaceGoogleWallet(datos: DatosTarjetaCliente): string {
   const loyaltyClass = {
     id: classId,
     issuerName: "Barbería Grasso",
-    programName: "Fidelización Barbería Grasso",
+    programName: "GrassoCoins · Barbería Grasso",
     reviewStatus: "UNDER_REVIEW",
     hexBackgroundColor: "#0b0b0a",
   };
@@ -79,8 +79,8 @@ export function generarEnlaceGoogleWallet(datos: DatosTarjetaCliente): string {
     accountId: datos.clienteId,
     accountName: datos.nombre,
     loyaltyPoints: {
-      label: "Saldo disponible",
-      balance: { string: formatearCentimos(datos.saldoFidelizacionCentimos) },
+      label: "GrassoCoins",
+      balance: { string: formatearGrassoCoins(datos.grassocoins) },
     },
     barcode: { type: "QR_CODE", value: datos.clienteId },
   };

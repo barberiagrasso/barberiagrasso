@@ -43,6 +43,9 @@ export interface Servicio {
   // pudiendo corregir el precio final a mano al cerrar la cita, igual
   // que con cualquier otro servicio.
   precio_variable?: boolean;
+  // Cuántas GrassoCoins cuesta canjear este servicio (null = no se puede
+  // canjear). Lo fija Diego en el panel → Servicios. Ver lib/grassocoins.ts.
+  coste_grassocoins?: number | null;
 }
 
 export interface Profesional {

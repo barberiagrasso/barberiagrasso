@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       canal: "panel",
       origen: "panel",
       complementoIds: Array.isArray(body.complementoIds) ? body.complementoIds : [],
-      pagarConSaldo: Boolean(body.pagarConSaldo),
+      canjearGrassoCoins: Boolean(body.canjearGrassoCoins),
       profesionalElegidoPorCliente: Boolean(body.profesionalElegidoPorCliente),
       // Creación manual desde la Agenda arrastrando (ver MenuCreacion en
       // CalendarioDia.tsx): el barbero escribe la hora de inicio y fin a

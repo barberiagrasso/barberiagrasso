@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  centimosParaSiguienteCoin,
+  EUROS_POR_GRASSOCOIN,
+  formatearGrassoCoins,
+  progresoSiguienteCoin,
+} from "@/lib/grassocoins";
 
 interface Props {
   nombre: string;
-  saldoFidelizacionCentimos: number;
+  grassocoins: number;
+  restoCentimos: number;
   walletAppleDisponible: boolean;
   walletGoogleDisponible: boolean;
 }
@@ -26,7 +33,7 @@ const ALTO = 620;
  * necesita ninguna cuenta de desarrollador ni backend: se genera entera
  * en el navegador del cliente.
  */
-export default function TarjetaClient({ nombre, saldoFidelizacionCentimos, walletAppleDisponible, walletGoogleDisponible }: Props) {
+export default function TarjetaClient({ nombre, grassocoins, restoCentimos, walletAppleDisponible, walletGoogleDisponible }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [lista, setLista] = useState(false);
   const [descargando, setDescargando] = useState(false);
@@ -98,14 +105,29 @@ export default function TarjetaClient({ nombre, saldoFidelizacionCentimos, walle
       ctx.fillStyle = "#f5f1e6";
       ctx.fillText(nombre, 56, 260);
 
-      // Saldo, el elemento principal de la tarjeta.
+      // GrassoCoins, el elemento principal de la tarjeta.
       ctx.font = "300 26px Lato, sans-serif";
       ctx.fillStyle = "rgba(245, 241, 230, 0.62)";
-      ctx.fillText("SALDO DISPONIBLE", 56, 340);
+      ctx.fillText("GRASSOCOINS", 56, 330);
 
       ctx.font = "700 90px Lato, sans-serif";
       ctx.fillStyle = "#f2d368";
-      ctx.fillText(formatearPrecio(saldoFidelizacionCentimos), 56, 440);
+      ctx.fillText(String(grassocoins), 56, 425);
+
+      // Barrita de progreso hacia la siguiente coin.
+      const anchoBarra = 420;
+      ctx.fillStyle = "rgba(245, 241, 230, 0.14)";
+      redondearRect(ctx, 56, 452, anchoBarra, 12, 6);
+      ctx.fill();
+      const progreso = progresoSiguienteCoin(restoCentimos);
+      if (progreso > 0) {
+        ctx.fillStyle = "#f2d368";
+        redondearRect(ctx, 56, 452, Math.max(12, anchoBarra * progreso), 12, 6);
+        ctx.fill();
+      }
+      ctx.font = "300 22px Lato, sans-serif";
+      ctx.fillStyle = "rgba(245, 241, 230, 0.62)";
+      ctx.fillText(`Faltan ${formatearPrecio(centimosParaSiguienteCoin(restoCentimos))} para la siguiente`, 56, 500);
 
       // Pie: las dos sedes.
       ctx.font = "300 24px Lato, sans-serif";
@@ -119,7 +141,7 @@ export default function TarjetaClient({ nombre, saldoFidelizacionCentimos, walle
     return () => {
       cancelado = true;
     };
-  }, [nombre, saldoFidelizacionCentimos]);
+  }, [nombre, grassocoins, restoCentimos]);
 
   function descargar() {
     const canvas = canvasRef.current;
@@ -173,6 +195,16 @@ export default function TarjetaClient({ nombre, saldoFidelizacionCentimos, walle
     <div className="space-y-4">
       <div className="overflow-hidden rounded-3xl shadow-2xl shadow-black/40">
         <canvas ref={canvasRef} className="block w-full" style={{ aspectRatio: `${ANCHO} / ${ALTO}` }} />
+      </div>
+
+      <div className="rounded-xl border border-brand-line bg-black/20 p-4 font-body text-sm text-brand-white-dim">
+        <p className="text-brand-white">
+          Tienes <span className="font-semibold text-brand-yellow">{formatearGrassoCoins(grassocoins)}</span>.
+        </p>
+        <p className="mt-1">
+          Ganas 1 GrassoCoin por cada {EUROS_POR_GRASSOCOIN} € que gastas; lo que sobra se guarda para tu próxima
+          visita. Canjéalas por servicios al reservar tu cita.
+        </p>
       </div>
 
       <button

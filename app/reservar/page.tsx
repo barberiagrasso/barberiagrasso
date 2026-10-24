@@ -28,7 +28,7 @@ export default async function ReservarPage() {
     supabase
       .from("servicios")
       .select(
-        "id, nombre, descripcion, duracion_minutos, precio_centimos, activo, categoria, orden, precio_variable",
+        "id, nombre, descripcion, duracion_minutos, precio_centimos, activo, categoria, orden, precio_variable, coste_grassocoins",
       )
       .order("orden"),
     supabase
@@ -103,7 +103,7 @@ export default async function ReservarPage() {
               nombre: cliente.nombre,
               telefono: cliente.telefono,
               email: cliente.email,
-              saldoFidelizacionCentimos: cliente.saldo_fidelizacion_centimos ?? 0,
+              grassocoins: cliente.grassocoins ?? 0,
             }}
           />
         </Suspense>

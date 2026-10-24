@@ -14,6 +14,15 @@ interface Servicio {
   activo: boolean;
   color?: string | null;
   precio_variable?: boolean;
+  // Cuántas GrassoCoins cuesta canjearlo (null = no se puede canjear).
+  coste_grassocoins?: number | null;
+}
+
+// Convierte lo escrito en el campo "Precio en GrassoCoins" en el valor a
+// guardar: vacío o 0 = no se puede canjear (null).
+function coinsDesdeTexto(texto: string): number | null {
+  const n = parseInt(texto, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Los desplegables ya usados en la reserva, para que Diego pueda elegir
@@ -129,6 +138,7 @@ function FilaServicio({
   const [orden, setOrden] = useState(String(servicio.orden));
   const [color, setColor] = useState(servicio.color ?? PALETA_COLORES_SERVICIO[0].valor);
   const [precioVariable, setPrecioVariable] = useState(servicio.precio_variable ?? false);
+  const [coinsTexto, setCoinsTexto] = useState(servicio.coste_grassocoins ? String(servicio.coste_grassocoins) : "");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,6 +154,7 @@ function FilaServicio({
       orden: parseInt(orden, 10) || 0,
       color,
       precio_variable: precioVariable,
+      coste_grassocoins: coinsDesdeTexto(coinsTexto),
     });
     setGuardando(false);
     if (res.ok) {
@@ -173,6 +184,7 @@ function FilaServicio({
           <div className="text-sm text-stone-500">
             {servicio.precio_variable ? "Desde " : ""}
             {euros(servicio.precio_centimos)}€ · {servicio.duracion_minutos} min
+            {servicio.coste_grassocoins ? ` · ${servicio.coste_grassocoins} GrassoCoins` : ""}
             {servicio.descripcion ? ` · ${servicio.descripcion}` : ""}
           </div>
         </div>
@@ -199,6 +211,17 @@ function FilaServicio({
       <label className="flex items-center gap-2 text-sm text-stone-600">
         <input type="checkbox" checked={precioVariable} onChange={(e) => setPrecioVariable(e.target.checked)} className="accent-brand-yellow" />
         Precio variable: mostrar &ldquo;Desde {precio || "0"}€&rdquo; en vez de un precio fijo (para servicios impredecibles, como Rastas o tintes)
+      </label>
+      <label className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
+        <span>Precio en GrassoCoins:</span>
+        <input
+          value={coinsTexto}
+          onChange={(e) => setCoinsTexto(e.target.value.replace(/[^0-9]/g, ""))}
+          inputMode="numeric"
+          placeholder="vacío = no se canjea"
+          className="w-40 rounded border border-stone-300 p-2 text-sm"
+        />
+        <span className="text-xs text-stone-400">El cliente gana 1 coin por cada 20 € gastados.</span>
       </label>
       <input
         value={descripcion}
@@ -251,6 +274,7 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
   const [categoria, setCategoria] = useState("");
   const [orden, setOrden] = useState("0");
   const [precioVariable, setPrecioVariable] = useState(false);
+  const [coinsTexto, setCoinsTexto] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -272,6 +296,7 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
         categoria: categoria || null,
         orden: parseInt(orden, 10) || 0,
         precio_variable: precioVariable,
+        coste_grassocoins: coinsDesdeTexto(coinsTexto),
       }),
     });
     setEnviando(false);
@@ -308,6 +333,17 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
       <label className="flex items-center gap-2 text-sm text-stone-600">
         <input type="checkbox" checked={precioVariable} onChange={(e) => setPrecioVariable(e.target.checked)} className="accent-brand-yellow" />
         Precio variable: mostrar &ldquo;Desde {precio || "0"}€&rdquo; en vez de un precio fijo (para servicios impredecibles, como Rastas o tintes)
+      </label>
+      <label className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
+        <span>Precio en GrassoCoins:</span>
+        <input
+          value={coinsTexto}
+          onChange={(e) => setCoinsTexto(e.target.value.replace(/[^0-9]/g, ""))}
+          inputMode="numeric"
+          placeholder="vacío = no se canjea"
+          className="w-40 rounded border border-stone-300 p-2 text-sm"
+        />
+        <span className="text-xs text-stone-400">El cliente gana 1 coin por cada 20 € gastados.</span>
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button disabled={enviando} onClick={crear} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">

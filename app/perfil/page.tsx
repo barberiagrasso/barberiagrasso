@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { centimosParaSiguienteCoin, progresoSiguienteCoin } from "@/lib/grassocoins";
 import { requireCliente } from "@/lib/clienteAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
@@ -30,6 +31,7 @@ interface CitaCruda {
   metodo_pago: string | null;
   precio_final_centimos: number | null;
   saldo_canjeado_centimos: number;
+  grassocoins_canjeados?: number | null;
   descuento_porcentaje: number | null;
   descuento_motivo: string | null;
   recibo_anulado_at: string | null;
@@ -83,7 +85,7 @@ export default async function PerfilPage() {
   const { data: citas } = await admin
     .from("citas")
     .select(
-      "id, inicio, estado, sede_id, servicio_id, profesional_id, profesional_elegido_por_cliente, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, sede:sedes(nombre, direccion), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, duracion_minutos, servicio:servicios(nombre))"
+      "id, inicio, estado, sede_id, servicio_id, profesional_id, profesional_elegido_por_cliente, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, grassocoins_canjeados, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, sede:sedes(nombre, direccion), servicio:servicios(nombre, precio_centimos), profesional:profesionales(nombre, foto_url), extras:cita_extras(precio_centimos, duracion_minutos, servicio:servicios(nombre))"
     )
     .eq("cliente_id", cliente.id)
     .order("inicio", { ascending: false });
@@ -201,10 +203,17 @@ export default async function PerfilPage() {
           href="/perfil/tarjeta"
           className="mb-6 flex items-center justify-between rounded-tl-md bg-brand-black-soft p-5 transition-opacity hover:opacity-90"
         >
-          <div>
-            <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tu saldo de fidelización</p>
-            <p className="mt-0.5 font-mono text-2xl text-brand-yellow">
-              {formatearPrecio(cliente.saldo_fidelizacion_centimos ?? 0)}
+          <div className="min-w-0 flex-1 pr-4">
+            <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tus GrassoCoins</p>
+            <p className="mt-0.5 font-mono text-2xl text-brand-yellow">{cliente.grassocoins ?? 0}</p>
+            <div className="mt-2 h-1.5 w-full max-w-48 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-brand-yellow"
+                style={{ width: `${Math.round(progresoSiguienteCoin(cliente.grassocoins_resto_centimos ?? 0) * 100)}%` }}
+              />
+            </div>
+            <p className="mt-1 font-body text-xs text-brand-white-dim">
+              Te faltan {formatearPrecio(centimosParaSiguienteCoin(cliente.grassocoins_resto_centimos ?? 0))} para la siguiente
             </p>
           </div>
           <span className="font-body text-sm text-brand-white-dim">Ver tarjeta →</span>

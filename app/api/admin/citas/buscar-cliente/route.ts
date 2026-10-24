@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("id, nombre, saldo_fidelizacion_centimos")
+    .select("id, nombre, grassocoins")
     .eq("telefono", telefono)
     .maybeSingle();
 
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     nombre: cliente?.nombre ?? null,
-    saldoFidelizacionCentimos: cliente?.saldo_fidelizacion_centimos ?? 0,
+    grassocoins: cliente?.grassocoins ?? 0,
     noShowsRecientes,
   });
 }

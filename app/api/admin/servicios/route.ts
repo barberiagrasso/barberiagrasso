@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
       activo: body.activo ?? true,
       color: colorAsignado,
       precio_variable: Boolean(body.precio_variable),
+      coste_grassocoins:
+        Number.isInteger(body.coste_grassocoins) && body.coste_grassocoins > 0 ? body.coste_grassocoins : null,
     })
     .select("*")
     .single();

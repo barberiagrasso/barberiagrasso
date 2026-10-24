@@ -26,7 +26,7 @@ export async function GET() {
   const supabase = createAdminClient();
   const { data: fila } = await supabase
     .from("clientes")
-    .select("saldo_fidelizacion_centimos")
+    .select("grassocoins")
     .eq("id", cliente.id)
     .single();
 
@@ -34,7 +34,7 @@ export async function GET() {
     const url = generarEnlaceGoogleWallet({
       clienteId: cliente.id,
       nombre: cliente.nombre,
-      saldoFidelizacionCentimos: fila?.saldo_fidelizacion_centimos ?? 0,
+      grassocoins: fila?.grassocoins ?? 0,
     });
     return NextResponse.json({ url });
   } catch (err) {

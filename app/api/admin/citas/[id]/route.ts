@@ -4,7 +4,7 @@ import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sincronizarCitaHubSpot } from "@/lib/hubspot";
 import { cancelarCita, ReservaError } from "@/lib/booking";
-import { acumularPorCitaCompletada, reembolsarSaldoDeCita } from "@/lib/fidelizacion";
+import { acumularPorCitaCompletada, reembolsarGrassoCoinsDeCita } from "@/lib/fidelizacion";
 import { registrarAuditoria } from "@/lib/auditoria";
 
 export const dynamic = "force-dynamic";
@@ -48,18 +48,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .from("citas")
       .update({ estado: body.estado })
       .eq("id", id)
-      .select("id, cliente_id, saldo_canjeado_centimos")
+      .select("id, cliente_id, saldo_canjeado_centimos, grassocoins_canjeados")
       .single();
     if (error || !citaActualizada) return NextResponse.json({ error: "No se pudo actualizar la cita." }, { status: 500 });
     await sincronizarCitaHubSpot(supabase, id);
-    // Fidelización: el 10% se acumula al completar la cita (nunca antes,
-    // para no premiar citas que al final no se presentan); si se marca
-    // "no presentada" y se había pagado con saldo, se le devuelve al
+    // GrassoCoins: se ganan al completar la cita (nunca antes, para no
+    // premiar citas que al final no se presentan); si se marca "no
+    // presentada" y se había canjeado con coins, se le devuelven al
     // cliente — ver lib/fidelizacion.ts para la política completa.
     if (body.estado === "completada") {
       await acumularPorCitaCompletada(supabase, citaActualizada);
     } else if (body.estado === "no_presentada") {
-      await reembolsarSaldoDeCita(supabase, citaActualizada);
+      await reembolsarGrassoCoinsDeCita(supabase, citaActualizada);
     }
     await registrarAuditoria({
       adminId: admin.id,

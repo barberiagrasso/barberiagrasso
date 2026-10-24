@@ -170,7 +170,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { data: citaActual } = await supabase
     .from("citas")
-    .select("id, cliente_id, estado, saldo_canjeado_centimos")
+    .select("id, cliente_id, estado, saldo_canjeado_centimos, grassocoins_canjeados")
     .eq("id", id)
     .maybeSingle();
   if (!citaActual) return NextResponse.json({ error: "Cita no encontrada." }, { status: 404 });
@@ -369,13 +369,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   await sincronizarCitaHubSpot(supabase, id);
-  // La fidelización se calcula solo sobre servicio + complementos (ver
-  // lib/fidelizacion.ts): los productos no generan saldo, a propósito,
+  // Las GrassoCoins se calculan solo sobre servicio + complementos (ver
+  // lib/fidelizacion.ts): los productos no dan coins, a propósito,
   // igual que no aparecen en ningún otro sitio de la app del cliente.
   await acumularPorCitaCompletada(supabase, {
     id: citaActual.id,
     cliente_id: citaActual.cliente_id,
     saldo_canjeado_centimos: citaActual.saldo_canjeado_centimos,
+    grassocoins_canjeados: citaActual.grassocoins_canjeados,
   });
 
   return NextResponse.json({ ok: true });

@@ -13,7 +13,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
 
   const { data: cliente } = await supabase
     .from("clientes")
-    .select("id, nombre, telefono, email, saldo_fidelizacion_centimos, created_at")
+    .select("id, nombre, telefono, email, grassocoins, grassocoins_resto_centimos, created_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -22,14 +22,14 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
 
   const [{ data: movimientos }, { data: citas }] = await Promise.all([
     supabase
-      .from("saldo_fidelizacion_movimientos")
-      .select("id, tipo, importe_centimos, saldo_resultante_centimos, nota, creado_por, created_at")
+      .from("grassocoins_movimientos")
+      .select("id, tipo, coins, gasto_centimos, coins_resultantes, nota, creado_por, created_at")
       .eq("cliente_id", id)
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
       .from("citas")
-      .select("id, inicio, estado, saldo_canjeado_centimos, servicio:servicios(nombre), sede:sedes(nombre)")
+      .select("id, inicio, estado, saldo_canjeado_centimos, grassocoins_canjeados, servicio:servicios(nombre), sede:sedes(nombre)")
       .eq("cliente_id", id)
       .order("inicio", { ascending: false })
       .limit(20),
@@ -44,6 +44,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
         inicio: c.inicio,
         estado: c.estado,
         saldoCanjeadoCentimos: c.saldo_canjeado_centimos,
+        grassocoinsCanjeados: c.grassocoins_canjeados ?? 0,
         servicioNombre: (Array.isArray(c.servicio) ? c.servicio[0] : c.servicio)?.nombre ?? "Servicio",
         sedeNombre: (Array.isArray(c.sede) ? c.sede[0] : c.sede)?.nombre ?? "",
       }))}

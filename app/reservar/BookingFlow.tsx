@@ -14,6 +14,7 @@ import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 import { HojaTrabajosServicio } from "@/components/portafolio/GaleriaTrabajos";
 import type { OpcionPropuestaCita } from "@/lib/asistenteReserva";
 import { minutosAgendaExtras } from "@/lib/duracionExtras";
+import { costeGrassoCoinsCita, formatearGrassoCoins } from "@/lib/grassocoins";
 
 // Cuántos meses hacia delante del actual se puede navegar en el
 // calendario de reserva (0 = solo el mes en curso).
@@ -120,10 +121,10 @@ interface ClienteInicial {
   nombre: string;
   telefono: string;
   email: string | null;
-  // Saldo de fidelización acumulado (10% de lo gastado en citas
-  // anteriores) — ver lib/fidelizacion.ts. Se puede canjear en esta
-  // reserva solo si cubre el total exacto.
-  saldoFidelizacionCentimos: number;
+  // GrassoCoins del cliente — ver lib/fidelizacion.ts. Se pueden canjear
+  // en esta reserva si el servicio y cada extra tienen precio en coins y
+  // le llegan.
+  grassocoins: number;
 }
 
 interface Props {
@@ -524,7 +525,7 @@ export default function BookingFlow({
   // del usuario, no una casilla ya marcada de fábrica (pedido de Diego,
   // 19/09/2026, tras la revisión de UX).
   const [aceptaComercial, setAceptaComercial] = useState(false);
-  const [pagarConSaldo, setPagarConSaldo] = useState(false);
+  const [canjearCoins, setCanjearCoins] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citaConfirmada, setCitaConfirmada] = useState<{
@@ -581,28 +582,24 @@ export default function BookingFlow({
   // Si el servicio principal o algún complemento es de precio variable,
   // precioTotalCentimos deja de ser "el total exacto" y pasa a ser solo
   // una referencia mínima — se muestra con "Desde" (ver
-  // formatearPrecioServicio) y no se puede pagar con saldo, porque el
-  // canje exige cubrir el importe exacto (ver lib/fidelizacion.ts) y aquí
-  // todavía no se sabe cuál va a ser.
+  // formatearPrecioServicio); el importe exacto lo fija el barbero al
+  // cobrar. (Canjear con GrassoCoins sí se puede: su precio en coins es fijo.)
   const totalEsVariable =
     Boolean(servicioSeleccionado?.precio_variable) ||
     complementosElegidos.some((c) => c.precio_variable);
-  const saldoDisponibleCentimos =
-    clienteInicial?.saldoFidelizacionCentimos ?? 0;
-  // El canje no admite parcialidad: el saldo tiene que cubrir el total
-  // exacto de la cita, o no se puede usar en absoluto (ver lib/fidelizacion.ts).
-  const saldoCubreTotal =
-    !totalEsVariable &&
-    precioTotalCentimos > 0 &&
-    saldoDisponibleCentimos >= precioTotalCentimos;
+  // GrassoCoins: cuánto cuesta canjear esta cita entera (servicio +
+  // extras) y si al cliente le llegan. null = algún elemento no tiene
+  // precio en coins y no se puede canjear.
+  const coinsDisponibles = clienteInicial?.grassocoins ?? 0;
+  const costeCoinsCita = costeGrassoCoinsCita(servicioSeleccionado, complementosElegidos);
+  const coinsCubrenCita = costeCoinsCita !== null && coinsDisponibles >= costeCoinsCita;
 
-  // Si el cliente marcó "pagar con saldo" y luego cambia de servicio o
-  // añade un complemento que ya no le cubre el saldo, se desmarca solo:
-  // así el estado interno nunca se queda "marcado" por detrás de una
-  // casilla que ahora se ve deshabilitada.
+  // Si el cliente marcó "canjear" y luego cambia de servicio o añade un
+  // extra que ya no puede canjear, se desmarca solo: así el estado interno
+  // nunca se queda "marcado" por detrás de una casilla deshabilitada.
   useEffect(() => {
-    if (pagarConSaldo && !saldoCubreTotal) setPagarConSaldo(false);
-  }, [pagarConSaldo, saldoCubreTotal]);
+    if (canjearCoins && !coinsCubrenCita) setCanjearCoins(false);
+  }, [canjearCoins, coinsCubrenCita]);
 
   function elegirServicioYContinuar(id: string) {
     if (id !== servicioId) {
@@ -1000,7 +997,7 @@ export default function BookingFlow({
           aceptaComercial,
           complementoIds,
           notaCliente: notaCliente.trim() || null,
-          pagarConSaldo: pagarConSaldo && saldoCubreTotal,
+          canjearGrassoCoins: canjearCoins && coinsCubrenCita,
           // Si profesionalId sigue siendo null aquí es que se quedó en
           // "Cualquiera": el barbero de arriba es el que tocó al buscar
           // hueco, no uno que el cliente pidiera a propósito.
@@ -1537,7 +1534,7 @@ export default function BookingFlow({
               ))}
               <div className="mt-2 border-t border-black/10 pt-2 font-mono text-black">
                 Total:{" "}
-                {pagarConSaldo && saldoCubreTotal ? (
+                {canjearCoins && coinsCubrenCita ? (
                   <span className="line-through opacity-50">
                     {formatearPrecioServicio(
                       precioTotalCentimos,
@@ -1552,33 +1549,38 @@ export default function BookingFlow({
                     )}
                   </span>
                 )}
-                {pagarConSaldo && saldoCubreTotal && (
+                {canjearCoins && coinsCubrenCita && (
                   <span className="ml-1 font-semibold text-amber-800">
-                    0,00 € (con tu saldo)
+                    0,00 € ({formatearGrassoCoins(costeCoinsCita ?? 0)})
                   </span>
                 )}
               </div>
-              {saldoDisponibleCentimos > 0 && (
+              {costeCoinsCita !== null ? (
                 <label
                   className={
                     "mt-3 flex items-start gap-2 border-t border-black/10 pt-3 " +
-                    (saldoCubreTotal ? "text-black" : "text-black/40")
+                    (coinsCubrenCita ? "text-black" : "text-black/40")
                   }
                 >
                   <input
                     type="checkbox"
                     className="mt-1 accent-brand-yellow-dark"
-                    checked={pagarConSaldo && saldoCubreTotal}
-                    disabled={!saldoCubreTotal}
-                    onChange={(e) => setPagarConSaldo(e.target.checked)}
+                    checked={canjearCoins && coinsCubrenCita}
+                    disabled={!coinsCubrenCita}
+                    onChange={(e) => setCanjearCoins(e.target.checked)}
                   />
                   <span>
-                    Pagar con mi saldo (
-                    {formatearPrecio(saldoDisponibleCentimos)} disponible)
-                    {!saldoCubreTotal &&
-                      " — todavía no te cubre el total de esta cita"}
+                    Canjear con {formatearGrassoCoins(costeCoinsCita)} (tienes {coinsDisponibles})
+                    {!coinsCubrenCita &&
+                      ` — te faltan ${costeCoinsCita - coinsDisponibles}`}
                   </span>
                 </label>
+              ) : (
+                coinsDisponibles > 0 && (
+                  <p className="mt-3 border-t border-black/10 pt-3 text-black/50">
+                    Tienes {formatearGrassoCoins(coinsDisponibles)}. Esta cita no se puede canjear con coins.
+                  </p>
+                )
               )}
             </div>
             <div className="space-y-3">
