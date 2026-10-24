@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { centimosParaSiguienteCoin, formatearGrassoCoins } from "@/lib/grassocoins";
+import { formatearGrassoCoins } from "@/lib/grassocoins";
 
 interface Cliente {
   id: string;
@@ -133,9 +133,11 @@ export default function ClienteDetalleClient({
           <div className="text-right">
             <p className="text-xs uppercase tracking-wide text-stone-500">GrassoCoins</p>
             <p className="font-mono text-2xl font-bold text-brand-yellow-dark">{coins}</p>
-            <p className="text-xs text-stone-400">
-              Le faltan {formatearPrecio(centimosParaSiguienteCoin(cliente.grassocoins_resto_centimos))} para la siguiente
-            </p>
+            {cliente.grassocoins_resto_centimos > 0 && (
+              <p className="text-xs text-stone-400">
+                + {formatearPrecio(cliente.grassocoins_resto_centimos)} guardados para la siguiente
+              </p>
+            )}
             <button
               onClick={() => setMostrarForm((v) => !v)}
               className="mt-1 text-xs font-medium text-stone-500 underline hover:text-stone-700"

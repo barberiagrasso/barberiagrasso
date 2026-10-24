@@ -24,7 +24,7 @@ export default async function ClientesPage() {
     <div>
       <h1 className="mb-1 text-xl font-bold text-stone-900">Clientes</h1>
       <p className="mb-4 text-sm text-stone-500">
-        Ficha de cada cliente: sus datos, sus GrassoCoins (1 por cada 20 € que gasta, se suman
+        Ficha de cada cliente: sus datos, sus GrassoCoins (1 por cada euro que paga, se suman
         solas al cobrar) y el histórico de movimientos. Desde la ficha también puedes sumar o
         restar coins a mano si hace falta.
       </p>

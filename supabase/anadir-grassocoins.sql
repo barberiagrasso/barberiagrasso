@@ -1,12 +1,14 @@
 -- GrassoCoins: puntos de la tarjeta de fidelidad (24/10/2026).
 --
 -- Sustituye al saldo en euros (10 % de lo gastado) por puntos:
---   * Se gana 1 GrassoCoin por cada 20 € gastados (EUROS_POR_GRASSOCOIN en
---     lib/fidelizacion.ts). Lo que sobra no se pierde: se guarda en
---     clientes.grassocoins_resto_centimos y cuenta para la siguiente visita
---     (30 € → 1 coin y 10 € guardados; la próxima de 10 € → otra coin).
+--   * Se gana 1 GrassoCoin por cada euro pagado (EUROS_POR_GRASSOCOIN en
+--     lib/grassocoins.ts; el servidor le pasa la regla a la función). Los
+--     céntimos que sobran no se pierden: se guardan en
+--     clientes.grassocoins_resto_centimos y cuentan para la siguiente visita
+--     (12,80 € → 12 coins y 0,80 € guardados).
 --   * Se ganan al COBRAR la cita en el panel, nunca antes, sobre lo que el
---     cliente paga de verdad por el servicio (los productos no cuentan).
+--     cliente paga de verdad: servicio y extras (precio en efectivo,
+--     descuento o precio del bono si lo compra) y productos.
 --   * Se canjean por servicios: cada servicio tiene un precio en coins
 --     (servicios.coste_grassocoins, lo pones tú en el panel → Servicios;
 --     vacío = no se puede canjear). Canjear cubre la cita entera, así que
@@ -95,7 +97,7 @@ create or replace function registrar_movimiento_grassocoins(
   p_tipo text,
   p_coins int default 0,
   p_gasto_centimos int default null,
-  p_euros_por_coin_centimos int default 2000,
+  p_euros_por_coin_centimos int default 100,
   p_nota text default null,
   p_creado_por text default 'sistema'
 ) returns int

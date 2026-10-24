@@ -1,23 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  centimosParaSiguienteCoin,
-  EUROS_POR_GRASSOCOIN,
-  formatearGrassoCoins,
-  progresoSiguienteCoin,
-} from "@/lib/grassocoins";
+import { formatearGrassoCoins } from "@/lib/grassocoins";
 
 interface Props {
   nombre: string;
   grassocoins: number;
-  restoCentimos: number;
   walletAppleDisponible: boolean;
   walletGoogleDisponible: boolean;
-}
-
-function formatearPrecio(centimos: number) {
-  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }
 
 // Medidas de una tarjeta de fidelización horizontal, a doble resolución
@@ -33,7 +23,7 @@ const ALTO = 620;
  * necesita ninguna cuenta de desarrollador ni backend: se genera entera
  * en el navegador del cliente.
  */
-export default function TarjetaClient({ nombre, grassocoins, restoCentimos, walletAppleDisponible, walletGoogleDisponible }: Props) {
+export default function TarjetaClient({ nombre, grassocoins, walletAppleDisponible, walletGoogleDisponible }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [lista, setLista] = useState(false);
   const [descargando, setDescargando] = useState(false);
@@ -114,20 +104,9 @@ export default function TarjetaClient({ nombre, grassocoins, restoCentimos, wall
       ctx.fillStyle = "#f2d368";
       ctx.fillText(String(grassocoins), 56, 425);
 
-      // Barrita de progreso hacia la siguiente coin.
-      const anchoBarra = 420;
-      ctx.fillStyle = "rgba(245, 241, 230, 0.14)";
-      redondearRect(ctx, 56, 452, anchoBarra, 12, 6);
-      ctx.fill();
-      const progreso = progresoSiguienteCoin(restoCentimos);
-      if (progreso > 0) {
-        ctx.fillStyle = "#f2d368";
-        redondearRect(ctx, 56, 452, Math.max(12, anchoBarra * progreso), 12, 6);
-        ctx.fill();
-      }
       ctx.font = "300 22px Lato, sans-serif";
       ctx.fillStyle = "rgba(245, 241, 230, 0.62)";
-      ctx.fillText(`Faltan ${formatearPrecio(centimosParaSiguienteCoin(restoCentimos))} para la siguiente`, 56, 500);
+      ctx.fillText("1 GrassoCoin por cada euro · canjéalas por servicios", 56, 475);
 
       // Pie: las dos sedes.
       ctx.font = "300 24px Lato, sans-serif";
@@ -141,7 +120,7 @@ export default function TarjetaClient({ nombre, grassocoins, restoCentimos, wall
     return () => {
       cancelado = true;
     };
-  }, [nombre, grassocoins, restoCentimos]);
+  }, [nombre, grassocoins]);
 
   function descargar() {
     const canvas = canvasRef.current;
@@ -202,8 +181,8 @@ export default function TarjetaClient({ nombre, grassocoins, restoCentimos, wall
           Tienes <span className="font-semibold text-brand-yellow">{formatearGrassoCoins(grassocoins)}</span>.
         </p>
         <p className="mt-1">
-          Ganas 1 GrassoCoin por cada {EUROS_POR_GRASSOCOIN} € que gastas; lo que sobra se guarda para tu próxima
-          visita. Canjéalas por servicios al reservar tu cita.
+          Ganas 1 GrassoCoin por cada euro que pagas, en servicios y en productos. Canjéalas por servicios al
+          reservar tu cita.
         </p>
       </div>
 

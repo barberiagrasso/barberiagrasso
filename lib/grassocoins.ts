@@ -6,8 +6,13 @@
 // cuentas en el navegador que el servidor al apuntarlas.
 // =====================================================================
 
-/** 1 GrassoCoin por cada 20 € gastados. */
-export const EUROS_POR_GRASSOCOIN = 20;
+/**
+ * 1 GrassoCoin por cada euro pagado (decisión de Diego, 24/10/2026): es
+ * proporcional a lo que deja cada cliente, sea un corte de 12 € o un ticket
+ * de 40 €. Lo generoso que es el programa se controla con el precio en
+ * coins de cada servicio (panel → Servicios), no con esta regla.
+ */
+export const EUROS_POR_GRASSOCOIN = 1;
 export const CENTIMOS_POR_GRASSOCOIN = EUROS_POR_GRASSOCOIN * 100;
 
 export const NOMBRE_GRASSOCOINS = "GrassoCoins";
@@ -21,8 +26,8 @@ export function formatearGrassoCoins(coins: number): string {
  * Cuántas coins se ganan con un pago y cuánto queda guardado para la
  * próxima, sumando lo que ya había guardado de visitas anteriores. Es la
  * misma cuenta que hace la base de datos en registrar_movimiento_grassocoins().
- *   resto 0 + 30 € → 1 coin, quedan 10 €
- *   resto 10 € + 10 € → 1 coin, quedan 0 €
+ *   resto 0 + 12,80 € → 12 coins, quedan 0,80 €
+ *   resto 0,80 € + 14,20 € → 15 coins, quedan 0 €
  */
 export function calcularGrassoCoins(
   restoCentimos: number,

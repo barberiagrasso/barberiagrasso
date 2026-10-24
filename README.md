@@ -136,16 +136,18 @@ que aprender.
 
 ### Fidelización: GrassoCoins y tarjeta digital
 
-Cada cliente gana **1 GrassoCoin por cada 20 €** que gasta (servicio + complementos), válidas
-en las dos sedes. Lo que sobra no se pierde: se guarda y cuenta para la siguiente visita
-(30 € → 1 coin y 10 € guardados; la próxima visita de 10 € → otra coin). Las piezas:
+Cada cliente gana **1 GrassoCoin por cada euro** que paga de verdad (servicios, extras y
+productos), válidas en las dos sedes. Los céntimos sobrantes se guardan para la siguiente
+visita (12,80 € → 12 coins y 0,80 € guardados). Lo generoso que es el programa se decide con
+el precio en coins de cada servicio: un corte de 16 € a 160 coins devuelve un 10 %. Las piezas:
 
 - **Base de datos**: ejecuta una vez `supabase/anadir-grassocoins.sql` en el SQL Editor de
   Supabase (es re-ejecutable). Todos los clientes empiezan con 0 coins; el saldo antiguo en
   euros (el 10 %) dejó de usarse el 24/10/2026.
 - **Cuándo se ganan**: solo al **cobrar** la cita desde la Agenda (nunca al reservarla), sobre
-  lo que se paga de verdad por el servicio y sus extras (los productos no cuentan). Una cita
-  canjeada con coins no da coins nuevas.
+  lo que se paga de verdad: el precio final del servicio y sus extras (el de efectivo, con
+  descuento, o el del bono si lo compra) más los productos. Usar un bono no da coins (ya las
+  dio al comprarlo), y una cita canjeada con coins solo da coins por los productos.
 - **Cómo se canjean**: por servicios. En el panel → **Servicios**, cada servicio tiene un
   campo **"Precio en GrassoCoins"** (vacío = no se puede canjear). En el último paso de
   `/reservar` (y en la cita rápida del panel) aparece "Canjear con X GrassoCoins" si el
@@ -496,7 +498,7 @@ app/admin/dashboard/FinalizarCitaModal.tsx  Pantalla que se abre al marcar una c
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
 lib/fidelizacion.ts        Ganar, canjear, devolver y ajustar GrassoCoins
-lib/grassocoins.ts         Cuentas de GrassoCoins (1 por cada 20 €)
+lib/grassocoins.ts         Cuentas de GrassoCoins (1 por cada euro)
 lib/recuperacionPassword.ts  Generar/hashear/verificar el código de recuperación de contraseña
 app/api/auth/recuperar/    Pedir código y confirmarlo con contraseña nueva
 lib/wallet/                Apple Wallet / Google Wallet reales (preparado, ver README arriba)

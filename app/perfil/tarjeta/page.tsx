@@ -23,7 +23,6 @@ export default async function TarjetaPage() {
         <TarjetaClient
           nombre={cliente.nombre}
           grassocoins={cliente.grassocoins ?? 0}
-          restoCentimos={cliente.grassocoins_resto_centimos ?? 0}
           walletAppleDisponible={appleWalletConfigurado()}
           walletGoogleDisponible={googleWalletConfigurado()}
         />

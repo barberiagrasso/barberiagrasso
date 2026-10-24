@@ -7,9 +7,13 @@ import { CENTIMOS_POR_GRASSOCOIN } from "@/lib/grassocoins";
 // =====================================================================
 // Tarjeta de fidelidad: GrassoCoins (24/10/2026, sustituye al antiguo
 // saldo del 10 % en euros).
-//   * 1 GrassoCoin por cada 20 € pagados; lo que sobra se guarda para la
-//     siguiente visita (ver lib/grassocoins.ts para las cuentas).
-//   * Se ganan al cobrar la cita en el panel, nunca antes.
+//   * 1 GrassoCoin por cada euro pagado de verdad; los céntimos sobrantes
+//     se guardan para la siguiente visita (ver lib/grassocoins.ts).
+//   * Se ganan al cobrar la cita en el panel, nunca antes, sobre todo lo
+//     que paga el cliente: servicio y extras (con su precio final: el de
+//     efectivo, el descuento o el de un bono que compra) y productos. Al
+//     usar un bono el servicio cuesta 0, así que no da coins: ya las dio
+//     al comprarlo.
 //   * Se canjean por servicios: cada servicio tiene un precio en coins
 //     (servicios.coste_grassocoins). Canjear cubre la cita entera
 //     (servicio + extras), y en ese caso la cita cuenta como "pagada con
@@ -84,19 +88,33 @@ export async function canjearGrassoCoinsEnCita(
   return data as number;
 }
 
+/** Total de productos vendidos en una cita (cantidad × precio). */
+export async function totalProductosCitaCentimos(supabase: SupabaseClient, citaId: string): Promise<number> {
+  const { data } = await supabase.from("cita_productos").select("cantidad, precio_centimos").eq("cita_id", citaId);
+  return (data ?? []).reduce(
+    (acc: number, p: { cantidad: number; precio_centimos: number }) => acc + p.cantidad * p.precio_centimos,
+    0,
+  );
+}
+
 /**
- * Se llama al cobrar una cita en el panel. Si la cita se pagó con
- * fidelización (coins o el saldo antiguo) no se gana nada: no hubo gasto
- * real. Nunca lanza — un fallo aquí no debe impedir cobrar — pero queda
- * registrado en errores_sistema para arreglarlo a mano si hiciera falta.
+ * Se llama al cobrar una cita en el panel. Da coins por todo lo pagado de
+ * verdad: el servicio (salvo que se canjease con fidelización al reservar,
+ * porque entonces no se pagó) más los productos. Nunca lanza — un fallo
+ * aquí no debe impedir cobrar — pero queda registrado en errores_sistema
+ * para arreglarlo a mano si hiciera falta.
  */
 export async function acumularPorCitaCompletada(
   supabase: SupabaseClient,
   cita: { id: string; cliente_id: string; saldo_canjeado_centimos?: number | null; grassocoins_canjeados?: number | null },
 ): Promise<void> {
   try {
-    if ((cita.saldo_canjeado_centimos ?? 0) > 0 || (cita.grassocoins_canjeados ?? 0) > 0) return;
-    const total = await totalCitaCentimos(supabase, cita.id);
+    const servicioCanjeado = (cita.saldo_canjeado_centimos ?? 0) > 0 || (cita.grassocoins_canjeados ?? 0) > 0;
+    const [totalServicio, totalProductos] = await Promise.all([
+      servicioCanjeado ? Promise.resolve(0) : totalCitaCentimos(supabase, cita.id),
+      totalProductosCitaCentimos(supabase, cita.id),
+    ]);
+    const total = totalServicio + totalProductos;
     if (total <= 0) return;
     const { error } = await supabase.rpc("registrar_movimiento_grassocoins", {
       p_cliente_id: cita.cliente_id,

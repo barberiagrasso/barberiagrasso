@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { centimosParaSiguienteCoin, progresoSiguienteCoin } from "@/lib/grassocoins";
 import { requireCliente } from "@/lib/clienteAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
@@ -49,10 +48,6 @@ interface CitaCruda {
 function uno<T>(valor: T | T[] | null): T | null {
   if (Array.isArray(valor)) return valor[0] ?? null;
   return valor;
-}
-
-function formatearPrecio(centimos: number) {
-  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }
 
 export default async function PerfilPage() {
@@ -206,15 +201,7 @@ export default async function PerfilPage() {
           <div className="min-w-0 flex-1 pr-4">
             <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tus GrassoCoins</p>
             <p className="mt-0.5 font-mono text-2xl text-brand-yellow">{cliente.grassocoins ?? 0}</p>
-            <div className="mt-2 h-1.5 w-full max-w-48 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-brand-yellow"
-                style={{ width: `${Math.round(progresoSiguienteCoin(cliente.grassocoins_resto_centimos ?? 0) * 100)}%` }}
-              />
-            </div>
-            <p className="mt-1 font-body text-xs text-brand-white-dim">
-              Te faltan {formatearPrecio(centimosParaSiguienteCoin(cliente.grassocoins_resto_centimos ?? 0))} para la siguiente
-            </p>
+            <p className="mt-1 font-body text-xs text-brand-white-dim">1 GrassoCoin por cada euro · canjéalas por servicios</p>
           </div>
           <span className="font-body text-sm text-brand-white-dim">Ver tarjeta →</span>
         </Link>

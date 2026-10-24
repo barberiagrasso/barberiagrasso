@@ -369,9 +369,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   await sincronizarCitaHubSpot(supabase, id);
-  // Las GrassoCoins se calculan solo sobre servicio + complementos (ver
-  // lib/fidelizacion.ts): los productos no dan coins, a propósito,
-  // igual que no aparecen en ningún otro sitio de la app del cliente.
+  // GrassoCoins por todo lo cobrado: servicio + complementos (con su
+  // precio final) y productos — ver lib/fidelizacion.ts. Va después de
+  // guardar cita_productos para que los productos ya cuenten.
   await acumularPorCitaCompletada(supabase, {
     id: citaActual.id,
     cliente_id: citaActual.cliente_id,

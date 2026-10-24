@@ -92,7 +92,7 @@ export async function generarPaseApple(datos: DatosTarjetaCliente): Promise<Buff
           key: "info",
           label: "Cómo funciona",
           value:
-            "Ganas 1 GrassoCoin por cada 20 € que gastas en Barbería Grasso (Los Molinos y Avenida de las Ciudades); lo que sobra se guarda para tu próxima visita. Canjéalas por servicios al reservar.",
+            "Ganas 1 GrassoCoin por cada euro que pagas en Barbería Grasso (Los Molinos y Avenida de las Ciudades), en servicios y en productos. Canjéalas por servicios al reservar.",
         },
       ],
     },
