@@ -86,6 +86,13 @@ export default async function Home() {
             texto="Reserva tu cita en Barbería Grasso desde el móvil."
           />
         </div>
+
+        <Link
+          href="/politica-privacidad"
+          className="mt-8 font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+        >
+          Política de privacidad
+        </Link>
       </div>
     </main>
   );

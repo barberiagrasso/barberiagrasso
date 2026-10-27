@@ -183,29 +183,23 @@ export default function TarjetaClient({ nombre, saldoFidelizacionCentimos, walle
         {descargando ? "Preparando…" : "Descargar tarjeta (imagen)"}
       </button>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <BotonWallet
-          etiqueta="Añadir a Apple Wallet"
-          disponible={walletAppleDisponible}
-          onClick={() => anadirAWallet("apple")}
-        />
-        <BotonWallet
-          etiqueta="Añadir a Google Wallet"
-          disponible={walletGoogleDisponible}
-          onClick={() => anadirAWallet("google")}
-        />
-      </div>
+      {/* Los botones de Wallet solo salen cuando están activados de verdad:
+          antes se enseñaban en gris con un "Próximamente", y al cliente le
+          parecía una app a medio hacer. */}
+      {(walletAppleDisponible || walletGoogleDisponible) && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {walletAppleDisponible && (
+            <BotonWallet etiqueta="Añadir a Apple Wallet" disponible onClick={() => anadirAWallet("apple")} />
+          )}
+          {walletGoogleDisponible && (
+            <BotonWallet etiqueta="Añadir a Google Wallet" disponible onClick={() => anadirAWallet("google")} />
+          )}
+        </div>
+      )}
 
       {avisoWallet && (
         <p className="rounded-lg border border-brand-yellow/30 bg-brand-black-soft p-3 font-body text-sm text-brand-white-dim">
           {avisoWallet}
-        </p>
-      )}
-
-      {(!walletAppleDisponible || !walletGoogleDisponible) && (
-        <p className="font-body text-xs text-brand-white-dim">
-          Próximamente podrás añadir esta tarjeta directamente a Apple Wallet o Google Wallet. Mientras tanto,
-          descárgala como imagen para guardarla donde quieras.
         </p>
       )}
     </div>

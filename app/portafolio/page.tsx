@@ -10,6 +10,16 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Nuestros trabajos · Barbería Grasso",
   description: "Cortes, degradados, barbas y más: mira los trabajos de Barbería Grasso en Getafe.",
+  // Al compartir este enlace, la vista previa dice "Nuestros trabajos"
+  // (la imagen sigue siendo la general de app/opengraph-image.jpg).
+  openGraph: {
+    title: "Nuestros trabajos · Barbería Grasso",
+    description: "Cortes, degradados, barbas y más: mira los trabajos de Barbería Grasso en Getafe.",
+    url: "/portafolio",
+    siteName: "Barbería Grasso",
+    locale: "es_ES",
+    type: "website",
+  },
 };
 
 // Página pública (sin necesidad de iniciar sesión) con todos los trabajos

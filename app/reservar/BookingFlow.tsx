@@ -1597,7 +1597,16 @@ export default function BookingFlow({
               <span>
                 Quiero recibir ofertas y novedades de Barbería Grasso por
                 WhatsApp, email o notificaciones. Podré darme de baja cuando
-                quiera. (Opcional: no es necesario para reservar tu cita.)
+                quiera. (Opcional: no es necesario para reservar tu cita.){" "}
+                {/* En otra pestaña, para no perder la reserva a medias. */}
+                <a
+                  href="/politica-privacidad"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+                >
+                  Política de privacidad
+                </a>
               </span>
             </label>
 

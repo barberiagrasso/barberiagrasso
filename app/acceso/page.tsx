@@ -352,16 +352,33 @@ function AccesoForm() {
         <p className="mt-6 text-center font-body text-xs text-brand-white-dim">
           {modo === "login" &&
             "¿Primera vez por aquí? Crea tu cuenta arriba — tardas menos de un minuto."}
-          {modo === "registro" && "Tu cuenta se usa solo para gestionar tus citas en Barbería Grasso."}
+          {modo === "registro" && (
+            <>
+              Tu cuenta se usa solo para gestionar tus citas en Barbería Grasso. Más información en nuestra{" "}
+              <Link
+                href="/politica-privacidad"
+                className="underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+              >
+                política de privacidad
+              </Link>
+              .
+            </>
+          )}
           {esRecuperar && "Recibirás el código en el WhatsApp de tu número, no por email."}
         </p>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 flex items-center justify-center gap-4">
           <Link
             href="/admin/login"
             className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
           >
             Acceso para el equipo
+          </Link>
+          <Link
+            href="/politica-privacidad"
+            className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          >
+            Privacidad
           </Link>
         </div>
       </div>
