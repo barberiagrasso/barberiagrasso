@@ -666,6 +666,7 @@ export default function CalendarioDia({
     }
 
     const inicioBase = calcularInicioMin(yInicial);
+    const estabaDesplazandose = performance.now() - ultimoScrollRef.current < 250;
 
     function empezarDeVerdad() {
       confirmado = true;
@@ -703,10 +704,26 @@ export default function CalendarioDia({
         limpiar();
       }
     }
-    function alSoltar() {
+    function alSoltar(ev: PointerEvent) {
       window.clearTimeout(idTimer);
       limpiar();
-      if (!confirmado) return; // se soltó antes de cumplirse la pulsación larga: no crear nada
+      if (!confirmado) {
+        // Toque corto con el dedo sobre un hueco libre (sin desplazarse):
+        // abre directamente el menú para programar una cita a esa hora
+        // (pedido de David, 23/10/2026). Mantener pulsado y arrastrar sigue
+        // sirviendo para elegir la hora exacta antes de soltar. Si la agenda
+        // se estaba desplazando, el toque solo sirve para frenarla.
+        const movido = Math.hypot(ev.clientX - xInicial, ev.clientY - yInicial) > UMBRAL_CANCELAR_ESPERA_PX;
+        if (e.pointerType === "touch" && !movido && !estabaDesplazandose) {
+          setCreacion({
+            profesionalId,
+            inicioMin: inicioBase,
+            finMin: Math.min(inicioBase + DURACION_BLOQUEO_DEFECTO_MIN, limiteFin),
+            fase: "menu",
+          });
+        }
+        return;
+      }
       setCreacion((actual) =>
         actual && actual.fase === "arrastrando"
           ? { ...actual, fase: "menu" }
@@ -822,6 +839,58 @@ export default function CalendarioDia({
         )
       : 160;
 
+  // Deslizar de lado con el dedo (como Booksy): la agenda sigue al dedo
+  // mientras se arrastra y, al soltar, encaja en el barbero siguiente o en
+  // el anterior. Se hace a mano en vez de con el scroll lateral nativo
+  // porque en el iPhone ese scroll no respondía dentro de la cuadrícula.
+  // No interviene mientras se está moviendo una cita, el descanso o
+  // creando un bloque nuevo (bloquearScrollTactil activo).
+  const ultimoScrollRef = useRef(0);
+  const gestoRef = useRef<{ x: number; y: number; izquierda: number; eje: "x" | "y" | null } | null>(null);
+  const encajarEnColumna = (columna: number) => {
+    if (!zonaScroll) return;
+    const maximo = zonaScroll.scrollWidth - zonaScroll.clientWidth;
+    zonaScroll.scrollTo({ left: Math.min(Math.max(0, columna * anchoColumna), maximo), behavior: "smooth" });
+  };
+  const gestoLateral = {
+    alEmpezar(ev: React.TouchEvent) {
+      if (!zonaScroll || ev.touches.length !== 1) return;
+      gestoRef.current = { x: ev.touches[0].clientX, y: ev.touches[0].clientY, izquierda: zonaScroll.scrollLeft, eje: null };
+    },
+    alMover(ev: React.TouchEvent) {
+      const g = gestoRef.current;
+      if (!g || !zonaScroll) return;
+      if (liberarScrollActivo) {
+        // Empezó a moverse una cita o a crearse un bloque: el gesto deja de
+        // ser un deslizamiento de la agenda (y si ya la había movido un
+        // poco, vuelve a su sitio).
+        if (g.eje === "x") encajarEnColumna(Math.round(g.izquierda / anchoColumna));
+        gestoRef.current = null;
+        return;
+      }
+      const dx = ev.touches[0].clientX - g.x;
+      const dy = ev.touches[0].clientY - g.y;
+      if (g.eje === null) {
+        // Mismo umbral que cancela la pulsación larga: o se desliza la
+        // agenda o se coge una cita, nunca las dos cosas a la vez.
+        if (Math.hypot(dx, dy) <= UMBRAL_CANCELAR_ESPERA_PX) return;
+        g.eje = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      }
+      if (g.eje === "x") zonaScroll.scrollLeft = g.izquierda - dx;
+    },
+    alTerminar(ev: React.TouchEvent) {
+      const g = gestoRef.current;
+      gestoRef.current = null;
+      if (!g || g.eje !== "x" || !zonaScroll || liberarScrollActivo) return;
+      const dx = (ev.changedTouches[0]?.clientX ?? g.x) - g.x;
+      const columnaInicial = Math.round(g.izquierda / anchoColumna);
+      // Un deslizamiento corto mueve un barbero; uno largo, los que haya
+      // recorrido el dedo.
+      const pasos = Math.abs(dx) < 40 ? 0 : Math.max(1, Math.round(Math.abs(dx) / anchoColumna));
+      encajarEnColumna(columnaInicial + (dx < 0 ? pasos : -pasos));
+    },
+  };
+
   // Al abrir el día de hoy, la agenda se coloca sola en la hora actual
   // (con un poco de margen por encima), en vez de al principio del día.
   // Solo una vez por día mostrado, para no "saltar" mientras se trabaja.
@@ -851,8 +920,19 @@ export default function CalendarioDia({
     <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
       <div
         ref={setZonaScroll}
-        className="max-h-[75vh] snap-x snap-mandatory overflow-auto overscroll-contain select-none"
-        style={{ scrollPaddingLeft: ANCHO_EJE_HORAS, WebkitTouchCallout: "none" }}
+        className="max-h-[75vh] overflow-auto overscroll-contain select-none"
+        // touch-action pan-y: con el dedo, el desplazamiento vertical lo hace
+        // el navegador y el horizontal lo hace la propia agenda (ver
+        // gestoLateral): en el iPhone el desplazamiento lateral nativo dentro
+        // de la cuadrícula no respondía y solo se movía tocando los nombres.
+        style={{ WebkitTouchCallout: "none", touchAction: "pan-y" }}
+        onTouchStart={gestoLateral.alEmpezar}
+        onTouchMove={gestoLateral.alMover}
+        onTouchEnd={gestoLateral.alTerminar}
+        onTouchCancel={gestoLateral.alTerminar}
+        onScroll={() => {
+          ultimoScrollRef.current = performance.now();
+        }}
       >
         <div style={{ width: ANCHO_EJE_HORAS + columnas.length * anchoColumna, minWidth: "100%" }}>
           {/* --- Cabecera: nombre de cada barbero (fija arriba al bajar) --- */}
@@ -902,17 +982,14 @@ export default function CalendarioDia({
                   }
                   onContextMenu={(e) => e.preventDefault()}
                   className={
-                    // touch-action pan-x pan-y (ver style): el dedo
-                    // desplaza la agenda en cualquier dirección — la
-                    // creación de un bloque nuevo solo se activa con una
-                    // pulsación larga sin apenas movimiento (ver
-                    // iniciarCreacion más arriba). snap-start: al
-                    // deslizar de lado, encaja en el borde de un barbero;
-                    // snap-always: avanza de uno en uno, como Booksy.
-                    "relative isolate shrink-0 snap-start snap-always border-l border-stone-100" +
+                    // El dedo desplaza la agenda en las dos direcciones
+                    // (vertical nativo, lateral con gestoLateral). Un toque
+                    // en un hueco libre abre el menú de crear; mantener
+                    // pulsado y arrastrar elige la hora (ver iniciarCreacion).
+                    "relative isolate shrink-0 border-l border-stone-100" +
                     (col.id !== ID_SIN_ASIGNAR ? " cursor-crosshair" : "")
                   }
-                  style={{ width: anchoColumna, touchAction: "pan-x pan-y" }}
+                  style={{ width: anchoColumna }}
                 >
                   {/* Franjas "cerrado" (antes de abrir / después de cerrar): puramente
                       visuales, con rayado, para orientarse — nunca se puede arrastrar
