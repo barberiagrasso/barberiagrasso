@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarBonoTipos } from "@/lib/bonos";
 import MiBarberiaClient from "./MiBarberiaClient";
+import { cargarFotosPortafolio, cargarResenasExternas } from "@/lib/portafolio";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,16 @@ export default async function MiBarberiaPage() {
   const esAdmin = admin.rol === "admin";
   const supabase = createAdminClient();
 
-  const [{ data: servicios }, { data: productos }, { data: sedesEquipo }, { data: serviciosEquipo }, bonoTipos, { data: sedesConNormas }] =
-    await Promise.all([
+  const [
+    { data: servicios },
+    { data: productos },
+    { data: sedesEquipo },
+    { data: serviciosEquipo },
+    bonoTipos,
+    { data: sedesConNormas },
+    fotosPortafolio,
+    resenasExternas,
+  ] = await Promise.all([
       supabase.from("servicios").select("*").order("categoria", { nullsFirst: true }).order("orden"),
       supabase.from("productos").select("*").order("categoria", { nullsFirst: true }).order("orden"),
       // Las pestañas "Bonos", "Equipo" y "Sedes" (dentro de este mismo
@@ -28,6 +37,10 @@ export default async function MiBarberiaPage() {
             .select("id, nombre, acepta_tarjeta, acceso_movilidad_reducida, wifi, apto_ninos")
             .order("nombre")
         : Promise.resolve({ data: [] }),
+      // Portafolio y notas de Booksy/Google: solo rol "admin" (pestañas
+      // "Portafolio" y "Sedes"). Devuelven vacío si el script aún no se ejecutó.
+      esAdmin ? cargarFotosPortafolio(supabase) : Promise.resolve([]),
+      esAdmin ? cargarResenasExternas(supabase) : Promise.resolve({}),
     ]);
 
   return (
@@ -45,6 +58,8 @@ export default async function MiBarberiaPage() {
         sedesEquipo={sedesEquipo ?? []}
         serviciosEquipo={serviciosEquipo ?? []}
         sedesConNormas={sedesConNormas ?? []}
+        fotosPortafolio={fotosPortafolio}
+        resenasExternas={resenasExternas}
       />
     </div>
   );

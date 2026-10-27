@@ -6,6 +6,7 @@ import ProductosClient from "../productos/ProductosClient";
 import ProfesionalesClient from "../profesionales/ProfesionalesClient";
 import BonosClient from "./BonosClient";
 import SedesClient from "./SedesClient";
+import PortafolioClient from "./PortafolioClient";
 
 interface Servicio {
   id: string;
@@ -54,7 +55,22 @@ interface BonoTipo {
   dias_validez: number;
 }
 
-type Pestana = "servicios" | "productos" | "bonos" | "equipo" | "sedes";
+type Pestana = "servicios" | "productos" | "bonos" | "equipo" | "sedes" | "portafolio";
+
+interface FotoPortafolio {
+  id: string;
+  url: string;
+  servicio_id: string | null;
+  sede_id: string | null;
+  descripcion: string | null;
+  created_at: string;
+}
+interface ResenaExterna {
+  url: string | null;
+  url_escribir: string | null;
+  nota: number | null;
+  total: number | null;
+}
 
 /**
  * "Mi barbería": agrupa lo que antes eran tres pestañas sueltas del menú
@@ -77,6 +93,8 @@ export default function MiBarberiaClient({
   sedesEquipo,
   serviciosEquipo,
   sedesConNormas,
+  fotosPortafolio,
+  resenasExternas,
 }: {
   servicios: Servicio[];
   productos: Producto[];
@@ -85,6 +103,8 @@ export default function MiBarberiaClient({
   sedesEquipo: Sede[];
   serviciosEquipo: ServicioEquipo[];
   sedesConNormas: SedeConNormas[];
+  fotosPortafolio: FotoPortafolio[];
+  resenasExternas: Record<string, { booksy?: ResenaExterna; google?: ResenaExterna }>;
 }) {
   const [pestana, setPestana] = useState<Pestana>("servicios");
 
@@ -96,17 +116,18 @@ export default function MiBarberiaClient({
     ...(esAdmin ? [{ id: "bonos" as Pestana, label: "Bonos" }] : []),
     ...(esAdmin ? [{ id: "equipo" as Pestana, label: "Equipo" }] : []),
     ...(esAdmin ? [{ id: "sedes" as Pestana, label: "Sedes" }] : []),
+    ...(esAdmin ? [{ id: "portafolio" as Pestana, label: "Portafolio" }] : []),
   ];
 
   return (
     <div className="space-y-4">
-      <div className="flex w-fit gap-1 rounded-lg border border-stone-300 p-1">
+      <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-stone-300 p-1 sm:w-fit">
         {pestanas.map((p) => (
           <button
             key={p.id}
             onClick={() => setPestana(p.id)}
             className={
-              "rounded-md px-3 py-1.5 text-sm " +
+              "shrink-0 rounded-md px-3 py-1.5 text-sm " +
               (pestana === p.id ? "bg-stone-900 text-white" : "text-stone-600 hover:text-stone-900")
             }
           >
@@ -119,7 +140,14 @@ export default function MiBarberiaClient({
       {pestana === "productos" && <ProductosClient productos={productos} />}
       {pestana === "bonos" && esAdmin && <BonosClient tipos={bonoTipos} />}
       {pestana === "equipo" && esAdmin && <ProfesionalesClient sedes={sedesEquipo} servicios={serviciosEquipo} />}
-      {pestana === "sedes" && esAdmin && <SedesClient sedes={sedesConNormas} />}
+      {pestana === "sedes" && esAdmin && <SedesClient sedes={sedesConNormas} resenasExternas={resenasExternas} />}
+      {pestana === "portafolio" && esAdmin && (
+        <PortafolioClient
+          fotosIniciales={fotosPortafolio}
+          servicios={serviciosEquipo.map((s) => ({ id: s.id, nombre: s.nombre }))}
+          sedes={sedesEquipo}
+        />
+      )}
     </div>
   );
 }

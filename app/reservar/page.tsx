@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { requireCliente } from "@/lib/clienteAuth";
 import BookingFlow from "./BookingFlow";
+import { contarFotosPorServicio } from "@/lib/portafolio";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import InstalarApp from "@/components/pwa/InstalarApp";
 
@@ -18,6 +19,7 @@ export default async function ReservarPage() {
     { data: servicios },
     { data: profesionalSedes },
     { data: profesionalServicios },
+    fotosPorServicio,
   ] = await Promise.all([
     supabase
       .from("sedes")
@@ -34,6 +36,9 @@ export default async function ReservarPage() {
       .select("profesional_id, sede_id, profesionales!inner(activo)")
       .eq("profesionales.activo", true),
     supabase.from("profesional_servicios").select("profesional_id, servicio_id"),
+    // Para enseñar "Ver trabajos" solo en los servicios con fotos (vacío si
+    // el portafolio todavía no está creado en la base de datos).
+    contarFotosPorServicio(supabase),
   ]);
 
   // Qué servicios tienen al menos un barbero activo en cada sede. Un
@@ -93,6 +98,7 @@ export default async function ReservarPage() {
             sedes={sedes ?? []}
             servicios={servicios ?? []}
             serviciosReservablesPorSede={serviciosReservablesPorSede}
+            fotosPorServicio={fotosPorServicio}
             clienteInicial={{
               nombre: cliente.nombre,
               telefono: cliente.telefono,

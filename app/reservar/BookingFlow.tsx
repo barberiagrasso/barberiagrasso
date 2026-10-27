@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
+import { HojaTrabajosServicio } from "@/components/portafolio/GaleriaTrabajos";
 import type { OpcionPropuestaCita } from "@/lib/asistenteReserva";
 
 // Cuántos meses hacia delante del actual se puede navegar en el
@@ -131,6 +132,9 @@ interface Props {
   // sede (ver app/reservar/page.tsx). null = no se pudo calcular, y se
   // muestran todos.
   serviciosReservablesPorSede?: Record<string, string[]> | null;
+  // Nº de fotos del portafolio de cada servicio, para el botón "Ver
+  // trabajos" (ver lib/portafolio.ts). Vacío = ningún servicio lo enseña.
+  fotosPorServicio?: Record<string, number>;
   // Datos del cliente ya logueado, para no hacérselos volver a escribir.
   // Se dejan en campos editables por si alguna vez reserva para otra
   // persona (p. ej. un hijo).
@@ -287,11 +291,17 @@ function TarjetaServicio({
   extra,
   seleccionado,
   onClick,
+  numFotos = 0,
+  onVerTrabajos,
 }: {
   servicio: Servicio;
   extra?: boolean;
   seleccionado?: boolean;
   onClick: () => void;
+  // Fotos del portafolio de este servicio: si hay, debajo de la tarjeta
+  // sale "Ver trabajos" (pedido de Diego, 27/10/2026).
+  numFotos?: number;
+  onVerTrabajos?: () => void;
 }) {
   const duracionTexto = `${extra ? "+" : ""}${servicio.duracion_minutos} min`;
   // La descripción a veces la usa Diego para avisar de un recargo por
@@ -303,7 +313,7 @@ function TarjetaServicio({
   // precio" y no como una nota al pie sin importancia.
   const notaPrecio = servicio.descripcion;
 
-  return (
+  const tarjeta = (
     <button
       onClick={onClick}
       className={
@@ -339,6 +349,20 @@ function TarjetaServicio({
         )}
       </p>
     </button>
+  );
+
+  if (numFotos <= 0 || !onVerTrabajos) return tarjeta;
+  return (
+    <div>
+      {tarjeta}
+      <button
+        type="button"
+        onClick={onVerTrabajos}
+        className="mt-1 px-1 font-body text-xs font-semibold text-brand-yellow underline decoration-brand-yellow/40 underline-offset-4 hover:decoration-brand-yellow"
+      >
+        Ver trabajos ({numFotos})
+      </button>
+    </div>
   );
 }
 
@@ -443,11 +467,14 @@ export default function BookingFlow({
   sedes,
   servicios,
   serviciosReservablesPorSede = null,
+  fotosPorServicio = {},
   clienteInicial,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [paso, setPaso] = useState<Paso>("sede");
+  // Servicio cuyas fotos de trabajos se están viendo (hoja "Ver trabajos").
+  const [trabajosDe, setTrabajosDe] = useState<{ id: string; nombre: string } | null>(null);
   // true cuando la cita en curso viene de aceptar una propuesta del
   // buscador de la portada (ver AsistenteReservaInicio) en vez de
   // elegirse a mano paso a paso — solo afecta a qué "origen" se manda a
@@ -1028,6 +1055,8 @@ export default function BookingFlow({
                   key={servicio.id}
                   servicio={servicio}
                   onClick={() => elegirServicioYContinuar(servicio.id)}
+                  numFotos={fotosPorServicio[servicio.id] ?? 0}
+                  onVerTrabajos={() => setTrabajosDe({ id: servicio.id, nombre: servicio.nombre })}
                 />
               ))}
             </div>
@@ -1071,6 +1100,8 @@ export default function BookingFlow({
                                 onClick={() =>
                                   elegirServicioYContinuar(servicio.id)
                                 }
+                                numFotos={fotosPorServicio[servicio.id] ?? 0}
+                                onVerTrabajos={() => setTrabajosDe({ id: servicio.id, nombre: servicio.nombre })}
                               />
                             </div>
                           ))}
@@ -1103,6 +1134,8 @@ export default function BookingFlow({
                   extra
                   seleccionado={complementoIds.includes(c.id)}
                   onClick={() => alternarComplemento(c.id)}
+                  numFotos={fotosPorServicio[c.id] ?? 0}
+                  onVerTrabajos={() => setTrabajosDe({ id: c.id, nombre: c.nombre })}
                 />
               ))}
             </div>
@@ -1635,6 +1668,13 @@ export default function BookingFlow({
           </div>
         )}
       </div>
+      {trabajosDe && (
+        <HojaTrabajosServicio
+          servicioId={trabajosDe.id}
+          servicioNombre={trabajosDe.nombre}
+          onCerrar={() => setTrabajosDe(null)}
+        />
+      )}
     </>
   );
 }

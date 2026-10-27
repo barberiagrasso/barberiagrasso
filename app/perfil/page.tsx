@@ -7,6 +7,7 @@ import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
 import { BonosSection } from "./BonosSection";
 import { precioCitaCentimos } from "@/lib/precios";
 import { bonosDelCliente } from "@/lib/bonos";
+import { cargarResenasExternas } from "@/lib/portafolio";
 import { construirRecibo } from "@/lib/recibo";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,21 @@ export default async function PerfilPage() {
   // después) — el acceso ya está comprobado arriba por requireCliente(),
   // y aquí solo se piden citas de ESE cliente, nunca de otro.
   const admin = createAdminClient();
-  const bonos = await bonosDelCliente(admin, cliente.id);
+  const [bonos, resenasExternas, { data: sedesContacto }] = await Promise.all([
+    bonosDelCliente(admin, cliente.id),
+    cargarResenasExternas(admin),
+    admin.from("sedes").select("id, telefono"),
+  ]);
+  // Tras valorar una visita se invita a TODOS a dejar la reseña también en
+  // Google (enlace de su sede), y si la nota es baja se ofrece además
+  // escribir a la barbería — ver SeccionValorar en HistorialCitas.tsx.
+  const contactoResenasPorSede: Record<string, { googleEscribir: string | null; telefono: string | null }> = {};
+  for (const sede of (sedesContacto ?? []) as { id: string; telefono: string | null }[]) {
+    contactoResenasPorSede[sede.id] = {
+      googleEscribir: resenasExternas[sede.id]?.google?.url_escribir ?? null,
+      telefono: sede.telefono ?? null,
+    };
+  }
   // Trae de una vez tanto lo que ya usaba esta pantalla (nombre de
   // servicio/sede/profesional, precio) como lo que hace falta para poder
   // construir el recibo de una visita completada (ver lib/recibo.ts):
@@ -198,7 +213,7 @@ export default async function PerfilPage() {
 
         <h2 className="mb-3 font-heading text-lg text-brand-white">Historial de citas</h2>
 
-        <HistorialCitas historialInicial={historial} />
+        <HistorialCitas historialInicial={historial} contactoResenasPorSede={contactoResenasPorSede} />
       </div>
     </main>
   );

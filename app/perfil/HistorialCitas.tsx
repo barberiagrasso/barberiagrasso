@@ -225,7 +225,18 @@ function CambiarHora({
   );
 }
 
-export function HistorialCitas({ historialInicial }: { historialInicial: CitaNormalizada[] }) {
+export interface ContactoResenasSede {
+  googleEscribir: string | null;
+  telefono: string | null;
+}
+
+export function HistorialCitas({
+  historialInicial,
+  contactoResenasPorSede = {},
+}: {
+  historialInicial: CitaNormalizada[];
+  contactoResenasPorSede?: Record<string, ContactoResenasSede>;
+}) {
   const [historial, setHistorial] = useState(historialInicial);
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
@@ -416,6 +427,7 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
                 <SeccionValorar
                   cita={cita}
                   oscuro={!activa}
+                  contacto={contactoResenasPorSede[cita.sedeId]}
                   onValorada={(resena) =>
                     setHistorial((actual) => actual.map((c) => (c.id === cita.id ? { ...c, resena } : c)))
                   }
@@ -454,12 +466,17 @@ export function HistorialCitas({ historialInicial }: { historialInicial: CitaNor
 function SeccionValorar({
   cita,
   oscuro,
+  contacto,
   onValorada,
 }: {
   cita: CitaNormalizada;
   oscuro: boolean;
+  contacto?: ContactoResenasSede;
   onValorada: (resena: { estrellas: number; comentario: string | null }) => void;
 }) {
+  // true justo después de enviar la valoración en esta visita a la página:
+  // es cuando se invita a dejarla también en Google.
+  const [recienEnviada, setRecienEnviada] = useState(false);
   const [estrellas, setEstrellas] = useState(0);
   const [hover, setHover] = useState(0);
   const [comentario, setComentario] = useState("");
@@ -472,6 +489,9 @@ function SeccionValorar({
         <span className="tracking-wide text-brand-yellow">{"★".repeat(cita.resena.estrellas)}</span>
         <span className="opacity-40">{"★".repeat(5 - cita.resena.estrellas)}</span>
         {cita.resena.comentario && <p className="mt-1 italic">&ldquo;{cita.resena.comentario}&rdquo;</p>}
+        {recienEnviada && (
+          <InvitacionGoogle estrellas={cita.resena.estrellas} contacto={contacto} oscuro={oscuro} />
+        )}
       </div>
     );
   }
@@ -491,6 +511,7 @@ function SeccionValorar({
         setError(json.error || "No se pudo guardar la valoración.");
         return;
       }
+      setRecienEnviada(true);
       onValorada({ estrellas, comentario: comentario.trim() || null });
     } catch {
       setError("No se pudo conectar con el servidor.");
@@ -545,6 +566,60 @@ function SeccionValorar({
         </>
       )}
       {error && <p className="font-body text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+// Después de valorar, se invita a TODOS los clientes a dejar la reseña
+// también en Google, sea cual sea su nota (pedido de Diego, 27/10/2026).
+// Invitar solo a los de 5 estrellas ("review gating") lo prohíbe Google y
+// puede costar reseñas o posicionamiento. Si la nota es baja, además se
+// ofrece escribir a la barbería para poder arreglarlo.
+function InvitacionGoogle({
+  estrellas,
+  contacto,
+  oscuro,
+}: {
+  estrellas: number;
+  contacto?: ContactoResenasSede;
+  oscuro: boolean;
+}) {
+  const telefono = contacto?.telefono?.replace(/[^0-9]/g, "");
+  const notaBaja = estrellas <= 3;
+  if (!contacto?.googleEscribir && !(notaBaja && telefono)) {
+    return <p className="mt-2 text-xs">¡Gracias por tu valoración!</p>;
+  }
+  return (
+    <div className={"mt-3 space-y-2 rounded-lg p-3 " + (oscuro ? "bg-white/5" : "bg-brand-black/5")}>
+      <p className="text-xs">
+        {notaBaja ? "Gracias por contárnoslo." : "¡Gracias!"}
+        {contacto?.googleEscribir ? " ¿Nos ayudas dejando tu opinión también en Google? Son 30 segundos." : ""}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {contacto?.googleEscribir && (
+          <a
+            href={contacto.googleEscribir}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-none bg-brand-white px-3 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-black hover:opacity-85"
+          >
+            Opinar en Google
+          </a>
+        )}
+        {notaBaja && telefono && (
+          <a
+            href={`https://wa.me/${telefono.startsWith("34") ? telefono : `34${telefono}`}`}
+            target="_blank"
+            rel="noreferrer"
+            className={
+              "rounded-none border px-3 py-1.5 font-body text-xs font-semibold uppercase tracking-wide " +
+              (oscuro ? "border-brand-line text-brand-white" : "border-brand-black/20 text-brand-black")
+            }
+          >
+            Contarnos qué pasó
+          </a>
+        )}
+      </div>
     </div>
   );
 }

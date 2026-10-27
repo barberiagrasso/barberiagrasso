@@ -5,6 +5,8 @@ import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 import { AsistenteReservaInicio } from "@/components/reservar/AsistenteReservaInicio";
 import { BotonCompartir } from "@/components/brand/BotonCompartir";
+import { NotasResenas } from "@/components/portafolio/NotasResenas";
+import { cargarResenasExternas } from "@/lib/portafolio";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +17,10 @@ export default async function Home() {
   const { cliente } = await requireCliente();
 
   const supabase = createPublicClient();
-  const { data: sedes } = await supabase
-    .from("sedes")
-    .select("id, nombre, direccion, maps_url")
-    .order("nombre");
+  const [{ data: sedes }, resenas] = await Promise.all([
+    supabase.from("sedes").select("id, nombre, direccion, maps_url").order("nombre"),
+    cargarResenasExternas(supabase),
+  ]);
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-brand-black px-4 py-16 text-center">
@@ -47,6 +49,7 @@ export default async function Home() {
                   Cómo llegar
                 </a>
               )}
+              <NotasResenas resenas={resenas[sede.id]} className="mt-2 items-center" />
             </div>
           ))}
         </div>
@@ -61,6 +64,13 @@ export default async function Home() {
         <div className="mt-5 w-full max-w-xs text-left sm:max-w-sm">
           <AsistenteReservaInicio />
         </div>
+
+        <Link
+          href="/portafolio"
+          className="mt-4 font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
+        >
+          Ver nuestros trabajos
+        </Link>
 
         <Link
           href="/perfil"
