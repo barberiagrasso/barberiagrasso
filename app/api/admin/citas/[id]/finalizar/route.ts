@@ -252,6 +252,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   const metodoPagoFinal = pagosMixtos ? "mixto" : metodoPago;
 
+  // Siempre hay que saber cómo pagó el cliente (pedido de Diego,
+  // 27/10/2026): antes se podía cobrar sin elegir método y la cita
+  // quedaba "sin especificar". Solo se permite sin método si no hay nada
+  // que cobrar: el servicio ya se pagó con fidelización al reservar, o
+  // todo suma 0 € (p. ej. un bono que lo cubre todo manda "bono").
+  if (!metodoPagoFinal) {
+    const automaticoServicio =
+      servicio.precio_centimos + extrasParaGuardar.reduce((acc, e) => acc + e.precio_centimos, 0);
+    const servicioPagadoAntes = (citaActual.saldo_canjeado_centimos ?? 0) > 0;
+    const totalServicio = servicioPagadoAntes ? 0 : precioCitaCentimos(precioFinalCentimos, automaticoServicio);
+    const totalProductos = productosParaGuardar.reduce((acc, p) => acc + p.precio_centimos * p.cantidad, 0);
+    if (totalServicio + totalProductos > 0) {
+      return NextResponse.json(
+        { error: "Elige cómo ha pagado el cliente: efectivo, tarjeta, Bizum, bono u otro." },
+        { status: 400 },
+      );
+    }
+  }
+
   // El bono se compra o se canjea ANTES de tocar la cita: si esto falla
   // (p. ej. el bono ya se agotó en otra pestaña un segundo antes), la
   // cita se queda tal cual, sin marcar completada ni con nada a medias.

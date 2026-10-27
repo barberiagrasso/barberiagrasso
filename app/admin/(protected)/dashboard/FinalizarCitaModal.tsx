@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fechaEnMadrid, horaEnMadrid, isoDesdeMadrid } from "@/lib/horarioLocal";
 import {
   IconScissors,
@@ -134,6 +134,8 @@ export default function FinalizarCitaModal({
   // alternarMetodoPago): vender o canjear un bono no se reparte con
   // efectivo/tarjeta/bizum/otro.
   const [metodosPago, setMetodosPago] = useState<string[]>([]);
+  const [resaltarMetodoPago, setResaltarMetodoPago] = useState(false);
+  const seccionMetodoPagoRef = useRef<HTMLDivElement>(null);
   const [porcentajesPago, setPorcentajesPago] = useState<Record<string, string>>({});
   const [bonos, setBonos] = useState<Bono[]>([]);
   const [bonoTipos, setBonoTipos] = useState<BonoTipo[]>([]);
@@ -176,6 +178,7 @@ export default function FinalizarCitaModal({
   // cuanto hay dos o más se reparte el total a partes iguales para
   // empezar (el barbero ajusta el % de cada uno después).
   function alternarMetodoPago(id: string) {
+    setError(null);
     if (id === "bono") {
       const yaElegido = metodosPago.includes("bono");
       setMetodosPago(yaElegido ? [] : ["bono"]);
@@ -404,6 +407,14 @@ export default function FinalizarCitaModal({
       setError("Elige qué bono se está vendiendo.");
       return;
     }
+    if (faltaMetodoPago) {
+      // Sin esto la cita quedaba cobrada "sin especificar" y luego no
+      // cuadraba la caja (pedido de Diego, 27/10/2026).
+      setError("Elige cómo ha pagado el cliente: efectivo, tarjeta, Bizum, bono u otro.");
+      setResaltarMetodoPago(true);
+      seccionMetodoPagoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (!pagoRepartidoValido) {
       setError("Los porcentajes del pago repartido deben sumar 100.");
       return;
@@ -473,6 +484,9 @@ export default function FinalizarCitaModal({
 
   const colorServicioSeleccionado = servicios.find((s) => s.id === servicioId)?.color || "#a8a29e";
   const totalACobrarCentimos = totalServicioCentimos + totalProductosCentimos;
+  // Hay que saber siempre cómo pagó el cliente, salvo que no haya nada que
+  // cobrar (un bono que lo cubre todo, o una cita de 0 €).
+  const faltaMetodoPago = !cubiertoDelTodoPorBono && totalACobrarCentimos > 0 && metodosPago.length === 0;
   const precioTocado = precioManualCentimos !== null && precioManualCentimos !== totalServicioAutomaticoCentimos;
 
   return (
@@ -692,8 +706,14 @@ export default function FinalizarCitaModal({
             </div>
           )}
 
-          <div className="py-4">
-            <Etiqueta icono={IconCard} texto="Método de pago" />
+          <div
+            ref={seccionMetodoPagoRef}
+            className={
+              "py-4 transition-colors " +
+              (resaltarMetodoPago && faltaMetodoPago ? "-mx-5 rounded-lg bg-red-50 px-5 ring-2 ring-red-400" : "")
+            }
+          >
+            <Etiqueta icono={IconCard} texto="¿Cómo ha pagado? (obligatorio)" />
             {cubiertoDelTodoPorBono ? (
               <p className="rounded-lg bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
                 Pagado con el bono — no hace falta elegir método de pago.
@@ -933,9 +953,18 @@ export default function FinalizarCitaModal({
           <button
             disabled={guardando || !pagoRepartidoValido}
             onClick={guardar}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white hover:bg-stone-800 disabled:opacity-50"
+            className={
+              "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide disabled:opacity-50 " +
+              (faltaMetodoPago
+                ? "border-2 border-dashed border-stone-300 bg-white text-stone-500"
+                : "bg-stone-900 text-white hover:bg-stone-800")
+            }
           >
-            {guardando ? "Cobrando…" : `Cobrar ${euros(totalACobrarCentimos)} €`}
+            {guardando
+              ? "Cobrando…"
+              : faltaMetodoPago
+                ? "Elige cómo ha pagado"
+                : `Cobrar ${euros(totalACobrarCentimos)} €`}
           </button>
           <button onClick={onCerrar} className="rounded-xl px-4 py-2.5 text-sm font-medium text-stone-500 hover:bg-stone-100">
             Cancelar
