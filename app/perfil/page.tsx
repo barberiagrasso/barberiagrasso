@@ -8,6 +8,7 @@ import { BonosSection } from "./BonosSection";
 import { precioCitaCentimos } from "@/lib/precios";
 import { bonosDelCliente } from "@/lib/bonos";
 import { cargarResenasExternas } from "@/lib/portafolio";
+import { fechaCaducidadGrassoCoins } from "@/lib/fidelizacion";
 import { construirRecibo } from "@/lib/recibo";
 import { minutosAgendaExtras } from "@/lib/duracionExtras";
 
@@ -58,10 +59,11 @@ export default async function PerfilPage() {
   // después) — el acceso ya está comprobado arriba por requireCliente(),
   // y aquí solo se piden citas de ESE cliente, nunca de otro.
   const admin = createAdminClient();
-  const [bonos, resenasExternas, { data: sedesContacto }] = await Promise.all([
+  const [bonos, resenasExternas, { data: sedesContacto }, caducanCoins] = await Promise.all([
     bonosDelCliente(admin, cliente.id),
     cargarResenasExternas(admin),
     admin.from("sedes").select("id, telefono"),
+    (cliente.grassocoins ?? 0) > 0 ? fechaCaducidadGrassoCoins(admin, cliente.id) : Promise.resolve(null),
   ]);
   // Tras valorar una visita se invita a TODOS a dejar la reseña también en
   // Google (enlace de su sede), y si la nota es baja se ofrece además
@@ -94,7 +96,7 @@ export default async function PerfilPage() {
   const idsCompletadas = citasCrudas.filter((c) => c.estado === "completada").map((c) => c.id);
   const idsSeguro = idsCompletadas.length ? idsCompletadas : ["00000000-0000-0000-0000-000000000000"];
   const [{ data: productosCrudos }, { data: pagosCrudos }] = await Promise.all([
-    admin.from("cita_productos").select("cita_id, cantidad, precio_centimos, producto:productos(nombre)").in("cita_id", idsSeguro),
+    admin.from("cita_productos").select("cita_id, cantidad, precio_centimos, grassocoins_canjeados, producto:productos(nombre)").in("cita_id", idsSeguro),
     admin.from("cita_pagos").select("cita_id, metodo, importe_centimos").in("cita_id", idsSeguro),
   ]);
   const productosPorCita = new Map<string, typeof productosCrudos>();
@@ -202,6 +204,11 @@ export default async function PerfilPage() {
             <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tus GrassoCoins</p>
             <p className="mt-0.5 font-mono text-2xl text-brand-yellow">{cliente.grassocoins ?? 0}</p>
             <p className="mt-1 font-body text-xs text-brand-white-dim">1 GrassoCoin por cada euro · canjéalas por servicios</p>
+            {caducanCoins && (
+              <p className="mt-0.5 font-body text-[11px] text-brand-white-dim/70">
+                Caducan el {caducanCoins.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Madrid" })} si no vienes antes
+              </p>
+            )}
           </div>
           <span className="font-body text-sm text-brand-white-dim">Ver tarjeta →</span>
         </Link>

@@ -99,6 +99,8 @@ interface ExtraCrudo {
 interface ProductoCrudo {
   cantidad: number;
   precio_centimos: number;
+  // > 0 si el cliente se lo llevó canjeando GrassoCoins (la línea va a 0 €).
+  grassocoins_canjeados?: number | null;
   producto: { nombre: string } | { nombre: string }[] | null;
 }
 interface PagoCrudo {
@@ -137,7 +139,12 @@ export function construirRecibo(params: {
   }
   for (const p of productos) {
     const prod = uno(p.producto);
-    lineas.push({ nombre: prod?.nombre ?? "Producto", cantidad: p.cantidad, precioUnitarioCentimos: p.precio_centimos });
+    const coins = p.grassocoins_canjeados ?? 0;
+    lineas.push({
+      nombre: (prod?.nombre ?? "Producto") + (coins > 0 ? ` (canjeado con ${coins} GrassoCoins)` : ""),
+      cantidad: p.cantidad,
+      precioUnitarioCentimos: p.precio_centimos,
+    });
   }
 
   // Mismo criterio que comisiones/informes (ver lib/precios.ts): el
@@ -193,7 +200,7 @@ export async function obtenerDatosRecibo(supabase: SupabaseClient, citaId: strin
 
   const [{ data: extras }, { data: productos }, { data: pagos }] = await Promise.all([
     supabase.from("cita_extras").select("precio_centimos, servicio:servicios(nombre)").eq("cita_id", citaId),
-    supabase.from("cita_productos").select("cantidad, precio_centimos, producto:productos(nombre)").eq("cita_id", citaId),
+    supabase.from("cita_productos").select("cantidad, precio_centimos, grassocoins_canjeados, producto:productos(nombre)").eq("cita_id", citaId),
     supabase.from("cita_pagos").select("metodo, importe_centimos").eq("cita_id", citaId),
   ]);
 

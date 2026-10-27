@@ -33,6 +33,8 @@ interface Producto {
   categoria: string | null;
   precio_centimos: number;
   activo: boolean;
+  // Precio en GrassoCoins (null = no se puede canjear).
+  coste_grassocoins?: number | null;
 }
 interface Cita {
   id: string;
@@ -132,6 +134,10 @@ export default function FinalizarCitaModal({
   const [productos, setProductos] = useState<Producto[]>([]);
   const [productosElegidos, setProductosElegidos] = useState<Map<string, number>>(new Map());
   const [productoParaAnadir, setProductoParaAnadir] = useState("");
+  // Productos (o merch) que el cliente se lleva canjeando GrassoCoins en
+  // vez de pagarlos: la línea entera, todas sus unidades.
+  const [productosCanjeados, setProductosCanjeados] = useState<Set<string>>(new Set());
+  const [coinsCliente, setCoinsCliente] = useState(0);
   // Uno o varios métodos de pago a la vez, repartidos en % cuando hay más
   // de uno (p. ej. 80% efectivo, 20% tarjeta) — pedido de Diego
   // (20/09/2026). "bono" es siempre exclusivo con los demás (ver
@@ -171,6 +177,10 @@ export default function FinalizarCitaModal({
       fetch(`/api/admin/clientes/${cita.cliente.id}/bonos`)
         .then((r) => r.json())
         .then((j) => setBonos(j.bonos ?? []));
+      fetch(`/api/admin/clientes/${cita.cliente.id}/grassocoins`)
+        .then((r) => r.json())
+        .then((j) => setCoinsCliente(Number(j.grassocoins) || 0))
+        .catch(() => setCoinsCliente(0));
     }
   }, [sedeId, fechaOriginal, cita.cliente?.id]);
 
@@ -251,6 +261,31 @@ export default function FinalizarCitaModal({
       const copia = new Map(prev);
       if (cantidad <= 0) copia.delete(id);
       else copia.set(id, cantidad);
+      return copia;
+    });
+    // Al cambiar unidades de un producto canjeado, se deja de canjear: así
+    // nunca se canjean más coins de las que el barbero ha visto.
+    setProductosCanjeados((prev) => {
+      if (!prev.has(id)) return prev;
+      const copia = new Set(prev);
+      copia.delete(id);
+      return copia;
+    });
+  }
+
+  function coinsDeLinea(id: string): number {
+    const p = productos.find((x) => x.id === id);
+    return (p?.coste_grassocoins ?? 0) * (productosElegidos.get(id) ?? 0);
+  }
+
+  const coinsUsadasEnProductos = Array.from(productosCanjeados).reduce((acc, id) => acc + coinsDeLinea(id), 0);
+  const coinsLibres = coinsCliente - coinsUsadasEnProductos;
+
+  function alternarCanjeProducto(id: string) {
+    setProductosCanjeados((prev) => {
+      const copia = new Set(prev);
+      if (copia.has(id)) copia.delete(id);
+      else copia.add(id);
       return copia;
     });
   }
@@ -387,10 +422,12 @@ export default function FinalizarCitaModal({
   const totalProductosCentimos = useMemo(() => {
     let total = 0;
     for (const [id, cantidad] of productosElegidos) {
+      // Los canjeados con GrassoCoins no se cobran.
+      if (productosCanjeados.has(id)) continue;
       total += (productos.find((p) => p.id === id)?.precio_centimos ?? 0) * cantidad;
     }
     return total;
-  }, [productos, productosElegidos]);
+  }, [productos, productosElegidos, productosCanjeados]);
 
   // Remanente que sí hay que cobrar de verdad cuando el servicio lo cubre
   // un bono: los complementos y los productos. Si es 0, no hace falta que
@@ -453,7 +490,11 @@ export default function FinalizarCitaModal({
         inicioISO: isoDesdeMadrid(fechaOriginal, horaInicio),
         finISO: isoDesdeMadrid(fechaOriginal, horaFin),
         extrasServicioIds: extrasIds,
-        productos: Array.from(productosElegidos.entries()).map(([productoId, cantidad]) => ({ productoId, cantidad })),
+        productos: Array.from(productosElegidos.entries()).map(([productoId, cantidad]) => ({
+          productoId,
+          cantidad,
+          canjearGrassoCoins: productosCanjeados.has(productoId),
+        })),
         metodoPago: metodoPagoAEnviar,
         ...(pagosAEnviar ? { pagos: pagosAEnviar } : {}),
         bono,
@@ -668,16 +709,44 @@ export default function FinalizarCitaModal({
                 Añadir
               </button>
             </div>
-            <p className="mt-1.5 text-xs text-stone-400">No se ven ni se venden desde la app del cliente.</p>
+            {coinsCliente > 0 && (
+              <p className="mt-1.5 text-xs text-amber-700">
+                El cliente tiene {coinsCliente} GrassoCoins: puede canjear productos o merch que tengan precio en coins.
+              </p>
+            )}
             {productosElegidos.size > 0 && (
               <ul className="mt-2 space-y-1.5">
                 {Array.from(productosElegidos.entries()).map(([id, cantidad]) => {
                   const p = productos.find((x) => x.id === id);
                   if (!p) return null;
                   return (
-                    <li key={id} className="flex items-center justify-between rounded-lg bg-stone-50 px-3 py-1.5 text-sm text-stone-700">
-                      <span>
-                        {p.nombre} · {euros(p.precio_centimos)}€
+                    <li key={id} className="flex flex-wrap items-center justify-between gap-y-1 rounded-lg bg-stone-50 px-3 py-1.5 text-sm text-stone-700">
+                      <span className="flex flex-col">
+                        <span className={productosCanjeados.has(id) ? "line-through opacity-50" : ""}>
+                          {p.nombre} · {euros(p.precio_centimos)}€
+                        </span>
+                        {p.coste_grassocoins ? (
+                          productosCanjeados.has(id) ? (
+                            <button
+                              type="button"
+                              onClick={() => alternarCanjeProducto(id)}
+                              className="w-fit text-xs font-semibold text-amber-700 underline"
+                            >
+                              Canjeado con {coinsDeLinea(id)} coins · quitar
+                            </button>
+                          ) : coinsCliente > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => alternarCanjeProducto(id)}
+                              disabled={coinsDeLinea(id) > coinsLibres}
+                              className="w-fit text-xs font-medium text-amber-700 underline disabled:cursor-not-allowed disabled:text-stone-400 disabled:no-underline"
+                            >
+                              {coinsDeLinea(id) > coinsLibres
+                                ? `Cuesta ${coinsDeLinea(id)} coins (no le llegan)`
+                                : `Canjear con ${coinsDeLinea(id)} coins`}
+                            </button>
+                          ) : null
+                        ) : null}
                       </span>
                       <div className="flex items-center gap-2">
                         <button

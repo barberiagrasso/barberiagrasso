@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { reducirFoto } from "@/lib/imagenes";
 
 interface Producto {
   id: string;
@@ -11,6 +12,17 @@ interface Producto {
   activo: boolean;
   stock: number | null;
   stock_minimo: number | null;
+  // Merch / tienda de la app y GrassoCoins (27/10/2026).
+  coste_grassocoins?: number | null;
+  visible_en_app?: boolean;
+  descripcion?: string | null;
+  foto_url?: string | null;
+}
+
+// Vacío o 0 = no se puede canjear (null).
+function coinsDesdeTexto(texto: string): number | null {
+  const n = parseInt(texto, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Los grupos ya usados en el catálogo inicial, para que Diego pueda
@@ -25,6 +37,7 @@ const CATEGORIAS_CONOCIDAS = [
   "Barba y afeitado",
   "Prótesis y fibra capilar",
   "Accesorios",
+  "Merch Grasso",
 ];
 
 function euros(centimos: number) {
@@ -127,8 +140,36 @@ function FilaProducto({
   const [orden, setOrden] = useState(String(producto.orden));
   const [stock, setStock] = useState(producto.stock === null ? "" : String(producto.stock));
   const [stockMinimo, setStockMinimo] = useState(producto.stock_minimo === null ? "" : String(producto.stock_minimo));
+  const [coinsTexto, setCoinsTexto] = useState(producto.coste_grassocoins ? String(producto.coste_grassocoins) : "");
+  const [visibleEnApp, setVisibleEnApp] = useState(Boolean(producto.visible_en_app));
+  const [descripcion, setDescripcion] = useState(producto.descripcion ?? "");
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [fotoUrl, setFotoUrl] = useState(producto.foto_url ?? null);
+  const inputFotoRef = useRef<HTMLInputElement>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function subirFoto(archivo: File | undefined) {
+    if (!archivo) return;
+    setSubiendoFoto(true);
+    setError(null);
+    try {
+      const imagenBase64 = await reducirFoto(archivo, 1200);
+      const res = await fetch(`/api/admin/productos/${producto.id}/foto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imagenBase64 }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "No se pudo subir la foto.");
+      setFotoUrl(json.producto?.foto_url ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo subir la foto.");
+    } finally {
+      setSubiendoFoto(false);
+      if (inputFotoRef.current) inputFotoRef.current.value = "";
+    }
+  }
 
   async function guardar() {
     setGuardando(true);
@@ -140,6 +181,9 @@ function FilaProducto({
       orden: parseInt(orden, 10) || 0,
       stock: stock.trim() === "" ? null : parseInt(stock, 10) || 0,
       stock_minimo: stockMinimo.trim() === "" ? null : parseInt(stockMinimo, 10) || 0,
+      coste_grassocoins: coinsDesdeTexto(coinsTexto),
+      visible_en_app: visibleEnApp,
+      descripcion: descripcion.trim() || null,
     });
     setGuardando(false);
     if (res.ok) {
@@ -163,6 +207,10 @@ function FilaProducto({
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
             <span>{euros(producto.precio_centimos)}€</span>
+            {producto.coste_grassocoins ? <span>· {producto.coste_grassocoins} GrassoCoins</span> : null}
+            {producto.visible_en_app && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">En la tienda de la app</span>
+            )}
             {producto.stock !== null && (
               <span
                 className={
@@ -219,6 +267,49 @@ function FilaProducto({
           </option>
         ))}
       </select>
+      <label className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
+        <span>Precio en GrassoCoins:</span>
+        <input
+          value={coinsTexto}
+          onChange={(e) => setCoinsTexto(e.target.value.replace(/[^0-9]/g, ""))}
+          inputMode="numeric"
+          placeholder="vacío = no se canjea"
+          className="w-40 rounded border border-stone-300 p-2 text-sm"
+        />
+        <span className="text-xs text-stone-400">
+          Al 5 %: {Math.ceil((parseFloat(precio.replace(",", ".")) || 0) * 20)} coins
+        </span>
+      </label>
+      <label className="flex items-center gap-2 text-sm text-stone-600">
+        <input type="checkbox" checked={visibleEnApp} onChange={(e) => setVisibleEnApp(e.target.checked)} className="accent-brand-yellow" />
+        Mostrar en la tienda de la app (los clientes lo ven con su precio y su precio en coins)
+      </label>
+      {visibleEnApp && (
+        <div className="space-y-2 rounded border border-stone-200 bg-white p-2">
+          <input
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Descripción corta para la tienda (opcional)"
+            maxLength={300}
+            className="w-full rounded border border-stone-300 p-2 text-sm"
+          />
+          <div className="flex items-center gap-3">
+            {fotoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={fotoUrl} alt={producto.nombre} className="h-14 w-14 rounded object-cover" />
+            )}
+            <input ref={inputFotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => subirFoto(e.target.files?.[0])} />
+            <button
+              type="button"
+              disabled={subiendoFoto}
+              onClick={() => inputFotoRef.current?.click()}
+              className="rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:border-stone-400 disabled:opacity-50"
+            >
+              {subiendoFoto ? "Subiendo…" : fotoUrl ? "Cambiar foto" : "Subir foto"}
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-3">
         <button disabled={guardando} onClick={guardar} className="rounded-none bg-brand-black px-3 py-1.5 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">
@@ -253,6 +344,8 @@ function NuevoProductoForm({ onCreado }: { onCreado: () => void }) {
       body: JSON.stringify({
         nombre,
         precio_centimos: Math.round(parseFloat(precio.replace(",", ".")) * 100),
+        // Nace canjeable al 5 % (20 coins por euro); se cambia al editarlo.
+        coste_grassocoins: Math.ceil((parseFloat(precio.replace(",", ".")) || 0) * 20) || null,
         categoria: categoria || null,
         orden: parseInt(orden, 10) || 0,
       }),

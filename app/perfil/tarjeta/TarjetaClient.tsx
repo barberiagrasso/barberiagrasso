@@ -6,6 +6,8 @@ import { formatearGrassoCoins } from "@/lib/grassocoins";
 interface Props {
   nombre: string;
   grassocoins: number;
+  // "27 de abril de 2027": hasta cuándo valen si no vuelve antes (null = sin coins).
+  caducanTexto?: string | null;
   walletAppleDisponible: boolean;
   walletGoogleDisponible: boolean;
 }
@@ -23,7 +25,7 @@ const ALTO = 620;
  * necesita ninguna cuenta de desarrollador ni backend: se genera entera
  * en el navegador del cliente.
  */
-export default function TarjetaClient({ nombre, grassocoins, walletAppleDisponible, walletGoogleDisponible }: Props) {
+export default function TarjetaClient({ nombre, grassocoins, caducanTexto = null, walletAppleDisponible, walletGoogleDisponible }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [lista, setLista] = useState(false);
   const [descargando, setDescargando] = useState(false);
@@ -182,8 +184,16 @@ export default function TarjetaClient({ nombre, grassocoins, walletAppleDisponib
         </p>
         <p className="mt-1">
           Ganas 1 GrassoCoin por cada euro que pagas, en servicios y en productos. Canjéalas por servicios al
-          reservar tu cita.
+          reservar tu cita, o por productos y merch en la barbería.
         </p>
+        {caducanTexto && (
+          <p className="mt-1 text-xs">
+            Si pasas 6 meses sin venir, las pierdes: las tuyas valen hasta el {caducanTexto}.
+          </p>
+        )}
+        <a href="/tienda" className="mt-2 inline-block font-semibold text-brand-yellow underline decoration-brand-yellow/40 underline-offset-4">
+          Ver la tienda →
+        </a>
       </div>
 
       <button

@@ -62,7 +62,7 @@ async function cargarCitas(supabase: Supa, desde: string, hasta: string): Promis
   const crudas = await todasLasFilas<CitaFila>((a, b) =>
     supabase
       .from("citas")
-      .select("id, profesional_id, sede_id, cliente_id, inicio, fin, saldo_canjeado_centimos, precio_final_centimos, bono_id, descuento_porcentaje, servicio:servicios(precio_centimos)")
+      .select("id, profesional_id, sede_id, cliente_id, inicio, fin, saldo_canjeado_centimos, precio_final_centimos, bono_id, descuento_porcentaje, grassocoins_canjeados, servicio:servicios(precio_centimos)")
       .eq("estado", "completada")
       .is("recibo_anulado_at", null)
       .not("profesional_id", "is", null)

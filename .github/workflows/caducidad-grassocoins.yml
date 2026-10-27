@@ -1,0 +1,33 @@
+# Caducidad de las GrassoCoins: una vez al día, quien lleva 6 meses sin
+# venir pierde sus coins (ver app/api/cron/caducar-grassocoins).
+#
+# Reutiliza los mismos dos secretos que el resto de tareas programadas
+# (CRON_SECRET y APP_URL): no hace falta configurar nada nuevo en GitHub.
+
+name: Caducidad de GrassoCoins
+
+on:
+  schedule:
+    # 03:30 UTC ≈ 4:30-5:30 de la madrugada en España, sin coincidir con la
+    # copia de seguridad (03:00).
+    - cron: "30 3 * * *"
+  workflow_dispatch: {} # permite lanzarla a mano desde la pestaña Actions, para probar
+
+jobs:
+  caducar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a /api/cron/caducar-grassocoins
+        run: |
+          curl --fail --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/caducar-grassocoins" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Avisar si algo ha fallado
+        if: failure()
+        run: |
+          curl --silent --show-error \
+            -X POST "${{ secrets.APP_URL }}/api/cron/aviso-fallo" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"origen":"fidelizacion"}' || true

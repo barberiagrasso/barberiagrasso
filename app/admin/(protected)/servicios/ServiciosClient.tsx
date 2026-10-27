@@ -221,7 +221,9 @@ function FilaServicio({
           placeholder="vacío = no se canjea"
           className="w-40 rounded border border-stone-300 p-2 text-sm"
         />
-        <span className="text-xs text-stone-400">El cliente gana 1 coin por cada euro. Ej.: corte de 16 € a 160 coins = devuelves un 10 %.</span>
+        <span className="text-xs text-stone-400">
+          Al 5 %: {Math.ceil((parseFloat(precio.replace(",", ".")) || 0) * 20)} coins (el cliente gana 1 coin por euro).
+        </span>
       </label>
       <input
         value={descripcion}
@@ -343,7 +345,9 @@ function NuevoServicioForm({ onCreado }: { onCreado: () => void }) {
           placeholder="vacío = no se canjea"
           className="w-40 rounded border border-stone-300 p-2 text-sm"
         />
-        <span className="text-xs text-stone-400">El cliente gana 1 coin por cada euro. Ej.: corte de 16 € a 160 coins = devuelves un 10 %.</span>
+        <span className="text-xs text-stone-400">
+          Al 5 %: {Math.ceil((parseFloat(precio.replace(",", ".")) || 0) * 20)} coins (el cliente gana 1 coin por euro).
+        </span>
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button disabled={enviando} onClick={crear} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">

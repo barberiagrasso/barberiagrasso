@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sincronizarCitaHubSpot } from "@/lib/hubspot";
-import { acumularPorCitaCompletada } from "@/lib/fidelizacion";
+import {
+  acumularPorCitaCompletada,
+  canjearGrassoCoinsProductos,
+  devolverGrassoCoinsPorErrorDeCobro,
+  GrassoCoinsInsuficientesError,
+} from "@/lib/fidelizacion";
 import { registrarError } from "@/lib/errorLog";
 import { comprarBono, canjearUsoBono, BonoNoDisponibleError } from "@/lib/bonos";
 import { precioCitaCentimos } from "@/lib/precios";
@@ -12,6 +17,8 @@ export const dynamic = "force-dynamic";
 interface ProductoElegido {
   productoId: string;
   cantidad: number;
+  // true = el cliente se lo lleva canjeando GrassoCoins en vez de pagarlo.
+  canjearGrassoCoins?: boolean;
 }
 
 const METODOS_PAGO_VALIDOS = new Set(["efectivo", "tarjeta", "bizum", "bono", "otro"]);
@@ -89,7 +96,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const productosElegidos: ProductoElegido[] = Array.isArray(body?.productos)
     ? body.productos
         .filter((p: unknown): p is ProductoElegido => Boolean(p && typeof (p as ProductoElegido).productoId === "string"))
-        .map((p: ProductoElegido) => ({ productoId: p.productoId, cantidad: Math.max(1, Math.round(Number(p.cantidad) || 1)) }))
+        .map((p: ProductoElegido) => ({
+          productoId: p.productoId,
+          cantidad: Math.max(1, Math.round(Number(p.cantidad) || 1)),
+          canjearGrassoCoins: p.canjearGrassoCoins === true,
+        }))
     : [];
   const metodoPago: string | null = typeof body?.metodoPago === "string" && METODOS_PAGO_VALIDOS.has(body.metodoPago) ? body.metodoPago : null;
   // Pago repartido entre varios métodos (checkout, ver FinalizarCitaModal.tsx
@@ -212,18 +223,49 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }));
   }
 
-  let productosParaGuardar: { producto_id: string; cantidad: number; precio_centimos: number }[] = [];
+  // Un producto canjeado con GrassoCoins se guarda a 0 € (no se cobró) y
+  // con las coins que costó: así caja, informes, comisiones y coins
+  // ganadas cuadran sin tratarlo aparte en cada sitio.
+  let productosParaGuardar: {
+    producto_id: string;
+    cantidad: number;
+    precio_centimos: number;
+    grassocoins_canjeados: number;
+  }[] = [];
   if (productosElegidos.length > 0) {
     const ids = productosElegidos.map((p) => p.productoId);
-    const { data: productosCatalogo } = await supabase.from("productos").select("id, precio_centimos").in("id", ids);
-    const precioPorId = new Map((productosCatalogo ?? []).map((p) => [p.id, p.precio_centimos]));
-    productosParaGuardar = productosElegidos
-      .filter((p) => precioPorId.has(p.productoId))
-      .map((p) => ({
+    const { data: productosCatalogo } = await supabase
+      .from("productos")
+      .select("id, nombre, precio_centimos, coste_grassocoins")
+      .in("id", ids);
+    const catalogoPorId = new Map(
+      ((productosCatalogo ?? []) as { id: string; nombre: string; precio_centimos: number; coste_grassocoins: number | null }[]).map(
+        (p) => [p.id, p],
+      ),
+    );
+    for (const p of productosElegidos) {
+      const catalogo = catalogoPorId.get(p.productoId);
+      if (!catalogo) continue;
+      if (p.canjearGrassoCoins && !catalogo.coste_grassocoins) {
+        return NextResponse.json({ error: `${catalogo.nombre} no se puede canjear con GrassoCoins.` }, { status: 400 });
+      }
+      productosParaGuardar.push({
         producto_id: p.productoId,
         cantidad: p.cantidad,
-        precio_centimos: precioPorId.get(p.productoId)!,
-      }));
+        precio_centimos: p.canjearGrassoCoins ? 0 : catalogo.precio_centimos,
+        grassocoins_canjeados: p.canjearGrassoCoins ? (catalogo.coste_grassocoins ?? 0) * p.cantidad : 0,
+      });
+    }
+  }
+  const coinsProductos = productosParaGuardar.reduce((acc, p) => acc + p.grassocoins_canjeados, 0);
+  // Si el cobro falla después de descontar esas coins, se devuelven (como
+  // ajuste, para no chocar con el reembolso de un canje de servicio).
+  async function devolverCoinsProductosSiHaceFalta() {
+    if (coinsProductos <= 0 || !citaActual) return;
+    await devolverGrassoCoinsPorErrorDeCobro(supabase, {
+      clienteId: citaActual.cliente_id,
+      coins: coinsProductos,
+    });
   }
 
   // Importe exacto de cada método del pago repartido (si lo hay), sobre el
@@ -271,6 +313,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
   }
 
+  // Las coins de los productos canjeados se descuentan ANTES de tocar la
+  // cita: si al cliente ya no le llegan, no se cobra nada a medias.
+  if (coinsProductos > 0) {
+    try {
+      await canjearGrassoCoinsProductos(supabase, {
+        clienteId: citaActual.cliente_id,
+        citaId: id,
+        coins: coinsProductos,
+      });
+    } catch (err) {
+      const mensaje =
+        err instanceof GrassoCoinsInsuficientesError
+          ? "El cliente ya no tiene GrassoCoins suficientes para esos productos."
+          : "No se pudieron canjear las GrassoCoins.";
+      return NextResponse.json({ error: mensaje }, { status: 409 });
+    }
+  }
+
   // El bono se compra o se canjea ANTES de tocar la cita: si esto falla
   // (p. ej. el bono ya se agotó en otra pestaña un segundo antes), la
   // cita se queda tal cual, sin marcar completada ni con nada a medias.
@@ -282,6 +342,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       bonoIdParaCita = bono.id;
       bonoNuevoCreadoId = bono.id;
     } catch {
+      await devolverCoinsProductosSiHaceFalta();
       return NextResponse.json({ error: "No se pudo crear el bono. Revisa el tipo elegido." }, { status: 400 });
     }
   } else if (bonoAccion?.accion === "canjear") {
@@ -289,6 +350,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const bono = await canjearUsoBono(supabase, bonoAccion.bonoId);
       bonoIdParaCita = bono.id;
     } catch (err) {
+      await devolverCoinsProductosSiHaceFalta();
       const mensaje = err instanceof BonoNoDisponibleError ? "Ese bono ya no tiene usos disponibles." : "No se pudo canjear el bono.";
       return NextResponse.json({ error: mensaje }, { status: 409 });
     }
@@ -326,6 +388,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     } else if (bonoAccion?.accion === "canjear") {
       await supabase.rpc("devolver_uso_bono", { p_bono_id: bonoAccion.bonoId });
     }
+    await devolverCoinsProductosSiHaceFalta();
     await registrarError({ origen: "servidor", mensaje: "No se pudo finalizar la cita.", detalle: errorCita });
     return NextResponse.json({ error: "No se pudo guardar la cita." }, { status: 500 });
   }

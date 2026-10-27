@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { registrarError } from "@/lib/errorLog";
 import { precioCitaCentimos } from "@/lib/precios";
-import { CENTIMOS_POR_GRASSOCOIN } from "@/lib/grassocoins";
+import { CENTIMOS_POR_GRASSOCOIN, fechaCaducidadDesde } from "@/lib/grassocoins";
 
 // =====================================================================
 // Tarjeta de fidelidad: GrassoCoins (24/10/2026, sustituye al antiguo
@@ -86,6 +86,85 @@ export async function canjearGrassoCoinsEnCita(
   });
   if (error) throw new GrassoCoinsInsuficientesError(error.message);
   return data as number;
+}
+
+/**
+ * Canjea coins por productos o merch al cobrar una cita (ver
+ * app/api/admin/citas/[id]/finalizar/route.ts). Lanza
+ * GrassoCoinsInsuficientesError si al cliente ya no le llegan.
+ */
+export async function canjearGrassoCoinsProductos(
+  supabase: SupabaseClient,
+  params: { clienteId: string; citaId: string; coins: number },
+): Promise<number> {
+  const { data, error } = await supabase.rpc("registrar_movimiento_grassocoins", {
+    p_cliente_id: params.clienteId,
+    p_cita_id: params.citaId,
+    p_tipo: "canje_producto",
+    p_coins: Math.abs(params.coins),
+    p_nota: "Productos canjeados al cobrar",
+    p_creado_por: "sistema",
+  });
+  if (error) throw new GrassoCoinsInsuficientesError(error.message);
+  return data as number;
+}
+
+/** Devuelve las coins de un canje de productos si el cobro falló después. Nunca lanza. */
+export async function devolverGrassoCoinsPorErrorDeCobro(
+  supabase: SupabaseClient,
+  params: { clienteId: string; coins: number },
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc("registrar_movimiento_grassocoins", {
+      p_cliente_id: params.clienteId,
+      p_cita_id: null,
+      p_tipo: "ajuste_manual",
+      p_coins: Math.abs(params.coins),
+      p_nota: "Devolución: el cobro no se pudo completar",
+      p_creado_por: "sistema",
+    });
+    if (error) throw error;
+  } catch (err) {
+    await registrarError({
+      origen: "fidelizacion",
+      mensaje: "No se pudieron devolver las GrassoCoins de un cobro fallido.",
+      detalle: { ...params, err },
+    });
+  }
+}
+
+/**
+ * Hasta cuándo valen las coins de un cliente si no vuelve antes: 6 meses
+ * desde su última visita (última cita completada) o su último movimiento
+ * de coins, lo más reciente — el mismo criterio que la caducidad de la
+ * base de datos. null si no tiene coins ni actividad.
+ */
+export async function fechaCaducidadGrassoCoins(supabase: SupabaseClient, clienteId: string): Promise<Date | null> {
+  try {
+    const [{ data: cita }, { data: movimiento }] = await Promise.all([
+      supabase
+        .from("citas")
+        .select("inicio")
+        .eq("cliente_id", clienteId)
+        .eq("estado", "completada")
+        .order("inicio", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("grassocoins_movimientos")
+        .select("created_at")
+        .eq("cliente_id", clienteId)
+        .neq("tipo", "caducidad")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const fechas = [cita?.inicio, movimiento?.created_at].filter(Boolean).map((f) => new Date(f as string).getTime());
+    if (fechas.length === 0) return null;
+    return fechaCaducidadDesde(new Date(Math.max(...fechas)));
+  } catch {
+    return null;
+  }
 }
 
 /** Total de productos vendidos en una cita (cantidad × precio). */

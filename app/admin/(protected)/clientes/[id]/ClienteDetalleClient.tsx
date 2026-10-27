@@ -16,7 +16,7 @@ interface Cliente {
 
 interface Movimiento {
   id: string;
-  tipo: "acumulacion" | "canje" | "reembolso" | "ajuste_manual";
+  tipo: "acumulacion" | "canje" | "canje_producto" | "reembolso" | "ajuste_manual" | "caducidad";
   coins: number;
   gasto_centimos: number | null;
   coins_resultantes: number;
@@ -37,8 +37,10 @@ interface CitaResumen {
 
 const ETIQUETA_TIPO: Record<Movimiento["tipo"], string> = {
   acumulacion: "Ganadas al cobrar",
-  canje: "Canje",
+  canje: "Canje de cita",
+  canje_producto: "Canje de productos",
   reembolso: "Devueltas (cancelación)",
+  caducidad: "Caducadas (6 meses sin venir)",
   ajuste_manual: "Ajuste manual",
 };
 

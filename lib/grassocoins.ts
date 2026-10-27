@@ -17,6 +17,20 @@ export const CENTIMOS_POR_GRASSOCOIN = EUROS_POR_GRASSOCOIN * 100;
 
 export const NOMBRE_GRASSOCOINS = "GrassoCoins";
 
+/**
+ * Si un cliente pasa este tiempo sin venir, pierde sus coins (decisión de
+ * Diego, 27/10/2026). La caducidad la hace una tarea diaria, ver
+ * app/api/cron/caducar-grassocoins.
+ */
+export const MESES_CADUCIDAD_GRASSOCOINS = 6;
+
+/** Fecha en que caducan las coins si el cliente no vuelve antes. */
+export function fechaCaducidadDesde(ultimaActividad: Date): Date {
+  const fecha = new Date(ultimaActividad);
+  fecha.setMonth(fecha.getMonth() + MESES_CADUCIDAD_GRASSOCOINS);
+  return fecha;
+}
+
 /** "1 GrassoCoin" / "3 GrassoCoins". */
 export function formatearGrassoCoins(coins: number): string {
   return `${coins} ${coins === 1 ? "GrassoCoin" : "GrassoCoins"}`;

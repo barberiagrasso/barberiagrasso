@@ -3,7 +3,9 @@ import {
   calcularGrassoCoins,
   centimosParaSiguienteCoin,
   costeGrassoCoinsCita,
+  fechaCaducidadDesde,
   formatearGrassoCoins,
+  MESES_CADUCIDAD_GRASSOCOINS,
   progresoSiguienteCoin,
 } from "./grassocoins";
 
@@ -61,5 +63,13 @@ describe("formatearGrassoCoins", () => {
     expect(formatearGrassoCoins(1)).toBe("1 GrassoCoin");
     expect(formatearGrassoCoins(0)).toBe("0 GrassoCoins");
     expect(formatearGrassoCoins(160)).toBe("160 GrassoCoins");
+  });
+});
+
+describe("caducidad", () => {
+  it("caducan 6 meses después de la última visita", () => {
+    expect(MESES_CADUCIDAD_GRASSOCOINS).toBe(6);
+    const caduca = fechaCaducidadDesde(new Date(2026, 9, 27, 12));
+    expect([caduca.getFullYear(), caduca.getMonth(), caduca.getDate()]).toEqual([2027, 3, 27]);
   });
 });

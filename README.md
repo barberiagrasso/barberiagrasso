@@ -154,6 +154,16 @@ el precio en coins de cada servicio: un corte de 16 € a 160 coins devuelve un 
   servicio y cada extra elegido tienen precio en coins y al cliente le llegan. La cita queda
   pagada entera: al pulsar COBRAR, el barbero ve el aviso y solo cobra productos si los hay.
 - **Si se cancela o no se presenta**: las coins canjeadas se devuelven íntegras.
+- **Devolución del 5 %**: el script rellena el precio en coins de servicios y productos a
+  20 coins por euro (corte de 16 € = 320 coins). Se cambia cuando quieras en Mi barbería.
+- **Comisión del barbero**: en una cita canjeada con coins cobra su comisión normal sobre el
+  precio de catálogo (el premio lo asume la barbería).
+- **Merch y productos**: en el cobro, cada producto con precio en coins se puede canjear
+  ("Canjear con X coins"); la línea se guarda a 0 € y no da coins. Los marcados como
+  "Mostrar en la tienda de la app" (con foto y descripción) salen en `/tienda`.
+- **Caducidad**: si un cliente pasa **6 meses sin venir**, pierde sus coins. Lo hace una tarea
+  diaria (`.github/workflows/caducidad-grassocoins.yml`); el cliente ve en su perfil y en su
+  tarjeta hasta cuándo valen.
 - **Ficha de cada cliente** (`/admin/clientes/[id]`): coins actuales, cuánto le falta para la
   siguiente, histórico completo y un botón para **sumar o restar coins a mano**, siempre con
   motivo obligatorio y quedando registrado quién lo hizo.

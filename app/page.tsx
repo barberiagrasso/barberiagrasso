@@ -94,12 +94,20 @@ export default async function Home() {
           </Link>
         )}
 
-        <Link
-          href="/portafolio"
-          className="mt-4 font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
-        >
-          Ver nuestros trabajos
-        </Link>
+        <div className="mt-4 flex gap-6">
+          <Link
+            href="/portafolio"
+            className="font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
+          >
+            Nuestros trabajos
+          </Link>
+          <Link
+            href="/tienda"
+            className="font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
+          >
+            Tienda
+          </Link>
+        </div>
 
         <Link
           href="/perfil"
