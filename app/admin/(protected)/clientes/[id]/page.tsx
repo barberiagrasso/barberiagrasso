@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { puedeVerTelefonos } from "@/lib/telefono";
 import ClienteDetalleClient from "./ClienteDetalleClient";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClienteDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { admin } = await requireAdmin();
+  const { admin } = await requireRolAdmin();
   const supabase = createAdminClient();
 
   const { data: cliente } = await supabase

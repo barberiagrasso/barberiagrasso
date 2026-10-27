@@ -97,7 +97,7 @@ export default async function ProtectedAdminLayout({
       </header>
       {((escaladasPendientes ?? 0) > 0 ||
         (fallosRecientes ?? 0) > 0 ||
-        (erroresSinResolver ?? 0) > 0 ||
+        (admin.rol === "admin" && (erroresSinResolver ?? 0) > 0) ||
         (admin.rol === "admin" && (vacacionesPendientes ?? 0) > 0)) && (
         <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 print:hidden">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-1 text-sm text-amber-900">
@@ -130,7 +130,7 @@ export default async function ProtectedAdminLayout({
                 asistente de IA en los últimos {DIAS_FALLOS_ASISTENTE} días
               </Link>
             )}
-            {(erroresSinResolver ?? 0) > 0 && (
+            {admin.rol === "admin" && (erroresSinResolver ?? 0) > 0 && (
               <Link
                 href="/admin/errores"
                 className="underline decoration-amber-500 underline-offset-2 hover:text-amber-950"

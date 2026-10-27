@@ -1,9 +1,12 @@
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import ServiciosClient from "./ServiciosClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ServiciosPage() {
+  // Solo el dueño (rol "admin"): un barbero vuelve a la Agenda.
+  await requireRolAdmin();
   const supabase = createAdminClient();
   const { data: servicios } = await supabase
     .from("servicios")

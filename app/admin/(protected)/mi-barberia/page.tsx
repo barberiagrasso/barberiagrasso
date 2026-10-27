@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/adminAuth";
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarBonoTipos } from "@/lib/bonos";
 import MiBarberiaClient from "./MiBarberiaClient";
@@ -7,7 +7,7 @@ import { cargarFotosPortafolio, cargarResenasExternas } from "@/lib/portafolio";
 export const dynamic = "force-dynamic";
 
 export default async function MiBarberiaPage() {
-  const { admin } = await requireAdmin();
+  const { admin } = await requireRolAdmin();
   const esAdmin = admin.rol === "admin";
   const supabase = createAdminClient();
 

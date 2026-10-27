@@ -8,7 +8,20 @@ import { usePathname } from "next/navigation";
 // el menú ni puede entrar a la URL directamente. "Mi barbería" sí la ven
 // los dos roles: dentro, su propia pestaña "Equipo" es la que se oculta
 // para un barbero (ver MiBarberiaClient.tsx).
-const SOLO_ADMIN = new Set(["/admin/campanas", "/admin/plantillas", "/admin/informes", "/admin/bloqueos", "/admin/auditoria"]);
+// Clientes, Mi barbería (servicios, productos, bonos, equipo, sedes y
+// portafolio) y Errores del sistema también son solo del dueño (pedido de
+// Diego, 27/10/2026): los barberos no editan precios ni ven la cartera de
+// clientes.
+const SOLO_ADMIN = new Set([
+  "/admin/campanas",
+  "/admin/plantillas",
+  "/admin/informes",
+  "/admin/bloqueos",
+  "/admin/auditoria",
+  "/admin/clientes",
+  "/admin/mi-barberia",
+  "/admin/errores",
+]);
 
 // Menú más corto que antes (pedido de Diego): Servicios, Productos y
 // Equipo se agruparon en una sola pestaña ("Mi barbería", con sus

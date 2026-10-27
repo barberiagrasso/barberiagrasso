@@ -1,9 +1,12 @@
+import { requireRolAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import ErroresClient from "./ErroresClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ErroresPage() {
+  // Solo el dueño (rol "admin"): un barbero vuelve a la Agenda.
+  await requireRolAdmin();
   const supabase = createAdminClient();
 
   const [{ data: sinResolver }, { data: resueltosRecientes }] = await Promise.all([
