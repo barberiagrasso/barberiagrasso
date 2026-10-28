@@ -21,6 +21,7 @@ const SOLO_ADMIN = new Set([
   "/admin/clientes",
   "/admin/mi-barberia",
   "/admin/errores",
+  "/admin/rendimiento",
 ]);
 
 // Menú más corto que antes (pedido de Diego): Servicios, Productos y
@@ -43,6 +44,7 @@ const NAV = [
   { href: "/admin/campanas", label: "Campañas" },
   { href: "/admin/plantillas", label: "Plantillas" },
   { href: "/admin/informes", label: "Informes" },
+  { href: "/admin/rendimiento", label: "Rendimiento" },
   { href: "/admin/opiniones", label: "Opiniones" },
   { href: "/admin/auditoria", label: "Auditoría" },
   { href: "/admin/errores", label: "Errores" },
