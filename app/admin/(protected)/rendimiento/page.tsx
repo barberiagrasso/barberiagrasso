@@ -14,6 +14,9 @@ export default async function RendimientoPage() {
         Ocupación, productividad por hora y horarios más rentables de cada barbero, con un simulador para comparar
         horarios. Nada de esta pantalla cambia los horarios reales.
       </p>
+      <a href="/admin/importar-horarios" className="mb-4 inline-block text-sm text-stone-700 underline">
+        Pasar a la app los horarios de Booksy →
+      </a>
       <RendimientoClient />
     </div>
   );
