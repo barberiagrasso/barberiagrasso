@@ -74,14 +74,13 @@ describe("generarSlotsParaDia", () => {
       ahora: MUY_ANTES,
     });
 
-    // El turno cierra a las 12:00 local: desde las 10:10 la cuadrícula de
-    // 30' da 10:10, 10:40, 11:10 — la siguiente (11:40) ya no cabe
-    // entera antes del cierre (11:40+30=12:10), así que ese resto de 20
-    // minutos al final del turno se pierde, tal y como describe Diego.
+    // Pedido de David (28/10/2026): tras el hueco exacto de las 10:10 se
+    // vuelve a las horas en punto y y media, para no descuadrar la tarde.
     expect(slots.map((s) => s.hora_inicio)).toEqual([
       "2026-01-15T09:10:00.000Z", // 10:10 local — fin exacto de la cita anterior
-      "2026-01-15T09:40:00.000Z", // 10:40 local
-      "2026-01-15T10:10:00.000Z", // 11:10 local
+      "2026-01-15T09:30:00.000Z", // 10:30 local
+      "2026-01-15T10:00:00.000Z", // 11:00 local
+      "2026-01-15T10:30:00.000Z", // 11:30 local, termina 12:00 justo al cierre
     ]);
   });
 
@@ -126,11 +125,11 @@ describe("generarSlotsParaDia", () => {
     // de 9:30 a 9:45 (local) parte el turno en dos huecos: 9:00-9:30 (un
     // slot a las 9:00; el siguiente de la cuadrícula, 9:30, ya no cabe
     // antes del bloqueo) y 9:45-10:30 (empieza justo al fin del bloqueo,
-    // y el siguiente de la cuadrícula, 10:15, sigue cabiendo).
+    // y luego vuelve a la hora en punto o y media: 10:00).
     expect(slots.map((s) => s.hora_inicio)).toEqual([
       "2026-01-15T08:00:00.000Z", // 9:00
       "2026-01-15T08:45:00.000Z", // 9:45 (fin exacto del bloqueo)
-      "2026-01-15T09:15:00.000Z", // 10:15
+      "2026-01-15T09:00:00.000Z", // 10:00
     ]);
   });
 

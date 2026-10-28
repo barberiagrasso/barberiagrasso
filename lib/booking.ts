@@ -8,6 +8,7 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { canjearSaldoEnCita, reembolsarSaldoDeCita, saldoDelCliente, SaldoInsuficienteError } from "@/lib/fidelizacion";
 import { fechaDentroDeFlexibilidad, sumarDias } from "@/lib/listaEspera";
 import type { CanalConsentimiento } from "@/lib/types";
+import { minutosAgendaExtras } from "@/lib/duracionExtras";
 
 // Fecha "YYYY-MM-DD" de un instante ISO en la zona horaria del negocio
 // (Europe/Madrid) — la misma noción de "día" que usa lib/availability.ts
@@ -316,7 +317,7 @@ export async function crearReserva(params: CrearReservaParams) {
       .select("id, nombre, duracion_minutos, precio_centimos")
       .in("id", complementoIds);
     if (complementos && complementos.length > 0) {
-      duracionExtraMinutos = complementos.reduce((acc, c) => acc + c.duracion_minutos, 0);
+      duracionExtraMinutos = minutosAgendaExtras(complementos);
       notaComplementos = "Complementos: " + complementos.map((c) => `${c.nombre} (${(c.precio_centimos / 100).toFixed(2)}€)`).join(", ");
       complementosParaGuardar = complementos.map((c) => ({
         servicio_id: c.id,

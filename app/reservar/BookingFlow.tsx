@@ -13,6 +13,7 @@ import { GrassoMark } from "@/components/brand/GrassoMark";
 import { AvatarProfesional } from "@/components/brand/AvatarProfesional";
 import { HojaTrabajosServicio } from "@/components/portafolio/GaleriaTrabajos";
 import type { OpcionPropuestaCita } from "@/lib/asistenteReserva";
+import { minutosAgendaExtras } from "@/lib/duracionExtras";
 
 // Cuántos meses hacia delante del actual se puede navegar en el
 // calendario de reserva (0 = solo el mes en curso).
@@ -572,10 +573,8 @@ export default function BookingFlow({
     () => complementosDisponibles.filter((c) => complementoIds.includes(c.id)),
     [complementosDisponibles, complementoIds],
   );
-  const duracionExtraMinutos = complementosElegidos.reduce(
-    (acc, c) => acc + c.duracion_minutos,
-    0,
-  );
+  // Extras de 5 min o menos (cejas, nariz…) no ocupan agenda: lib/duracionExtras.ts
+  const duracionExtraMinutos = minutosAgendaExtras(complementosElegidos);
   const precioTotalCentimos =
     (servicioSeleccionado?.precio_centimos ?? 0) +
     complementosElegidos.reduce((acc, c) => acc + c.precio_centimos, 0);

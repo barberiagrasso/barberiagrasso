@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvailableSlots, buscarProximoDiaConHueco } from "@/lib/availability";
 import { fechaEnMadrid, horaEnMadrid, minutosDeHora } from "@/lib/horarioLocal";
 import type { FranjaDisponible } from "@/lib/types";
+import { minutosAgendaExtras } from "@/lib/duracionExtras";
 
 // =====================================================================
 // Buscador por texto libre pedido por Diego (25/09/2026), integrado
@@ -258,7 +259,7 @@ export async function proponerCita(
     .filter((c): c is NonNullable<typeof c> => Boolean(c) && c!.id !== servicio.id);
   const complementoIds = complementosResueltos.map((c) => c.id);
   const complementoNombres = complementosResueltos.map((c) => c.nombre);
-  const duracionExtraMinutos = complementosResueltos.reduce((acc, c) => acc + c.duracion_minutos, 0);
+  const duracionExtraMinutos = minutosAgendaExtras(complementosResueltos);
   const precioTotalCentimos = servicio.precio_centimos + complementosResueltos.reduce((acc, c) => acc + c.precio_centimos, 0);
   const precioEsVariable = Boolean(servicio.precio_variable) || complementosResueltos.some((c) => c.precio_variable);
 

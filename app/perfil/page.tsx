@@ -9,6 +9,7 @@ import { precioCitaCentimos } from "@/lib/precios";
 import { bonosDelCliente } from "@/lib/bonos";
 import { cargarResenasExternas } from "@/lib/portafolio";
 import { construirRecibo } from "@/lib/recibo";
+import { minutosAgendaExtras } from "@/lib/duracionExtras";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,7 @@ export default async function PerfilPage() {
       sedeId: cita.sede_id,
       servicioId: cita.servicio_id,
       profesionalId: cita.profesional_elegido_por_cliente ? cita.profesional_id : null,
-      duracionExtraMinutos: extras.reduce((acc, e) => acc + (e.duracion_minutos ?? 0), 0),
+      duracionExtraMinutos: minutosAgendaExtras(extras),
       sedeNombre: uno(cita.sede)?.nombre ?? null,
       servicioNombre: servicio?.nombre ?? "Servicio",
       precioTotalCentimos: total,

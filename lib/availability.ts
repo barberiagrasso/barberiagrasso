@@ -725,6 +725,11 @@ export function generarSlotsParaDia({
       if (cursorLibre < turnoFinUTC) huecos.push({ inicio: cursorLibre, fin: turnoFinUTC });
 
       for (const hueco of huecos) {
+        // El primer hueco empieza justo cuando queda libre (10:10 tras una
+        // cita de 9:30 a 10:10, para no perder minutos — pedido del
+        // 17/09/2026), y a partir de ahí se vuelve a las horas en punto y
+        // y media (10:30, 11:00…). Antes seguía de 30 en 30 desde la hora
+        // rara (14:06, 14:36…) y no salían nunca las horas redondas.
         let cursor = hueco.inicio;
         while (isBefore(addMinutes(cursor, duracionMinutos), addMinutes(hueco.fin, 1))) {
           const slotInicio = cursor;
@@ -736,7 +741,7 @@ export function generarSlotsParaDia({
               profesional_nombre: candidato.nombre,
             });
           }
-          cursor = addMinutes(cursor, SLOT_STEP_MINUTES);
+          cursor = redondearArribaAlPaso(addMinutes(cursor, 1));
         }
       }
     }
@@ -744,6 +749,12 @@ export function generarSlotsParaDia({
 
   resultado.sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
   return resultado;
+}
+
+/** Siguiente :00 o :30 (con SLOT_STEP_MINUTES = 30). Madrid tiene desfase de horas enteras con UTC, así que vale en UTC. */
+function redondearArribaAlPaso(d: Date): Date {
+  const paso = SLOT_STEP_MINUTES * 60_000;
+  return new Date(Math.ceil(d.getTime() / paso) * paso);
 }
 
 function combinarFechaYHora(fecha: string, hora: string): Date {
