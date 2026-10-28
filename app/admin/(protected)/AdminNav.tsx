@@ -36,6 +36,7 @@ const SOLO_ADMIN = new Set([
 // aparecen aquí.
 const NAV = [
   { href: "/admin/dashboard", label: "Agenda" },
+  { href: "/admin/rendimiento", label: "Rendimiento" },
   { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
@@ -44,7 +45,6 @@ const NAV = [
   { href: "/admin/campanas", label: "Campañas" },
   { href: "/admin/plantillas", label: "Plantillas" },
   { href: "/admin/informes", label: "Informes" },
-  { href: "/admin/rendimiento", label: "Rendimiento" },
   { href: "/admin/opiniones", label: "Opiniones" },
   { href: "/admin/auditoria", label: "Auditoría" },
   { href: "/admin/errores", label: "Errores" },
