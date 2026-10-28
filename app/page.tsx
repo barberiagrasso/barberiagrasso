@@ -3,7 +3,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { requireCliente } from "@/lib/clienteAuth";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
-import { AsistenteReservaInicio } from "@/components/reservar/AsistenteReservaInicio";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { BotonCompartir } from "@/components/brand/BotonCompartir";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { cargarResenasExternas } from "@/lib/portafolio";
@@ -17,10 +17,33 @@ export default async function Home() {
   const { cliente } = await requireCliente();
 
   const supabase = createPublicClient();
-  const [{ data: sedes }, resenas] = await Promise.all([
+  const [{ data: sedes }, resenas, { data: ultimas }] = await Promise.all([
     supabase.from("sedes").select("id, nombre, direccion, maps_url").order("nombre"),
     cargarResenasExternas(supabase),
+    // Su última visita, para el botón "Repetir con <barbero>".
+    createAdminClient()
+      .from("citas")
+      .select("sede_id, servicio_id, profesional_id, profesional:profesionales(nombre, activo), servicio:servicios(nombre, activo)")
+      .eq("cliente_id", cliente.id)
+      .eq("estado", "completada")
+      .not("profesional_id", "is", null)
+      .order("inicio", { ascending: false })
+      .limit(1),
   ]);
+
+  // Supabase puede devolver la relación como objeto o como lista.
+  const uno = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+  const ultima = ultimas?.[0];
+  const barberoUltima = uno(ultima?.profesional as { nombre: string; activo: boolean } | { nombre: string; activo: boolean }[] | null);
+  const servicioUltima = uno(ultima?.servicio as { nombre: string; activo: boolean } | { nombre: string; activo: boolean }[] | null);
+  const repetir =
+    ultima && barberoUltima?.activo && servicioUltima?.activo
+      ? {
+          href: `/reservar?${new URLSearchParams({ sede: ultima.sede_id, servicio: ultima.servicio_id, barbero: ultima.profesional_id! })}`,
+          barbero: barberoUltima.nombre.split(" ")[0],
+          servicio: servicioUltima.nombre,
+        }
+      : null;
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-brand-black px-4 py-16 text-center">
@@ -61,9 +84,15 @@ export default async function Home() {
           Reservar cita
         </Link>
 
-        <div className="mt-5 w-full max-w-xs text-left sm:max-w-sm">
-          <AsistenteReservaInicio />
-        </div>
+        {repetir && (
+          <Link
+            href={repetir.href}
+            className="mt-4 flex flex-col items-center rounded-none border border-brand-white/70 px-6 py-2.5 font-body text-brand-white transition-colors hover:bg-brand-white/10"
+          >
+            <span className="text-sm font-semibold uppercase tracking-wide">Repetir con {repetir.barbero}</span>
+            <span className="text-xs text-brand-white-dim">{repetir.servicio}</span>
+          </Link>
+        )}
 
         <Link
           href="/portafolio"

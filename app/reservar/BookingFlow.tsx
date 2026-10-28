@@ -926,6 +926,24 @@ export default function BookingFlow({
   // viene en la URL, se aplica exactamente igual que si se hubiera
   // elegido aquí mismo (elegirPropuestaAsistente) y se limpia la URL
   // para que un refresco de página no la vuelva a aplicar sola.
+  // "Repetir con <barbero>" (botón de la portada): llega con la sede, el
+  // servicio y el barbero de su última visita y salta directo a elegir
+  // día y hora. Solo se aplica si ese servicio sigue existiendo y activo.
+  useEffect(() => {
+    const sede = searchParams.get("sede");
+    const servicio = searchParams.get("servicio");
+    const barbero = searchParams.get("barbero");
+    if (!sede || !servicio || !barbero) return;
+    router.replace("/reservar");
+    if (!sedes.some((s) => s.id === sede) || !servicios.some((s) => s.id === servicio && s.activo)) return;
+    setSedeId(sede);
+    setServicioId(servicio);
+    setComplementoIds([]);
+    setProfesionalId(barbero);
+    setPaso("fecha");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const crudo = searchParams.get("propuesta");
     if (!crudo) return;
