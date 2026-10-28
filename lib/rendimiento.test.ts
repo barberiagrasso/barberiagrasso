@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 import { analizarRendimiento, horarioActual, restar, simularEscenario, type CitaRendimiento, type TurnoSemanal } from "./rendimiento";
 
 const SEDE = "s1";
