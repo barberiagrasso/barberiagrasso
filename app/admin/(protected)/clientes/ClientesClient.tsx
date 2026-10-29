@@ -8,12 +8,8 @@ interface Cliente {
   nombre: string;
   telefono: string | null;
   email: string | null;
-  saldo_fidelizacion_centimos: number;
+  grassocoins: number;
   created_at: string;
-}
-
-function formatearPrecio(centimos: number) {
-  return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }
 
 export default function ClientesClient({ clientesIniciales }: { clientesIniciales: Cliente[] }) {
@@ -55,7 +51,7 @@ export default function ClientesClient({ clientesIniciales }: { clientesIniciale
             <tr className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
               <th className="p-3">Nombre</th>
               <th className="p-3">Teléfono</th>
-              <th className="p-3">Saldo</th>
+              <th className="p-3">GrassoCoins</th>
               <th className="p-3" />
             </tr>
           </thead>
@@ -64,7 +60,7 @@ export default function ClientesClient({ clientesIniciales }: { clientesIniciale
               <tr key={c.id} className="hover:bg-stone-50">
                 <td className="p-3 font-medium text-stone-800">{c.nombre}</td>
                 <td className="p-3 text-stone-600">{c.telefono ?? <span className="italic text-stone-400">Oculto</span>}</td>
-                <td className="p-3 font-mono text-stone-700">{formatearPrecio(c.saldo_fidelizacion_centimos)}</td>
+                <td className="p-3 font-mono text-stone-700">{c.grassocoins ?? 0}</td>
                 <td className="p-3 text-right">
                   <Link href={`/admin/clientes/${c.id}`} className="text-sm font-medium text-brand-yellow-dark hover:underline">
                     Ver ficha →

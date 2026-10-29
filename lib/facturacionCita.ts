@@ -10,6 +10,7 @@ export interface CitaParaFacturacion {
   precio_final_centimos: number | null;
   bono_id: string | null;
   descuento_porcentaje: number | null;
+  grassocoins_canjeados?: number | null;
   servicio: { precio_centimos: number } | { precio_centimos: number }[] | null;
 }
 
@@ -47,8 +48,18 @@ export function ingresoCitaCentimos(
   extrasPorCita: Map<string, number>,
   bonosPorId: Map<string, BonoParaComision>
 ): number {
-  if (c.saldo_canjeado_centimos > 0) return 0;
   const extras = extrasPorCita.get(c.id) ?? 0;
+  // Cita canjeada con GrassoCoins: el barbero cobra su comisión normal
+  // sobre el precio de catálogo (servicio + extras), aunque no entre
+  // dinero en caja — decisión de David (27/10/2026): el barbero hace el
+  // trabajo igual, y el coste del premio lo asume la barbería.
+  if ((c.grassocoins_canjeados ?? 0) > 0) {
+    const servicio = uno(c.servicio);
+    return (servicio?.precio_centimos ?? 0) + extras;
+  }
+  // Saldo antiguo en euros (antes de las GrassoCoins): se queda como
+  // estaba, sin comisión, para no cambiar comisiones ya pagadas.
+  if (c.saldo_canjeado_centimos > 0) return 0;
 
   if (c.bono_id) {
     const bono = bonosPorId.get(c.bono_id);

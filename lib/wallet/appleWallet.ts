@@ -2,7 +2,7 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PKPass } from "passkit-generator";
-import { formatearCentimos } from "@/lib/fidelizacion";
+import { formatearGrassoCoins } from "@/lib/grassocoins";
 
 // =====================================================================
 // Apple Wallet real — generación de un .pkpass firmado con las
@@ -46,7 +46,7 @@ export function appleWalletConfigurado(): boolean {
 interface DatosTarjetaCliente {
   clienteId: string;
   nombre: string;
-  saldoFidelizacionCentimos: number;
+  grassocoins: number;
 }
 
 async function leerAssetApple(nombre: string): Promise<Buffer> {
@@ -85,14 +85,14 @@ export async function generarPaseApple(datos: DatosTarjetaCliente): Promise<Buff
     foregroundColor: "rgb(245, 241, 230)",
     labelColor: "rgb(242, 211, 104)",
     storeCard: {
-      primaryFields: [{ key: "saldo", label: "SALDO DISPONIBLE", value: formatearCentimos(datos.saldoFidelizacionCentimos) }],
+      primaryFields: [{ key: "grassocoins", label: "GRASSOCOINS", value: formatearGrassoCoins(datos.grassocoins) }],
       secondaryFields: [{ key: "nombre", label: "CLIENTE", value: datos.nombre }],
       backFields: [
         {
           key: "info",
           label: "Cómo funciona",
           value:
-            "Acumulas un 10% de lo que gastas en cada cita en Barbería Grasso (Los Molinos y Avenida de las Ciudades). Puedes canjearlo por cualquier servicio cuando el saldo cubra el total.",
+            "Ganas 1 GrassoCoin por cada euro que pagas en Barbería Grasso (Los Molinos y Avenida de las Ciudades), en servicios y en productos. Canjéalas por servicios al reservar.",
         },
       ],
     },

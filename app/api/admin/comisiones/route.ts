@@ -12,6 +12,7 @@ interface CitaFila {
   id: string;
   profesional_id: string | null;
   saldo_canjeado_centimos: number;
+  grassocoins_canjeados?: number | null;
   precio_final_centimos: number | null;
   bono_id: string | null;
   descuento_porcentaje: number | null;
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
   const { data: citasCrudas } = await supabase
     .from("citas")
     .select(
-      "id, profesional_id, saldo_canjeado_centimos, precio_final_centimos, bono_id, descuento_porcentaje, profesional:profesionales(nombre, foto_url), servicio:servicios(precio_centimos)"
+      "id, profesional_id, saldo_canjeado_centimos, grassocoins_canjeados, precio_final_centimos, bono_id, descuento_porcentaje, profesional:profesionales(nombre, foto_url), servicio:servicios(precio_centimos)"
     )
     .eq("estado", "completada")
     // Un recibo anulado y archivado (ver lib/recibo.ts) no debe generar
@@ -132,9 +133,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Venta de productos del mes: siempre cuenta entera (a diferencia de
-  // los servicios, un producto no se puede pagar con saldo de
-  // fidelización, así que no hay nada que restar aquí).
+  // Venta de productos del mes: cuenta lo cobrado. Un producto canjeado
+  // con GrassoCoins se guarda a 0 € (ver finalizar/route.ts), así que ni
+  // suma facturación ni genera comisión: no se vendió, se regaló.
   const { data: productosCrudos } = await supabase
     .from("cita_productos")
     .select("cita_id, cantidad, precio_centimos")

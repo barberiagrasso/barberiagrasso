@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
       activo: body.activo ?? true,
       stock: body.stock ?? null,
       stock_minimo: body.stock_minimo ?? null,
+      visible_en_app: Boolean(body.visible_en_app),
+      descripcion: typeof body.descripcion === "string" ? body.descripcion.trim().slice(0, 300) || null : null,
+      coste_grassocoins:
+        Number.isInteger(body.coste_grassocoins) && body.coste_grassocoins > 0 ? body.coste_grassocoins : null,
     })
     .select("*")
     .single();

@@ -98,7 +98,11 @@ export function ReciboView({ recibo, acciones }: { recibo: DatosRecibo; acciones
           )}
           {recibo.pagadoConSaldoCentimos > 0 && (
             <div className="flex justify-between text-stone-500">
-              <span>Pagado con saldo de fidelización</span>
+              <span>
+                {recibo.grassocoinsCanjeados > 0
+                  ? `Canjeado con ${recibo.grassocoinsCanjeados} ${recibo.grassocoinsCanjeados === 1 ? "GrassoCoin" : "GrassoCoins"}`
+                  : "Pagado con fidelización"}
+              </span>
               <span className="tabular-nums">−{euros(recibo.pagadoConSaldoCentimos)}</span>
             </div>
           )}

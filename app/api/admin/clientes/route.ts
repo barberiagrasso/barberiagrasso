@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   let consulta = supabase
     .from("clientes")
-    .select("id, nombre, telefono, email, saldo_fidelizacion_centimos, created_at")
+    .select("id, nombre, telefono, email, grassocoins, created_at")
     .order("created_at", { ascending: false })
     .limit(50);
 

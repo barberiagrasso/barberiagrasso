@@ -44,7 +44,7 @@ export default async function ProtectedAdminLayout({
     supabase.from("sedes").select("id, nombre").order("nombre"),
     supabase
       .from("servicios")
-      .select("id, nombre, duracion_minutos, precio_centimos")
+      .select("id, nombre, duracion_minutos, precio_centimos, coste_grassocoins")
       .order("nombre"),
     supabase
       .from("conversaciones")

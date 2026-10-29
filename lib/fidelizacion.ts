@@ -2,32 +2,31 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { registrarError } from "@/lib/errorLog";
 import { precioCitaCentimos } from "@/lib/precios";
+import { CENTIMOS_POR_GRASSOCOIN, fechaCaducidadDesde } from "@/lib/grassocoins";
 
 // =====================================================================
-// Programa de fidelización: 10% de lo gastado en cada cita se acumula
-// como saldo, canjeable después por cualquier servicio en cualquiera de
-// las dos sedes SIEMPRE que el saldo cubra el total (no se admite canje
-// parcial). Todo movimiento pasa por la función de base de datos
-// registrar_movimiento_saldo() (ver supabase/actualizar-fidelizacion.sql),
-// que es quien de verdad decide y deja constancia — este archivo es solo
-// la capa de más alto nivel que decide CUÁNDO se llama a esa función y
-// con qué importe.
+// Tarjeta de fidelidad: GrassoCoins (24/10/2026, sustituye al antiguo
+// saldo del 10 % en euros).
+//   * 1 GrassoCoin por cada euro pagado de verdad; los céntimos sobrantes
+//     se guardan para la siguiente visita (ver lib/grassocoins.ts).
+//   * Se ganan al cobrar la cita en el panel, nunca antes, sobre todo lo
+//     que paga el cliente: servicio y extras (con su precio final: el de
+//     efectivo, el descuento o el de un bono que compra) y productos. Al
+//     usar un bono el servicio cuesta 0, así que no da coins: ya las dio
+//     al comprarlo.
+//   * Se canjean por servicios: cada servicio tiene un precio en coins
+//     (servicios.coste_grassocoins). Canjear cubre la cita entera
+//     (servicio + extras), y en ese caso la cita cuenta como "pagada con
+//     fidelización" en recibos, informes y comisiones, igual que antes
+//     con el saldo (saldo_canjeado_centimos = su valor en euros).
+//   * Si una cita canjeada se cancela o no se presenta, se devuelven.
+// Todo movimiento pasa por la función de base de datos
+// registrar_movimiento_grassocoins() (supabase/anadir-grassocoins.sql),
+// que es quien de verdad decide y deja constancia.
 // =====================================================================
 
-export const PORCENTAJE_FIDELIZACION = 0.1;
-
-/** Se lanza cuando un canje no puede completarse porque el saldo ya no alcanza (p. ej. una carrera entre dos peticiones). */
-export class SaldoInsuficienteError extends Error {}
-
-/**
- * Cuánto saldo genera un importe realmente pagado (en efectivo/tarjeta).
- * Redondeo al céntimo más cercano: nunca se generan fracciones de
- * céntimo que no existen en el mundo real.
- */
-export function calcularAcumulacionCentimos(totalPagadoCentimos: number): number {
-  if (!Number.isFinite(totalPagadoCentimos) || totalPagadoCentimos <= 0) return 0;
-  return Math.round(totalPagadoCentimos * PORCENTAJE_FIDELIZACION);
-}
+/** Se lanza cuando un canje no puede completarse porque ya no hay coins suficientes (p. ej. una carrera entre dos peticiones). */
+export class GrassoCoinsInsuficientesError extends Error {}
 
 export function formatearCentimos(centimos: number): string {
   return (centimos / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });
@@ -37,13 +36,9 @@ function esErrorDeDuplicado(err: unknown): boolean {
   return Boolean(err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "23505");
 }
 
-export async function saldoDelCliente(supabase: SupabaseClient, clienteId: string): Promise<number> {
-  const { data } = await supabase
-    .from("clientes")
-    .select("saldo_fidelizacion_centimos")
-    .eq("id", clienteId)
-    .single();
-  return data?.saldo_fidelizacion_centimos ?? 0;
+export async function grassoCoinsDelCliente(supabase: SupabaseClient, clienteId: string): Promise<number> {
+  const { data } = await supabase.from("clientes").select("grassocoins").eq("id", clienteId).single();
+  return data?.grassocoins ?? 0;
 }
 
 interface ServicioConPrecio {
@@ -56,10 +51,7 @@ interface ExtraConPrecio {
 /**
  * Total pagado en una cita ya guardada: precio del servicio + sus
  * complementos, salvo que el barbero haya corregido el precio final a
- * mano al cerrarla (precio_final_centimos, ver lib/precios.ts) — en ese
- * caso manda ese número. Es el mismo cálculo que ya usa app/perfil/page.tsx
- * para enseñar el historial al cliente — aquí centralizado para que el
- * saldo que se acumula use exactamente el mismo número.
+ * mano al cobrarla (precio_final_centimos, ver lib/precios.ts).
  */
 export async function totalCitaCentimos(supabase: SupabaseClient, citaId: string): Promise<number> {
   const { data: cita } = await supabase
@@ -76,92 +68,171 @@ export async function totalCitaCentimos(supabase: SupabaseClient, citaId: string
 }
 
 /**
- * Canjea saldo al confirmar una reserva (llamado desde crearReserva,
- * dentro de lib/booking.ts, cuando el cliente elige pagar con saldo). Se
- * apoya en el índice único de saldo_fidelizacion_movimientos y en la
- * comprobación de saldo>=0 dentro de registrar_movimiento_saldo(): si por
- * una carrera el saldo ya no alcanza en el momento exacto de guardar,
- * lanza SaldoInsuficienteError para que quien llama pueda deshacer la
- * cita recién creada y avisar al cliente, en vez de dejarla a medio
- * pagar.
+ * Canjea coins al confirmar una reserva (llamado desde crearReserva en
+ * lib/booking.ts). Si por una carrera ya no le alcanzan en el momento de
+ * guardar, lanza GrassoCoinsInsuficientesError para que quien llama
+ * deshaga la cita recién creada.
  */
-export async function canjearSaldoEnCita(
+export async function canjearGrassoCoinsEnCita(
   supabase: SupabaseClient,
-  params: { clienteId: string; citaId: string; importeCentimos: number }
+  params: { clienteId: string; citaId: string; coins: number },
 ): Promise<number> {
-  const { data, error } = await supabase.rpc("registrar_movimiento_saldo", {
+  const { data, error } = await supabase.rpc("registrar_movimiento_grassocoins", {
     p_cliente_id: params.clienteId,
     p_cita_id: params.citaId,
     p_tipo: "canje",
-    p_importe_centimos: -Math.abs(params.importeCentimos),
-    p_nota: null,
+    p_coins: Math.abs(params.coins),
     p_creado_por: "sistema",
   });
-  if (error) throw new SaldoInsuficienteError(error.message);
+  if (error) throw new GrassoCoinsInsuficientesError(error.message);
   return data as number;
 }
 
 /**
- * Se llama al marcar una cita como "completada" desde el panel (el único
- * sitio donde esto ocurre — ver app/api/admin/citas/[id]/route.ts). Si la
- * cita se pagó con saldo no se acumula nada (no hubo gasto real que
- * recompensar: sería fidelizar con el propio saldo del cliente). Nunca
- * lanza — un fallo aquí no debe impedir que la cita quede marcada como
- * completada — pero sí queda registrado en errores_sistema para poder
- * arreglarlo a mano desde /admin/clientes si hiciera falta.
+ * Canjea coins por productos o merch al cobrar una cita (ver
+ * app/api/admin/citas/[id]/finalizar/route.ts). Lanza
+ * GrassoCoinsInsuficientesError si al cliente ya no le llegan.
+ */
+export async function canjearGrassoCoinsProductos(
+  supabase: SupabaseClient,
+  params: { clienteId: string; citaId: string; coins: number },
+): Promise<number> {
+  const { data, error } = await supabase.rpc("registrar_movimiento_grassocoins", {
+    p_cliente_id: params.clienteId,
+    p_cita_id: params.citaId,
+    p_tipo: "canje_producto",
+    p_coins: Math.abs(params.coins),
+    p_nota: "Productos canjeados al cobrar",
+    p_creado_por: "sistema",
+  });
+  if (error) throw new GrassoCoinsInsuficientesError(error.message);
+  return data as number;
+}
+
+/** Devuelve las coins de un canje de productos si el cobro falló después. Nunca lanza. */
+export async function devolverGrassoCoinsPorErrorDeCobro(
+  supabase: SupabaseClient,
+  params: { clienteId: string; coins: number },
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc("registrar_movimiento_grassocoins", {
+      p_cliente_id: params.clienteId,
+      p_cita_id: null,
+      p_tipo: "ajuste_manual",
+      p_coins: Math.abs(params.coins),
+      p_nota: "Devolución: el cobro no se pudo completar",
+      p_creado_por: "sistema",
+    });
+    if (error) throw error;
+  } catch (err) {
+    await registrarError({
+      origen: "fidelizacion",
+      mensaje: "No se pudieron devolver las GrassoCoins de un cobro fallido.",
+      detalle: { ...params, err },
+    });
+  }
+}
+
+/**
+ * Hasta cuándo valen las coins de un cliente si no vuelve antes: 6 meses
+ * desde su última visita (última cita completada) o su último movimiento
+ * de coins, lo más reciente — el mismo criterio que la caducidad de la
+ * base de datos. null si no tiene coins ni actividad.
+ */
+export async function fechaCaducidadGrassoCoins(supabase: SupabaseClient, clienteId: string): Promise<Date | null> {
+  try {
+    const [{ data: cita }, { data: movimiento }] = await Promise.all([
+      supabase
+        .from("citas")
+        .select("inicio")
+        .eq("cliente_id", clienteId)
+        .eq("estado", "completada")
+        .order("inicio", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("grassocoins_movimientos")
+        .select("created_at")
+        .eq("cliente_id", clienteId)
+        .neq("tipo", "caducidad")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const fechas = [cita?.inicio, movimiento?.created_at].filter(Boolean).map((f) => new Date(f as string).getTime());
+    if (fechas.length === 0) return null;
+    return fechaCaducidadDesde(new Date(Math.max(...fechas)));
+  } catch {
+    return null;
+  }
+}
+
+/** Total de productos vendidos en una cita (cantidad × precio). */
+export async function totalProductosCitaCentimos(supabase: SupabaseClient, citaId: string): Promise<number> {
+  const { data } = await supabase.from("cita_productos").select("cantidad, precio_centimos").eq("cita_id", citaId);
+  return (data ?? []).reduce(
+    (acc: number, p: { cantidad: number; precio_centimos: number }) => acc + p.cantidad * p.precio_centimos,
+    0,
+  );
+}
+
+/**
+ * Se llama al cobrar una cita en el panel. Da coins por todo lo pagado de
+ * verdad: el servicio (salvo que se canjease con fidelización al reservar,
+ * porque entonces no se pagó) más los productos. Nunca lanza — un fallo
+ * aquí no debe impedir cobrar — pero queda registrado en errores_sistema
+ * para arreglarlo a mano si hiciera falta.
  */
 export async function acumularPorCitaCompletada(
   supabase: SupabaseClient,
-  cita: { id: string; cliente_id: string; saldo_canjeado_centimos: number }
+  cita: { id: string; cliente_id: string; saldo_canjeado_centimos?: number | null; grassocoins_canjeados?: number | null },
 ): Promise<void> {
   try {
-    if (cita.saldo_canjeado_centimos > 0) return;
-    const total = await totalCitaCentimos(supabase, cita.id);
-    const importe = calcularAcumulacionCentimos(total);
-    if (importe <= 0) return;
-    const { error } = await supabase.rpc("registrar_movimiento_saldo", {
+    const servicioCanjeado = (cita.saldo_canjeado_centimos ?? 0) > 0 || (cita.grassocoins_canjeados ?? 0) > 0;
+    const [totalServicio, totalProductos] = await Promise.all([
+      servicioCanjeado ? Promise.resolve(0) : totalCitaCentimos(supabase, cita.id),
+      totalProductosCitaCentimos(supabase, cita.id),
+    ]);
+    const total = totalServicio + totalProductos;
+    if (total <= 0) return;
+    const { error } = await supabase.rpc("registrar_movimiento_grassocoins", {
       p_cliente_id: cita.cliente_id,
       p_cita_id: cita.id,
       p_tipo: "acumulacion",
-      p_importe_centimos: importe,
-      p_nota: null,
+      p_gasto_centimos: total,
+      p_euros_por_coin_centimos: CENTIMOS_POR_GRASSOCOIN,
       p_creado_por: "sistema",
     });
     if (error) throw error;
   } catch (err) {
-    // Ya había un movimiento de acumulación para esta cita (p. ej. un
-    // doble clic en el panel marcándola completada dos veces): el índice
-    // único ya evitó la doble acumulación, que es justo lo que se quería.
+    // Ya se habían dado las coins de esta cita (p. ej. doble clic al
+    // cobrar): el índice único evitó darlas dos veces.
     if (esErrorDeDuplicado(err)) return;
     await registrarError({
       origen: "fidelizacion",
-      mensaje: "No se pudo acumular saldo de fidelización de una cita completada.",
+      mensaje: "No se pudieron dar las GrassoCoins de una cita cobrada.",
       detalle: { citaId: cita.id, err },
     });
   }
 }
 
 /**
- * Se llama al cancelar una cita o marcarla "no presentada" (ver
- * cancelarCita() en lib/booking.ts y el PATCH de
- * app/api/admin/citas/[id]/route.ts). Si la cita se había pagado con
- * saldo, se lo devuelve íntegro al cliente — política deliberadamente
- * no punitiva: cancelar o faltar a una cita no debe costarle el saldo
- * que ya tenía ganado. Nunca lanza, por la misma razón que
- * acumularPorCitaCompletada.
+ * Se llama al cancelar una cita o marcarla "no presentada". Si se había
+ * canjeado con coins, se devuelven íntegras: cancelar o faltar no le
+ * cuesta al cliente las coins que ya tenía ganadas. Nunca lanza.
  */
-export async function reembolsarSaldoDeCita(
+export async function reembolsarGrassoCoinsDeCita(
   supabase: SupabaseClient,
-  cita: { id: string; cliente_id: string; saldo_canjeado_centimos: number }
+  cita: { id: string; cliente_id: string; grassocoins_canjeados?: number | null },
 ): Promise<void> {
   try {
-    if (cita.saldo_canjeado_centimos <= 0) return;
-    const { error } = await supabase.rpc("registrar_movimiento_saldo", {
+    const coins = cita.grassocoins_canjeados ?? 0;
+    if (coins <= 0) return;
+    const { error } = await supabase.rpc("registrar_movimiento_grassocoins", {
       p_cliente_id: cita.cliente_id,
       p_cita_id: cita.id,
       p_tipo: "reembolso",
-      p_importe_centimos: cita.saldo_canjeado_centimos,
-      p_nota: null,
+      p_coins: coins,
       p_creado_por: "sistema",
     });
     if (error) throw error;
@@ -169,28 +240,26 @@ export async function reembolsarSaldoDeCita(
     if (esErrorDeDuplicado(err)) return;
     await registrarError({
       origen: "fidelizacion",
-      mensaje: "No se pudo reembolsar el saldo canjeado de una cita cancelada/no presentada.",
+      mensaje: "No se pudieron devolver las GrassoCoins de una cita cancelada/no presentada.",
       detalle: { citaId: cita.id, err },
     });
   }
 }
 
 /**
- * Ajuste manual desde /admin/clientes (un barbero corrige el saldo de un
- * cliente a mano — por ejemplo, un detalle comercial o para arreglar un
- * error). A diferencia de los movimientos automáticos, este SÍ deja que
- * el error suba a quien llama: si el barbero pide restar más saldo del
- * que hay, tiene que verlo en el panel, no que falle en silencio.
+ * Ajuste manual desde la ficha del cliente en el panel (un detalle
+ * comercial o corregir un error). Este SÍ deja subir el error: si se
+ * intenta restar más coins de las que tiene, el barbero tiene que verlo.
  */
-export async function ajustarSaldoManual(
+export async function ajustarGrassoCoinsManual(
   supabase: SupabaseClient,
-  params: { clienteId: string; importeCentimos: number; nota: string; creadoPor: string }
+  params: { clienteId: string; coins: number; nota: string; creadoPor: string },
 ): Promise<number> {
-  const { data, error } = await supabase.rpc("registrar_movimiento_saldo", {
+  const { data, error } = await supabase.rpc("registrar_movimiento_grassocoins", {
     p_cliente_id: params.clienteId,
     p_cita_id: null,
     p_tipo: "ajuste_manual",
-    p_importe_centimos: params.importeCentimos,
+    p_coins: params.coins,
     p_nota: params.nota || null,
     p_creado_por: params.creadoPor,
   });

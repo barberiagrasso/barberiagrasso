@@ -25,6 +25,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   for (const clave of ["nombre", "categoria", "precio_centimos", "orden", "activo", "stock", "stock_minimo"]) {
     if (clave in body) campos[clave] = body[clave];
   }
+  // Merch / tienda de la app y GrassoCoins (27/10/2026).
+  if ("visible_en_app" in body) campos.visible_en_app = Boolean(body.visible_en_app);
+  if ("descripcion" in body) {
+    campos.descripcion = typeof body.descripcion === "string" ? body.descripcion.trim().slice(0, 300) || null : null;
+  }
+  if ("coste_grassocoins" in body) {
+    const coste = body.coste_grassocoins;
+    if (coste !== null && !(Number.isInteger(coste) && coste > 0)) {
+      return NextResponse.json({ error: "El precio en GrassoCoins tiene que ser un número entero mayor que 0 (o vacío)." }, { status: 400 });
+    }
+    campos.coste_grassocoins = coste;
+  }
   if (Object.keys(campos).length === 0) {
     return NextResponse.json({ error: "No hay campos que actualizar." }, { status: 400 });
   }

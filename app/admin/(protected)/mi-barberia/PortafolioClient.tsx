@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { reducirFoto } from "@/lib/imagenes";
 
 interface Foto {
   id: string;
@@ -13,28 +14,6 @@ interface Foto {
 interface Opcion {
   id: string;
   nombre: string;
-}
-
-// Lado más largo de la foto ya reducida: se ve nítida en cualquier móvil
-// y pesa unos cientos de KB en vez de varios MB.
-const LADO_MAXIMO_PX = 1600;
-const CALIDAD_JPEG = 0.85;
-
-/** Reduce la foto en el navegador y la devuelve como JPEG en base64. */
-async function reducirFoto(archivo: File): Promise<string> {
-  const bitmap = await createImageBitmap(archivo);
-  const escala = Math.min(1, LADO_MAXIMO_PX / Math.max(bitmap.width, bitmap.height));
-  const ancho = Math.round(bitmap.width * escala);
-  const alto = Math.round(bitmap.height * escala);
-  const canvas = document.createElement("canvas");
-  canvas.width = ancho;
-  canvas.height = alto;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Sin canvas");
-  ctx.drawImage(bitmap, 0, 0, ancho, alto);
-  bitmap.close();
-  const dataUrl = canvas.toDataURL("image/jpeg", CALIDAD_JPEG);
-  return dataUrl.split(",")[1] ?? "";
 }
 
 /**

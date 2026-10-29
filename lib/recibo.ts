@@ -48,6 +48,8 @@ export interface DatosRecibo {
   descuentoMotivo: string | null;
   totalCentimos: number;
   pagadoConSaldoCentimos: number;
+  // GrassoCoins canjeadas en esta cita (0 si no se canjeó con coins).
+  grassocoinsCanjeados: number;
   metodoPago: string | null;
   pagosMixtos: PagoRecibo[];
   anulado: { atISO: string; por: string | null; motivo: string | null } | null;
@@ -79,6 +81,7 @@ interface CitaCruda {
   metodo_pago: string | null;
   precio_final_centimos: number | null;
   saldo_canjeado_centimos: number;
+  grassocoins_canjeados?: number | null;
   descuento_porcentaje: number | null;
   descuento_motivo: string | null;
   recibo_anulado_at: string | null;
@@ -96,6 +99,8 @@ interface ExtraCrudo {
 interface ProductoCrudo {
   cantidad: number;
   precio_centimos: number;
+  // > 0 si el cliente se lo llevó canjeando GrassoCoins (la línea va a 0 €).
+  grassocoins_canjeados?: number | null;
   producto: { nombre: string } | { nombre: string }[] | null;
 }
 interface PagoCrudo {
@@ -134,7 +139,12 @@ export function construirRecibo(params: {
   }
   for (const p of productos) {
     const prod = uno(p.producto);
-    lineas.push({ nombre: prod?.nombre ?? "Producto", cantidad: p.cantidad, precioUnitarioCentimos: p.precio_centimos });
+    const coins = p.grassocoins_canjeados ?? 0;
+    lineas.push({
+      nombre: (prod?.nombre ?? "Producto") + (coins > 0 ? ` (canjeado con ${coins} GrassoCoins)` : ""),
+      cantidad: p.cantidad,
+      precioUnitarioCentimos: p.precio_centimos,
+    });
   }
 
   // Mismo criterio que comisiones/informes (ver lib/precios.ts): el
@@ -167,6 +177,7 @@ export function construirRecibo(params: {
     descuentoMotivo: cita.descuento_motivo,
     totalCentimos,
     pagadoConSaldoCentimos: cita.saldo_canjeado_centimos,
+    grassocoinsCanjeados: cita.grassocoins_canjeados ?? 0,
     metodoPago: cita.metodo_pago,
     pagosMixtos,
     anulado: cita.recibo_anulado_at
@@ -176,7 +187,7 @@ export function construirRecibo(params: {
 }
 
 export const SELECT_CITA_RECIBO =
-  "id, inicio, estado, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, cliente:clientes(id, nombre, telefono), sede:sedes(nombre, direccion), profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos)";
+  "id, inicio, estado, pagado_at, metodo_pago, precio_final_centimos, saldo_canjeado_centimos, grassocoins_canjeados, descuento_porcentaje, descuento_motivo, recibo_anulado_at, recibo_anulado_por, recibo_anulado_motivo, cliente:clientes(id, nombre, telefono), sede:sedes(nombre, direccion), profesional:profesionales(nombre), servicio:servicios(nombre, precio_centimos)";
 
 /**
  * Trae y construye el recibo de UNA cita (panel de admin y envío por
@@ -189,7 +200,7 @@ export async function obtenerDatosRecibo(supabase: SupabaseClient, citaId: strin
 
   const [{ data: extras }, { data: productos }, { data: pagos }] = await Promise.all([
     supabase.from("cita_extras").select("precio_centimos, servicio:servicios(nombre)").eq("cita_id", citaId),
-    supabase.from("cita_productos").select("cantidad, precio_centimos, producto:productos(nombre)").eq("cita_id", citaId),
+    supabase.from("cita_productos").select("cantidad, precio_centimos, grassocoins_canjeados, producto:productos(nombre)").eq("cita_id", citaId),
     supabase.from("cita_pagos").select("metodo, importe_centimos").eq("cita_id", citaId),
   ]);
 

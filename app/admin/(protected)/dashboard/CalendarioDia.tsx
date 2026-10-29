@@ -113,6 +113,7 @@ interface Cita {
   // el recibo completo (ver lib/recibo.ts).
   precio_final_centimos?: number | null;
   saldo_canjeado_centimos?: number;
+  grassocoins_canjeados?: number | null;
   recibo_anulado_at?: string | null;
   // Nota de la cita: complementos añadidos y/o el comentario libre que
   // el propio cliente escribió al reservar ("¿algún comentario o
@@ -2079,7 +2080,14 @@ function DetalleCitaPanel({
               </div>
               <div className="text-right">
                 <div className="text-xs text-stone-500">A pagar</div>
-                <div className="text-2xl font-bold text-stone-900">{euros(precioEstimadoCentimos(cita))}</div>
+                <div className="text-2xl font-bold text-stone-900">
+                  {euros((cita.saldo_canjeado_centimos ?? 0) > 0 ? 0 : precioEstimadoCentimos(cita))}
+                </div>
+                {(cita.grassocoins_canjeados ?? 0) > 0 && (
+                  <div className="text-xs font-medium text-amber-700">
+                    Canjeada con {cita.grassocoins_canjeados} {cita.grassocoins_canjeados === 1 ? "GrassoCoin" : "GrassoCoins"}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">

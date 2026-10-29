@@ -134,37 +134,47 @@ que aprender.
   esto respalda los datos día a día. Si alguna vez necesitas restaurar algo desde una de
   estas copias, descarga el archivo del día que te interese y pídeselo a Claude.
 
-### Fidelización: saldo acumulable y tarjeta digital
+### Fidelización: GrassoCoins y tarjeta digital
 
-Cada cliente acumula automáticamente un **10%** de lo que se gasta en cada cita (servicio +
-complementos) como saldo, válido en cualquiera de las dos sedes. Las piezas:
+Cada cliente gana **1 GrassoCoin por cada euro** que paga de verdad (servicios, extras y
+productos), válidas en las dos sedes. Los céntimos sobrantes se guardan para la siguiente
+visita (12,80 € → 12 coins y 0,80 € guardados). Lo generoso que es el programa se decide con
+el precio en coins de cada servicio: un corte de 16 € a 160 coins devuelve un 10 %. Las piezas:
 
-- **Cuándo se acumula**: solo al marcar una cita como **completada** desde `/admin/dashboard`
-  (nunca al reservarla) — así no se premia una cita que luego se cancela o no se presenta.
-  Si la cita se había pagado con saldo, no genera saldo nuevo (no hubo gasto real que
-  recompensar).
-- **Cómo se canjea**: el cliente ve su saldo disponible en el paso de confirmación de
-  `/reservar` (y el barbero, en la cita rápida del panel) y puede marcar "pagar con mi saldo"
-  **solo si el saldo cubre el total exacto** de esa cita — no se admite canje parcial, tal y
-  como pediste. Si no llega, simplemente no aparece la opción.
-- **Si se cancela o no se presenta**: el saldo canjeado se devuelve íntegro al cliente
-  automáticamente — cancelar o faltar a una cita no le debe costar el saldo que ya tenía
-  ganado.
-- **Ficha de cada cliente** (`/admin/clientes/[id]`): saldo actual, histórico completo de
-  movimientos (de dónde salió cada céntimo) y un botón para hacer un **ajuste manual** (p. ej.
-  un detalle comercial), siempre con motivo obligatorio y quedando registrado quién lo hizo.
-- **El asistente de WhatsApp con IA NO puede canjear saldo** — de momento, pagar con saldo
-  solo se puede hacer desde `/reservar` (el cliente, con su sesión iniciada) o desde el panel
-  (un barbero, en persona). Es una decisión deliberada: mover saldo es mover dinero de
-  verdad, y prefiero que eso pase siempre por una sesión de cliente autenticada o por una
-  persona del equipo, nunca por una conversación automática de IA. Si más adelante quieres
-  que la IA también lo ofrezca por WhatsApp, pídeselo a Claude.
+- **Base de datos**: ejecuta una vez `supabase/anadir-grassocoins.sql` en el SQL Editor de
+  Supabase (es re-ejecutable). Todos los clientes empiezan con 0 coins; el saldo antiguo en
+  euros (el 10 %) dejó de usarse el 24/10/2026.
+- **Cuándo se ganan**: solo al **cobrar** la cita desde la Agenda (nunca al reservarla), sobre
+  lo que se paga de verdad: el precio final del servicio y sus extras (el de efectivo, con
+  descuento, o el del bono si lo compra) más los productos. Usar un bono no da coins (ya las
+  dio al comprarlo), y una cita canjeada con coins solo da coins por los productos.
+- **Cómo se canjean**: por servicios. En el panel → **Servicios**, cada servicio tiene un
+  campo **"Precio en GrassoCoins"** (vacío = no se puede canjear). En el último paso de
+  `/reservar` (y en la cita rápida del panel) aparece "Canjear con X GrassoCoins" si el
+  servicio y cada extra elegido tienen precio en coins y al cliente le llegan. La cita queda
+  pagada entera: al pulsar COBRAR, el barbero ve el aviso y solo cobra productos si los hay.
+- **Si se cancela o no se presenta**: las coins canjeadas se devuelven íntegras.
+- **Devolución del 5 %**: el script rellena el precio en coins de servicios y productos a
+  20 coins por euro (corte de 16 € = 320 coins). Se cambia cuando quieras en Mi barbería.
+- **Comisión del barbero**: en una cita canjeada con coins cobra su comisión normal sobre el
+  precio de catálogo (el premio lo asume la barbería).
+- **Merch y productos**: en el cobro, cada producto con precio en coins se puede canjear
+  ("Canjear con X coins"); la línea se guarda a 0 € y no da coins. Los marcados como
+  "Mostrar en la tienda de la app" (con foto y descripción) salen en `/tienda`.
+- **Caducidad**: si un cliente pasa **6 meses sin venir**, pierde sus coins. Lo hace una tarea
+  diaria (`.github/workflows/caducidad-grassocoins.yml`); el cliente ve en su perfil y en su
+  tarjeta hasta cuándo valen.
+- **Ficha de cada cliente** (`/admin/clientes/[id]`): coins actuales, cuánto le falta para la
+  siguiente, histórico completo y un botón para **sumar o restar coins a mano**, siempre con
+  motivo obligatorio y quedando registrado quién lo hizo.
+- **El asistente de WhatsApp con IA NO puede canjear coins**: solo desde `/reservar` (el
+  cliente, con su sesión iniciada) o desde el panel (una persona del equipo).
 - **Tarjeta digital**: en `/perfil/tarjeta`, cualquier cliente puede ver y **descargar una
-  imagen** de su tarjeta (logo, su nombre y su saldo actualizado) para guardarla donde
+  imagen** de su tarjeta (logo, su nombre, sus GrassoCoins y el progreso hacia la siguiente) para guardarla donde
   quiera — funciona ya, hoy, sin ninguna cuenta ni coste adicional.
 - **Apple Wallet / Google Wallet reales**: el código ya está preparado (`lib/wallet/`,
   `app/api/wallet/`) para que el cliente pueda añadir la tarjeta directamente a su Wallet del
-  móvil, con el saldo actualizándose. Los botones ya están en `/perfil/tarjeta`, pero
+  móvil, con sus GrassoCoins actualizándose. Los botones ya están en `/perfil/tarjeta`, pero
   aparecen desactivados ("Todavía no está activado") hasta que completes esto:
   - **Apple Wallet** necesita una cuenta de Apple Developer (de pago, ~99$/año) y generar un
     certificado de "Pass Type" — la guía paso a paso, con los nombres exactos de las
@@ -481,7 +491,8 @@ supabase/seed.sql                      Datos de ejemplo opcionales
 supabase/actualizar-datos-reales.sql   Catálogo real de servicios/barberos/horarios (re-ejecutable)
 supabase/actualizar-funcionalidad-avanzada.sql  Tablas de campañas/plantillas/recordatorios (re-ejecutable)
 supabase/actualizar-monitorizacion-produccion.sql  Tabla de errores del sistema (re-ejecutable)
-supabase/actualizar-fidelizacion.sql   Saldo de fidelización: tablas, columnas y función (re-ejecutable)
+supabase/actualizar-fidelizacion.sql   Saldo antiguo en euros (ya no se usa)
+supabase/anadir-grassocoins.sql        GrassoCoins: columnas, histórico y función (re-ejecutable)
 supabase/actualizar-recuperacion-password.sql  Códigos de recuperación y plantillas nuevas (re-ejecutable)
 supabase/actualizar-comisiones.sql     Tabla de tramos de comisión + función de reemplazo (re-ejecutable)
 supabase/anadir-productos.sql          Catálogo de productos, cita_productos y comisión plana de productos (re-ejecutable)
@@ -496,7 +507,8 @@ app/api/admin/citas/[id]/finalizar/  Cierra una cita: servicio, complementos, pr
 app/admin/dashboard/FinalizarCitaModal.tsx  Pantalla que se abre al marcar una cita como "Completada"
 lib/availability.ts        Cálculo de huecos libres (el corazón del motor de reservas)
 lib/booking.ts             Crear, cancelar y reprogramar una reserva (app, panel y WhatsApp)
-lib/fidelizacion.ts        Acumular, canjear y reembolsar saldo de fidelización
+lib/fidelizacion.ts        Ganar, canjear, devolver y ajustar GrassoCoins
+lib/grassocoins.ts         Cuentas de GrassoCoins (1 por cada euro)
 lib/recuperacionPassword.ts  Generar/hashear/verificar el código de recuperación de contraseña
 app/api/auth/recuperar/    Pedir código y confirmarlo con contraseña nueva
 lib/wallet/                Apple Wallet / Google Wallet reales (preparado, ver README arriba)
