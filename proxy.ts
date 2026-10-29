@@ -13,6 +13,26 @@ export async function proxy(request: NextRequest) {
   // de iniciar sesión en vez de mandar siempre a la home / al dashboard.
   request.headers.set("x-pathname", request.nextUrl.pathname + request.nextUrl.search);
 
+  // Camino rápido para quien no tiene sesión (todo cliente nuevo, o el
+  // que abre la app sin haber entrado nunca): antes el servidor
+  // preguntaba a Supabase quién eras, montaba la portada y solo entonces
+  // te mandaba a /acceso — varios segundos de pantalla negra y blanca en
+  // el móvil (vídeo de David, 29/10/2026). Sin cookie de sesión no hay
+  // nada que comprobar: se le manda directo a /acceso desde aquí.
+  const tieneSesion = request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+  if (!tieneSesion) {
+    const ruta = request.nextUrl.pathname;
+    if (ruta === "/" || ruta === "/reservar" || ruta === "/perfil") {
+      const destino = request.nextUrl.clone();
+      destino.pathname = "/acceso";
+      destino.search = "";
+      const pedido = ruta + request.nextUrl.search;
+      if (pedido !== "/") destino.searchParams.set("next", pedido);
+      return NextResponse.redirect(destino);
+    }
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

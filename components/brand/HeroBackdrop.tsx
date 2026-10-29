@@ -39,6 +39,14 @@ export function HeroBackdrop() {
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  // Al abrir la app solo se descarga el primer clip; los otros dos (casi
+  // 1 MB más) esperan unos segundos para no frenar la carga de la
+  // pantalla, que es lo que el cliente necesita ver primero.
+  const [cargarResto, setCargarResto] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setCargarResto(true), 4000);
+    return () => clearTimeout(id);
+  }, []);
 
   // A veces el navegador deja un vídeo en pausa por su cuenta (cambio de
   // pestaña, ahorro de batería, algún hipo del autoplay al cargar) y,
@@ -102,7 +110,7 @@ export function HeroBackdrop() {
           className="h-full w-full scale-105 object-cover opacity-70"
         />
       ) : (
-        CLIPS.map((clip, i) => (
+        CLIPS.map((clip, i) => (i > 0 && !cargarResto ? null : (
           <video
             key={clip.src}
             ref={(el) => {
@@ -123,7 +131,7 @@ export function HeroBackdrop() {
           >
             <source src={clip.src} type="video/mp4" />
           </video>
-        ))
+        )))
       )}
 
       {/* Textura de grano muy sutil, para que no se vea "plano" */}
