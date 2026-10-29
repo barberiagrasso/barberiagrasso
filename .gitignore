@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# documentos generados por Claude con credenciales reales - nunca subir
+/Claude outputs/
