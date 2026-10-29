@@ -977,8 +977,13 @@ export default function BookingFlow({
     return Array.from(mapa.values());
   }, [slots]);
 
+  // Bloquea el doble toque en "Confirmar cita": sin esto, dos toques muy
+  // seguidos podían lanzar dos reservas antes de que el botón se desactivara.
+  const reservandoRef = useRef(false);
   async function confirmarReserva() {
     if (!slotElegido || !sedeId || !servicioId || !fecha) return;
+    if (reservandoRef.current) return;
+    reservandoRef.current = true;
     setEnviando(true);
     setError(null);
     try {
@@ -1016,6 +1021,7 @@ export default function BookingFlow({
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
     } finally {
+      reservandoRef.current = false;
       setEnviando(false);
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
@@ -49,13 +49,19 @@ function AccesoForm() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  // Evita que dos toques seguidos manden el formulario dos veces antes de
+  // que el botón llegue a desactivarse.
+  const enviandoRef = useRef(false);
 
   function irAModo(nuevoModo: Modo) {
     const qs = new URLSearchParams();
     if (nuevoModo !== "login") qs.set("modo", nuevoModo);
     if (next !== "/") qs.set("next", next);
     const cadena = qs.toString();
-    router.push(cadena ? `/acceso?${cadena}` : "/acceso");
+    // pushState en vez de router.push: cambia de pestaña al instante, sin
+    // volver a pedir la pantalla al servidor (antes tardaba y los clientes
+    // pulsaban varias veces). El botón "atrás" del móvil sigue funcionando.
+    window.history.pushState(null, "", cadena ? `/acceso?${cadena}` : "/acceso");
   }
 
   function irALogin() {
@@ -66,10 +72,12 @@ function AccesoForm() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    if (enviandoRef.current) return;
     if (modo === "registro" && password !== passwordConfirmacion) {
       setError("Las contraseñas no coinciden.");
       return;
     }
+    enviandoRef.current = true;
     setCargando(true);
     setError(null);
     try {
@@ -84,6 +92,7 @@ function AccesoForm() {
       if (!res.ok) {
         setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
         setCargando(false);
+        enviandoRef.current = false;
         return;
       }
       // La ruedecita sigue girando hasta que aparece la pantalla
@@ -93,6 +102,7 @@ function AccesoForm() {
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
       setCargando(false);
+      enviandoRef.current = false;
     }
   }
 
