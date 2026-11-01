@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { createPublicClient } from "@/lib/supabase/public";
-import { requireCliente } from "@/lib/clienteAuth";
+import { obtenerClienteActual } from "@/lib/sesionCliente";
 import BookingFlow from "./BookingFlow";
 import { contarFotosPorServicio } from "@/lib/portafolio";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
@@ -9,8 +9,10 @@ import InstalarApp from "@/components/pwa/InstalarApp";
 export const dynamic = "force-dynamic";
 
 export default async function ReservarPage() {
-  // Igual que la portada: sin sesión de cliente, no se llega aquí.
-  const { cliente } = await requireCliente();
+  // Se puede reservar sin cuenta (01/11/2026). Si este móvil ya reconoce
+  // al cliente, sus datos salen rellenos; si no, los escribe en el paso 5.
+  // Nunca se rellena nada a partir de un teléfono escrito a mano.
+  const cliente = (await obtenerClienteActual())?.cliente ?? null;
 
   const supabase = createPublicClient();
 
@@ -99,12 +101,16 @@ export default async function ReservarPage() {
             servicios={servicios ?? []}
             serviciosReservablesPorSede={serviciosReservablesPorSede}
             fotosPorServicio={fotosPorServicio}
-            clienteInicial={{
-              nombre: cliente.nombre,
-              telefono: cliente.telefono,
-              email: cliente.email,
-              grassocoins: cliente.grassocoins ?? 0,
-            }}
+            clienteInicial={
+              cliente
+                ? {
+                    nombre: cliente.nombre,
+                    telefono: cliente.telefono,
+                    email: cliente.email,
+                    grassocoins: cliente.grassocoins ?? 0,
+                  }
+                : undefined
+            }
           />
         </Suspense>
       </div>

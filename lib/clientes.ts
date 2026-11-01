@@ -9,12 +9,34 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Ajusta el prefijo "34" si en el futuro abres en otro país.
  */
 export function normalizarTelefono(telefono: string): string {
-  const soloDigitosYMas = telefono.replace(/[^\d+]/g, "");
-  if (soloDigitosYMas.startsWith("+")) return soloDigitosYMas;
-  if (soloDigitosYMas.length === 9 && /^[679]/.test(soloDigitosYMas)) {
-    return `+34${soloDigitosYMas}`;
+  let limpio = telefono.replace(/[^\d+]/g, "");
+  // "0034 612…" es lo mismo que "+34 612…".
+  if (limpio.startsWith("00")) limpio = `+${limpio.slice(2)}`;
+  if (limpio.startsWith("+")) return `+${limpio.slice(1).replace(/\+/g, "")}`;
+  if (limpio.length === 9 && /^[6789]/.test(limpio)) {
+    return `+34${limpio}`;
   }
-  return `+${soloDigitosYMas}`;
+  return `+${limpio}`;
+}
+
+/**
+ * ¿Es un teléfono con sentido, ya normalizado (E.164)? Para España exige
+ * +34 y 9 cifras que empiecen por 6, 7, 8 o 9; para otros países, entre 8
+ * y 15 cifras en total.
+ */
+export function telefonoValido(telefonoNormalizado: string): boolean {
+  if (!/^\+\d{8,15}$/.test(telefonoNormalizado)) return false;
+  if (telefonoNormalizado.startsWith("+34")) return /^\+34[6789]\d{8}$/.test(telefonoNormalizado);
+  return true;
+}
+
+/** "david grasso" / "DAVID GRASSO" → "David Grasso" (respeta guiones y apóstrofos). */
+export function capitalizarNombre(nombre: string): string {
+  return nombre
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("es-ES")
+    .replace(/(^|[\s'-])(\p{L})/gu, (_, sep: string, letra: string) => sep + letra.toLocaleUpperCase("es-ES"));
 }
 
 /**

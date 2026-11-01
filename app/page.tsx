@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
-import { requireCliente } from "@/lib/clienteAuth";
+import { obtenerClienteActual } from "@/lib/sesionCliente";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,24 +11,26 @@ import { cargarResenasExternas } from "@/lib/portafolio";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  // Lo primero al entrar: si no hay sesión de cliente, esto manda a
-  // /acceso. Una vez logueado, la sesión se queda puesta indefinidamente
-  // (no caduca sola) hasta que el propio cliente cierre sesión.
-  const { cliente } = await requireCliente();
+  // Portada abierta a todos (01/11/2026): sin cuenta se puede reservar.
+  // Si este móvil ya reconoce al cliente, se le saluda y se le ofrece
+  // repetir con su barbero y entrar a su perfil.
+  const cliente = (await obtenerClienteActual())?.cliente ?? null;
 
   const supabase = createPublicClient();
   const [{ data: sedes }, resenas, { data: ultimas }] = await Promise.all([
     supabase.from("sedes").select("id, nombre, direccion, maps_url").order("nombre"),
     cargarResenasExternas(supabase),
     // Su última visita, para el botón "Repetir con <barbero>".
-    createAdminClient()
-      .from("citas")
-      .select("sede_id, servicio_id, profesional_id, profesional:profesionales(nombre, activo), servicio:servicios(nombre, activo)")
-      .eq("cliente_id", cliente.id)
-      .eq("estado", "completada")
-      .not("profesional_id", "is", null)
-      .order("inicio", { ascending: false })
-      .limit(1),
+    cliente
+      ? createAdminClient()
+          .from("citas")
+          .select("sede_id, servicio_id, profesional_id, profesional:profesionales(nombre, activo), servicio:servicios(nombre, activo)")
+          .eq("cliente_id", cliente.id)
+          .eq("estado", "completada")
+          .not("profesional_id", "is", null)
+          .order("inicio", { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: null }),
   ]);
 
   // Supabase puede devolver la relación como objeto o como lista.
@@ -52,7 +54,7 @@ export default async function Home() {
       <div className="relative z-10 flex flex-col items-center">
         <GrassoLogo className="h-auto w-64 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:w-80" />
         <p className="mt-5 font-heading text-xl italic text-brand-white-dim">
-          Hola, {cliente.nombre.split(" ")[0]}
+          {cliente ? `Hola, ${cliente.nombre.split(" ")[0]}` : "Reserva tu cita en 1 minuto"}
         </p>
 
         <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:gap-10">
@@ -109,12 +111,22 @@ export default async function Home() {
           </Link>
         </div>
 
-        <Link
-          href="/perfil"
-          className="mt-4 rounded-full border border-brand-yellow/50 px-6 py-2.5 font-body text-sm font-semibold text-brand-yellow transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"
-        >
-          Mi perfil y mis citas
-        </Link>
+        {cliente ? (
+          <Link
+            href="/perfil"
+            className="mt-4 rounded-full border border-brand-yellow/50 px-6 py-2.5 font-body text-sm font-semibold text-brand-yellow transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"
+          >
+            Mi perfil y mis citas
+          </Link>
+        ) : (
+          // Discreto: para quien ya es cliente y entra desde otro móvil.
+          <Link
+            href="/acceso"
+            className="mt-5 font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          >
+            ¿Ya has venido? Ver mis citas
+          </Link>
+        )}
 
         <div className="mt-5">
           <BotonCompartir

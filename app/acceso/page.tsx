@@ -9,9 +9,18 @@ import InstalarApp from "@/components/pwa/InstalarApp";
 import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
 import { Spinner } from "@/components/ui/Spinner";
 
-type Modo = "login" | "registro" | "recuperar-telefono" | "recuperar-codigo";
+// Acceso del CLIENTE (01/11/2026): ya no hace falta para reservar. Solo
+// para ver "Mi perfil y mis citas" desde un móvil que no le reconoce:
+// teléfono → código de 6 dígitos por WhatsApp → dentro, sin contraseña.
+// Quien ya tenía contraseña puede seguir entrando con ella.
+type Modo = "telefono" | "codigo" | "login" | "recuperar-telefono" | "recuperar-codigo";
+const MODOS_VALIDOS: Modo[] = ["telefono", "codigo", "login", "recuperar-telefono", "recuperar-codigo"];
 
-const MODOS_VALIDOS: Modo[] = ["login", "registro", "recuperar-telefono", "recuperar-codigo"];
+const CAMPO =
+  "w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none";
+const BOTON =
+  "flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70";
+const ENLACE = "font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow";
 
 export default function AccesoPage() {
   return (
@@ -21,146 +30,143 @@ export default function AccesoPage() {
   );
 }
 
+function telefonoConPrefijo(t: string) {
+  return /^\s*(\+|00)/.test(t) ? t : `+34${t}`;
+}
+
 function AccesoForm() {
   const router = useRouter();
   const params = useSearchParams();
-
-  // El modo (login / crear cuenta / recuperar...) vive en la URL en vez
-  // de en un useState suelto: así, al cambiar de pestaña se añade una
-  // entrada al historial del navegador y el botón "atrás" del móvil
-  // vuelve al paso anterior de este mismo formulario en vez de sacarte
-  // de la pantalla de acceso directamente.
   const modoParam = params.get("modo");
-  const modo: Modo = MODOS_VALIDOS.includes(modoParam as Modo) ? (modoParam as Modo) : "login";
+  const modo: Modo = MODOS_VALIDOS.includes(modoParam as Modo) ? (modoParam as Modo) : "telefono";
+  const next = rutaSiguienteSegura(params.get("next"), "/perfil");
 
-  // A dónde volver después de iniciar sesión (o registrarte, o
-  // recuperar la contraseña): la página que te mandó aquí porque hacía
-  // falta sesión (ver requireCliente en lib/clienteAuth.ts), o la home
-  // si has entrado directamente en /acceso.
-  const next = rutaSiguienteSegura(params.get("next"), "/");
-
-  const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordConfirmacion, setPasswordConfirmacion] = useState("");
   const [codigo, setCodigo] = useState("");
+  const [password, setPassword] = useState("");
   const [passwordNueva, setPasswordNueva] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
-  // Evita que dos toques seguidos manden el formulario dos veces antes de
-  // que el botón llegue a desactivarse.
-  const enviandoRef = useRef(false);
+  // Un segundo toque mientras se procesa el primero no hace nada.
+  const ocupado = useRef(false);
 
-  function irAModo(nuevoModo: Modo) {
+  function irAModo(nuevo: Modo) {
     const qs = new URLSearchParams();
-    if (nuevoModo !== "login") qs.set("modo", nuevoModo);
-    if (next !== "/") qs.set("next", next);
+    if (nuevo !== "telefono") qs.set("modo", nuevo);
+    if (next !== "/perfil") qs.set("next", next);
     const cadena = qs.toString();
-    // pushState en vez de router.push: cambia de pestaña al instante, sin
-    // volver a pedir la pantalla al servidor (antes tardaba y los clientes
-    // pulsaban varias veces). El botón "atrás" del móvil sigue funcionando.
+    // pushState: cambio instantáneo, sin pedir la pantalla al servidor.
     window.history.pushState(null, "", cadena ? `/acceso?${cadena}` : "/acceso");
-  }
-
-  function irALogin() {
-    irAModo("login");
     setError(null);
-    setAviso(null);
   }
 
-  async function enviar(e: React.FormEvent) {
-    e.preventDefault();
-    if (enviandoRef.current) return;
-    if (modo === "registro" && password !== passwordConfirmacion) {
-      setError("Las contraseñas no coinciden.");
-      return;
-    }
-    enviandoRef.current = true;
+  async function llamar(url: string, cuerpo: object): Promise<{ ok: boolean; json: Record<string, unknown> } | null> {
+    if (ocupado.current) return null;
+    ocupado.current = true;
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch(modo === "login" ? "/api/auth/login" : "/api/auth/registro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          modo === "login" ? { telefono, password } : { nombre, telefono, email, password }
-        ),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
-        setCargando(false);
-        enviandoRef.current = false;
-        return;
-      }
-      // La ruedecita sigue girando hasta que aparece la pantalla
-      // siguiente (antes el botón volvía a "Entrar" mientras cargaba y
-      // parecía colgado). Sin router.refresh(): cargaba la página dos veces.
-      router.replace(next);
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) setError((json.error as string) || "Algo no ha ido bien. Inténtalo de nuevo.");
+      return { ok: res.ok, json };
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
-      setCargando(false);
-      enviandoRef.current = false;
-    }
-  }
-
-  async function pedirCodigo(e: React.FormEvent) {
-    e.preventDefault();
-    setCargando(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/auth/recuperar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefono }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
-        return;
-      }
-      setAviso(json.mensaje || "Si ese número tiene una cuenta, te hemos enviado un código por WhatsApp.");
-      irAModo("recuperar-codigo");
-    } catch {
-      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+      return null;
     } finally {
+      ocupado.current = false;
       setCargando(false);
     }
   }
 
-  async function confirmarCodigo(e: React.FormEvent) {
+  async function pedirCodigo(e: React.FormEvent, recuperar = false) {
     e.preventDefault();
-    setError(null);
+    const r = await llamar(recuperar ? "/api/auth/recuperar" : "/api/auth/codigo", { telefono: telefonoConPrefijo(telefono) });
+    if (!r?.ok) return;
+    setAviso((r.json.mensaje as string) || "Te hemos enviado un código por WhatsApp.");
+    setCodigo("");
+    irAModo(recuperar ? "recuperar-codigo" : "codigo");
+  }
+
+  async function entrarConCodigo(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await llamar("/api/auth/codigo/confirmar", { telefono: telefonoConPrefijo(telefono), codigo });
+    if (r?.ok) {
+      setCargando(true); // la ruedecita sigue hasta que cambia la pantalla
+      router.replace(next);
+    }
+  }
+
+  async function entrarConPassword(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await llamar("/api/auth/login", { telefono: telefonoConPrefijo(telefono), password });
+    if (r?.ok) {
+      setCargando(true);
+      router.replace(next);
+    }
+  }
+
+  async function cambiarPassword(e: React.FormEvent) {
+    e.preventDefault();
     if (passwordNueva.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
-    setCargando(true);
-    try {
-      const res = await fetch("/api/auth/recuperar/confirmar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefono, codigo, passwordNueva }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "Algo no ha ido bien. Inténtalo de nuevo.");
-        setCargando(false);
-        return;
-      }
-      // La ruedecita sigue girando hasta que aparece la pantalla
-      // siguiente (antes el botón volvía a "Entrar" mientras cargaba y
-      // parecía colgado). Sin router.refresh(): cargaba la página dos veces.
+    const r = await llamar("/api/auth/recuperar/confirmar", { telefono: telefonoConPrefijo(telefono), codigo, passwordNueva });
+    if (r?.ok) {
+      setCargando(true);
       router.replace(next);
-    } catch {
-      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
-      setCargando(false);
     }
   }
 
-  const esRecuperar = modo === "recuperar-telefono" || modo === "recuperar-codigo";
+  const campoTelefono = (
+    <div className="flex items-stretch overflow-hidden rounded-lg border border-brand-line focus-within:border-brand-yellow">
+      {!/^\s*(\+|00)/.test(telefono) && (
+        <span className="flex items-center border-r border-brand-line px-3 font-body text-brand-white-dim">+34</span>
+      )}
+      <input
+        required
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel"
+        name="tel"
+        placeholder="Tu teléfono móvil"
+        value={telefono}
+        onChange={(e) => setTelefono(e.target.value.replace(/^\s*\+34\s*/, ""))}
+        className="w-full bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:outline-none"
+      />
+    </div>
+  );
+
+  const campoCodigo = (
+    <input
+      required
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      name="one-time-code"
+      maxLength={6}
+      placeholder="Código de 6 dígitos"
+      value={codigo}
+      onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+      className={CAMPO + " text-center text-lg tracking-[0.4em]"}
+    />
+  );
+
+  const botonEnviar = (texto: string) => (
+    <button disabled={cargando} aria-busy={cargando} className={BOTON}>
+      {cargando && <Spinner />}
+      {cargando ? "Un momento…" : texto}
+    </button>
+  );
+
+  const titulo: Record<Modo, string> = {
+    telefono: "Mis citas",
+    codigo: "Escribe el código",
+    login: "Entrar con contraseña",
+    "recuperar-telefono": "Recuperar contraseña",
+    "recuperar-codigo": "Nueva contraseña",
+  };
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-brand-black px-4">
@@ -169,225 +175,104 @@ function AccesoForm() {
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <GrassoLogo className="h-auto w-36 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)]" />
-          <h1 className="mt-4 font-heading text-2xl italic text-brand-white">
-            {modo === "login" && "Bienvenido de nuevo"}
-            {modo === "registro" && "Crea tu cuenta"}
-            {modo === "recuperar-telefono" && "Recuperar contraseña"}
-            {modo === "recuperar-codigo" && "Escribe el código"}
-          </h1>
+          <h1 className="mt-4 font-heading text-2xl italic text-brand-white">{titulo[modo]}</h1>
           <p className="font-mono text-xs uppercase tracking-widest text-brand-white-dim">Cuidamos de tu imagen</p>
         </div>
 
         <InstalarApp />
 
-        {!esRecuperar && (
-          <div className="mb-5 flex rounded-full border border-brand-line p-1">
-            <button
-              type="button"
-              onClick={() => {
-                irAModo("login");
-                setError(null);
-              }}
-              className={
-                "flex-1 rounded-full py-2 font-body text-sm font-semibold transition-colors " +
-                (modo === "login" ? "bg-brand-yellow text-brand-yellow-ink" : "text-brand-white-dim")
-              }
-            >
-              Iniciar sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                irAModo("registro");
-                setError(null);
-              }}
-              className={
-                "flex-1 rounded-full py-2 font-body text-sm font-semibold transition-colors " +
-                (modo === "registro" ? "bg-brand-yellow text-brand-yellow-ink" : "text-brand-white-dim")
-              }
-            >
-              Crear cuenta
-            </button>
-          </div>
-        )}
-
-        {(modo === "login" || modo === "registro") && (
-          <form onSubmit={enviar} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
-            {modo === "registro" && (
-              <input
-                required
-                placeholder="Nombre y apellidos"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-              />
-            )}
-            <input
-              required
-              type="tel"
-              placeholder="Teléfono"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-            />
-            {modo === "registro" && (
-              <input
-                type="email"
-                placeholder="Email (opcional)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-              />
-            )}
-            <input
-              required
-              type="password"
-              placeholder="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-            />
-            {modo === "registro" && (
-              <input
-                required
-                type="password"
-                placeholder="Repite la contraseña"
-                value={passwordConfirmacion}
-                onChange={(e) => setPasswordConfirmacion(e.target.value)}
-                className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-              />
-            )}
-
-            {modo === "login" && (
-              <button
-                type="button"
-                onClick={() => {
-                  irAModo("recuperar-telefono");
-                  setError(null);
-                  setAviso(null);
-                }}
-                className="font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
-            )}
-
-            {error && <p className="font-body text-sm text-red-400">{error}</p>}
-
-            <button
-              disabled={cargando}
-              aria-busy={cargando}
-              className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
-            >
-              {cargando && <Spinner />}
-              {cargando ? "Un momento…" : modo === "login" ? "Entrar" : "Crear cuenta"}
-            </button>
-          </form>
-        )}
-
-        {modo === "recuperar-telefono" && (
-          <form onSubmit={pedirCodigo} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
+        {modo === "telefono" && (
+          <form onSubmit={(e) => pedirCodigo(e)} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
             <p className="font-body text-sm text-brand-white-dim">
-              Escribe tu teléfono y te mandamos un código de 6 dígitos por WhatsApp para elegir una contraseña
-              nueva.
+              Escribe el teléfono con el que reservas y te mandamos un código por WhatsApp. Sin contraseñas.
             </p>
-            <input
-              required
-              type="tel"
-              placeholder="Teléfono"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-            />
-
+            {campoTelefono}
             {error && <p className="font-body text-sm text-red-400">{error}</p>}
-
-            <button
-              disabled={cargando}
-              aria-busy={cargando}
-              className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
-            >
-              {cargando && <Spinner />}
-              {cargando ? "Un momento…" : "Enviar código por WhatsApp"}
-            </button>
-            <button type="button" onClick={irALogin} className="w-full font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow">
-              Volver a iniciar sesión
+            {botonEnviar("Enviar código")}
+            <button type="button" onClick={() => irAModo("login")} className={ENLACE + " w-full"}>
+              Tengo contraseña
             </button>
           </form>
         )}
 
-        {modo === "recuperar-codigo" && (
-          <form onSubmit={confirmarCodigo} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
+        {modo === "codigo" && (
+          <form onSubmit={entrarConCodigo} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
             {aviso && <p className="font-body text-sm text-brand-white-dim">{aviso}</p>}
-            <input
-              required
-              inputMode="numeric"
-              placeholder="Código de 6 dígitos"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-            />
-            <input
-              required
-              type="password"
-              placeholder="Contraseña nueva"
-              value={passwordNueva}
-              onChange={(e) => setPasswordNueva(e.target.value)}
-              className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-            />
-
+            {campoCodigo}
             {error && <p className="font-body text-sm text-red-400">{error}</p>}
-
-            <button
-              disabled={cargando}
-              aria-busy={cargando}
-              className="flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70"
-            >
-              {cargando && <Spinner />}
-              {cargando ? "Un momento…" : "Cambiar contraseña"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                irAModo("recuperar-telefono");
-                setError(null);
-              }}
-              className="w-full font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-            >
+            {botonEnviar("Entrar")}
+            <button type="button" onClick={() => irAModo("telefono")} className={ENLACE + " w-full"}>
               Pedir otro código
             </button>
           </form>
         )}
 
-        <p className="mt-6 text-center font-body text-xs text-brand-white-dim">
-          {modo === "login" &&
-            "¿Primera vez por aquí? Crea tu cuenta arriba — tardas menos de un minuto."}
-          {modo === "registro" && (
-            <>
-              Tu cuenta se usa solo para gestionar tus citas en Barbería Grasso. Más información en nuestra{" "}
-              <Link
-                href="/politica-privacidad"
-                className="underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-              >
-                política de privacidad
-              </Link>
-              .
-            </>
-          )}
-          {esRecuperar && "Recibirás el código en el WhatsApp de tu número, no por email."}
-        </p>
+        {modo === "login" && (
+          <form onSubmit={entrarConPassword} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
+            {campoTelefono}
+            <input
+              required
+              type="password"
+              autoComplete="current-password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={CAMPO}
+            />
+            {error && <p className="font-body text-sm text-red-400">{error}</p>}
+            {botonEnviar("Entrar")}
+            <div className="flex justify-between">
+              <button type="button" onClick={() => irAModo("telefono")} className={ENLACE}>
+                Entrar con código
+              </button>
+              <button type="button" onClick={() => irAModo("recuperar-telefono")} className={ENLACE}>
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          </form>
+        )}
+
+        {modo === "recuperar-telefono" && (
+          <form onSubmit={(e) => pedirCodigo(e, true)} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
+            <p className="font-body text-sm text-brand-white-dim">Te mandamos un código por WhatsApp para elegir una contraseña nueva.</p>
+            {campoTelefono}
+            {error && <p className="font-body text-sm text-red-400">{error}</p>}
+            {botonEnviar("Enviar código por WhatsApp")}
+            <button type="button" onClick={() => irAModo("login")} className={ENLACE + " w-full"}>
+              Volver
+            </button>
+          </form>
+        )}
+
+        {modo === "recuperar-codigo" && (
+          <form onSubmit={cambiarPassword} className="space-y-3 rounded-2xl border border-brand-line bg-brand-black-soft/60 p-6">
+            {aviso && <p className="font-body text-sm text-brand-white-dim">{aviso}</p>}
+            {campoCodigo}
+            <input
+              required
+              type="password"
+              autoComplete="new-password"
+              placeholder="Contraseña nueva"
+              value={passwordNueva}
+              onChange={(e) => setPasswordNueva(e.target.value)}
+              className={CAMPO}
+            />
+            {error && <p className="font-body text-sm text-red-400">{error}</p>}
+            {botonEnviar("Cambiar contraseña")}
+          </form>
+        )}
+
+        <div className="mt-6 text-center">
+          <Link href="/reservar" className="font-body text-sm font-semibold text-brand-yellow underline underline-offset-4">
+            ¿Solo quieres reservar? No hace falta entrar
+          </Link>
+        </div>
 
         <div className="mt-8 flex items-center justify-center gap-4">
-          <Link
-            href="/admin/login"
-            className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-          >
+          <Link href="/admin/login" className={ENLACE + " text-brand-white-dim/70"}>
             Acceso para el equipo
           </Link>
-          <Link
-            href="/politica-privacidad"
-            className="font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-          >
+          <Link href="/politica-privacidad" className={ENLACE + " text-brand-white-dim/70"}>
             Privacidad
           </Link>
         </div>

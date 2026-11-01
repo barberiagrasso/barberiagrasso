@@ -10,7 +10,7 @@ export function CerrarSesionButton({ className, children }: { className?: string
   async function cerrarSesion() {
     setSaliendo(true);
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/acceso");
+    router.push("/");
     router.refresh();
   }
 

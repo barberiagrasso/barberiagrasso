@@ -514,7 +514,11 @@ export default function BookingFlow({
   const [reintentoMes, setReintentoMes] = useState(0);
   const [slotElegido, setSlotElegido] = useState<FranjaDisponible | null>(null);
   const [nombre, setNombre] = useState(clienteInicial?.nombre ?? "");
-  const [telefono, setTelefono] = useState(clienteInicial?.telefono ?? "");
+  // El teléfono se escribe sin prefijo (+34 por defecto, se ve delante del
+  // campo); si alguien escribe +44… o 0044…, se respeta. El servidor lo
+  // normaliza a E.164.
+  const [telefono, setTelefono] = useState((clienteInicial?.telefono ?? "").replace(/^\+34/, ""));
+  const telefonoCompleto = /^\s*(\+|00)/.test(telefono) ? telefono : `+34${telefono}`;
   const [email, setEmail] = useState(clienteInicial?.email ?? "");
   // Comentario libre del cliente para el último paso ("¿algún
   // comentario o petición para tu visita?"), inspirado en Booksy —
@@ -531,6 +535,7 @@ export default function BookingFlow({
   const [citaConfirmada, setCitaConfirmada] = useState<{
     inicio: string;
     profesionalNombre: string;
+    guardadoEnMovil?: boolean;
   } | null>(null);
   const [mostrarFormListaEspera, setMostrarFormListaEspera] = useState(false);
   const [flexibilidadListaEspera, setFlexibilidadListaEspera] = useState<
@@ -712,7 +717,7 @@ export default function BookingFlow({
           profesionalId,
           fecha,
           flexibilidadDias: flexibilidadListaEspera,
-          cliente: { nombre, telefono, email: email || null },
+          cliente: { nombre, telefono: telefonoCompleto, email: email || null },
           aceptaComercial,
         }),
       });
@@ -993,7 +998,7 @@ export default function BookingFlow({
           profesionalId: profesionalId || slotElegido.profesional_id,
           fecha,
           horaInicioISO: slotElegido.hora_inicio,
-          cliente: { nombre, telefono, email: email || null },
+          cliente: { nombre, telefono: telefonoCompleto, email: email || null },
           aceptaComercial,
           complementoIds,
           notaCliente: notaCliente.trim() || null,
@@ -1013,6 +1018,7 @@ export default function BookingFlow({
       setCitaConfirmada({
         inicio: json.cita.inicio,
         profesionalNombre: json.profesionalNombre,
+        guardadoEnMovil: Boolean(json.guardadoEnMovil),
       });
       setPaso("confirmado");
     } catch {
@@ -1417,14 +1423,19 @@ export default function BookingFlow({
                     <input
                       className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                       placeholder="Nombre y apellidos"
+                      autoComplete="name"
+                      autoCapitalize="words"
                       value={nombre}
                       onChange={(e) => setNombre(e.target.value)}
                     />
                     <input
                       className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-                      placeholder="Teléfono (WhatsApp)"
+                      placeholder="Teléfono móvil (WhatsApp)"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
                       value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
+                      onChange={(e) => setTelefono(e.target.value.replace(/^\s*\+34\s*/, ""))}
                     />
                     {errorListaEspera && (
                       <p className="font-body text-xs text-red-400">
@@ -1587,18 +1598,34 @@ export default function BookingFlow({
               <input
                 className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                 placeholder="Nombre y apellidos"
+                autoComplete="name"
+                autoCapitalize="words"
+                name="name"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
               />
-              <input
-                className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-                placeholder="Teléfono (WhatsApp)"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-              />
+              <div className="flex items-stretch overflow-hidden rounded-lg border border-brand-line focus-within:border-brand-yellow">
+                {!/^\s*(\+|00)/.test(telefono) && (
+                  <span className="flex items-center border-r border-brand-line px-3 font-body text-brand-white-dim">+34</span>
+                )}
+                <input
+                  className="w-full bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:outline-none"
+                  placeholder="Teléfono móvil (WhatsApp)"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  name="tel"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value.replace(/^\s*\+34\s*/, ""))}
+                />
+              </div>
               <input
                 className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                 placeholder="Email (opcional)"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -1685,6 +1712,11 @@ export default function BookingFlow({
             <p className="font-body text-xs text-brand-white-dim">
               Te avisaremos por WhatsApp antes de tu cita.
             </p>
+            {citaConfirmada.guardadoEnMovil && (
+              <p className="font-body text-sm text-brand-yellow">
+                Te hemos guardado en este móvil: la próxima vez reservas en dos toques.
+              </p>
+            )}
             <div className="flex flex-col items-center gap-2 pt-2 sm:flex-row sm:justify-center">
               <Link
                 href="/"
@@ -1692,12 +1724,16 @@ export default function BookingFlow({
               >
                 Ir a inicio
               </Link>
+              {/* Solo si este móvil le reconoce: con un teléfono que ya
+                  existía y sin sesión, para ver su perfil hay que verificarlo. */}
+              {(clienteInicial || citaConfirmada.guardadoEnMovil) && (
               <Link
                 href="/perfil"
                 className="rounded-none bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
               >
                 Ir a mi perfil
               </Link>
+              )}
             </div>
           </div>
         )}

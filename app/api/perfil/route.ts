@@ -81,7 +81,7 @@ export async function PATCH(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  if (telefonoNormalizado && telefonoNormalizado !== cliente.telefono) {
+  if (user && telefonoNormalizado && telefonoNormalizado !== cliente.telefono) {
     const { error: errorAuth } = await admin.auth.admin.updateUserById(user.id, {
       email: emailSinteticoParaTelefono(telefonoNormalizado),
     });
@@ -95,7 +95,7 @@ export async function PATCH(request: NextRequest) {
     // Si falló también hay que deshacer el cambio de email de Auth de
     // arriba, para no dejar el teléfono de acceso desincronizado del que
     // se ve en la ficha.
-    if (telefonoNormalizado && telefonoNormalizado !== cliente.telefono) {
+    if (user && telefonoNormalizado && telefonoNormalizado !== cliente.telefono) {
       await admin.auth.admin.updateUserById(user.id, { email: emailSinteticoParaTelefono(cliente.telefono) });
     }
     const mensaje = error.code === "23505" ? "Ese teléfono ya está en uso por otra cuenta." : "No se pudo guardar. Inténtalo de nuevo.";
