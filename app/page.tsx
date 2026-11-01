@@ -113,22 +113,14 @@ export default async function Home() {
           </Link>
         </div>
 
-        {cliente ? (
-          <Link
-            href="/perfil"
-            className="mt-4 rounded-full border border-brand-yellow/50 px-6 py-2.5 font-body text-sm font-semibold text-brand-yellow transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"
-          >
-            Mi perfil y mis citas
-          </Link>
-        ) : (
-          // Discreto: para quien ya es cliente y entra desde otro móvil.
-          <Link
-            href="/acceso"
-            className="mt-5 font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-          >
-            ¿Ya has venido? Ver mis citas
-          </Link>
-        )}
+        {/* Botón bien visible para todos. Si este móvil no le reconoce,
+            /perfil le lleva a entrar con su teléfono y un código. */}
+        <Link
+          href="/perfil"
+          className="mt-5 rounded-full border-2 border-brand-yellow px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow transition-colors hover:bg-brand-yellow/10"
+        >
+          {cliente ? "Mi perfil y mis citas" : "Mi perfil"}
+        </Link>
 
         <div className="mt-5">
           <BotonCompartir
