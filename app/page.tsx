@@ -5,6 +5,7 @@ import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BotonCompartir } from "@/components/brand/BotonCompartir";
+import { BotonInstalarApp } from "@/components/pwa/BotonInstalarApp";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { cargarResenasExternas } from "@/lib/portafolio";
 
@@ -121,6 +122,8 @@ export default async function Home() {
         >
           {cliente ? "Mi perfil y mis citas" : "Mi perfil"}
         </Link>
+
+        <BotonInstalarApp />
 
         <div className="mt-5">
           <BotonCompartir
