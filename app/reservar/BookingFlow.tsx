@@ -927,9 +927,10 @@ export default function BookingFlow({
   // viene en la URL, se aplica exactamente igual que si se hubiera
   // elegido aquí mismo (elegirPropuestaAsistente) y se limpia la URL
   // para que un refresco de página no la vuelva a aplicar sola.
-  // "Repetir con <barbero>" (botón de la portada): llega con la sede, el
-  // servicio y el barbero de su última visita y salta directo a elegir
-  // día y hora. Solo se aplica si ese servicio sigue existiendo y activo.
+  // "Reservar de nuevo" (botón de la portada): llega con la sede, el
+  // servicio y el barbero de su última visita y pasa SIEMPRE por los
+  // complementos antes de elegir día y hora — si no, no se venden
+  // (pedido de David, 01/11/2026). Solo si el servicio sigue activo.
   useEffect(() => {
     const sede = searchParams.get("sede");
     const servicio = searchParams.get("servicio");
@@ -941,7 +942,8 @@ export default function BookingFlow({
     setServicioId(servicio);
     setComplementoIds([]);
     setProfesionalId(barbero);
-    setPaso("fecha");
+    const elegido = servicios.find((s) => s.id === servicio);
+    setPaso(elegido && esComplemento(elegido) ? "fecha" : "complementos");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

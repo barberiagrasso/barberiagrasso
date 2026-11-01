@@ -91,8 +91,10 @@ export default async function Home() {
             href={repetir.href}
             className="mt-4 flex flex-col items-center rounded-none border border-brand-white/70 px-6 py-2.5 font-body text-brand-white transition-colors hover:bg-brand-white/10"
           >
-            <span className="text-sm font-semibold uppercase tracking-wide">Repetir con {repetir.barbero}</span>
-            <span className="text-xs text-brand-white-dim">{repetir.servicio}</span>
+            <span className="text-sm font-semibold uppercase tracking-wide">Reservar de nuevo</span>
+            <span className="text-xs text-brand-white-dim">
+              {repetir.servicio} con {repetir.barbero}
+            </span>
           </Link>
         )}
 
