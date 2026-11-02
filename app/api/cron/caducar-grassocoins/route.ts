@@ -22,12 +22,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  const { data, error } = await createAdminClient().rpc("caducar_grassocoins_inactivos", {
-    p_meses: MESES_CADUCIDAD_GRASSOCOINS,
-  });
-  if (error) {
-    await registrarError({ origen: "fidelizacion", mensaje: "Fallo al caducar GrassoCoins de clientes inactivos", detalle: error });
+  try {
+    const { data, error } = await createAdminClient().rpc("caducar_grassocoins_inactivos", {
+      p_meses: MESES_CADUCIDAD_GRASSOCOINS,
+    });
+    if (error) {
+      await registrarError({ origen: "fidelizacion", mensaje: "Fallo al caducar GrassoCoins de clientes inactivos", detalle: error });
+      return NextResponse.json({ ok: false, error: "No se pudieron caducar las GrassoCoins." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, clientesCaducados: data ?? 0 });
+  } catch (err) {
+    await registrarError({
+      origen: "fidelizacion",
+      mensaje: "Fallo inesperado caducando GrassoCoins (no fue un error devuelto por Supabase, sino una excepción).",
+      detalle: err,
+    });
     return NextResponse.json({ ok: false, error: "No se pudieron caducar las GrassoCoins." }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, clientesCaducados: data ?? 0 });
 }
