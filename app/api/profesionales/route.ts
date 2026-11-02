@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolverCandidatosConDestinosPuntuales } from "@/lib/availability";
 import { valoracionesPorColumna } from "@/lib/resenas";
+import { registrarError } from "@/lib/errorLog";
 
 export const dynamic = "force-dynamic";
 
@@ -24,106 +25,115 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Falta sedeId." }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  try {
+    const supabase = createAdminClient();
 
-  // Profesionales de la sede y quién hace el servicio no dependen la una
-  // de la otra: se piden a la vez para ahorrar un viaje a la base de
-  // datos (el paso de "Barbero, día y hora" tardaba en mostrarlos).
-  const [{ data: sedeProfesionales }, profesionalServiciosRes] = await Promise.all([
-    supabase
-      .from("profesional_sedes")
-      .select("profesional_id, profesionales!inner(id, nombre, activo)")
-      .eq("sede_id", sedeId)
-      .eq("profesionales.activo", true),
-    servicioId
-      ? supabase.from("profesional_servicios").select("profesional_id").eq("servicio_id", servicioId)
-      : Promise.resolve(null),
-  ]);
-
-  const candidatosPermanentes = (sedeProfesionales ?? []).map((sp) => {
-    const prof = Array.isArray(sp.profesionales) ? sp.profesionales[0] : sp.profesionales;
-    return { id: sp.profesional_id as string, nombre: (prof as { nombre: string })?.nombre ?? "" };
-  });
-
-  const idsConServicio: Set<string> | null = profesionalServiciosRes
-    ? new Set((profesionalServiciosRes.data ?? []).map((p) => p.profesional_id as string))
-    : null;
-
-  let candidatos = candidatosPermanentes;
-  if (fecha) {
-    const idsPermanentes = candidatosPermanentes.map((c) => c.id);
-    const consultasDestinos = [
+    // Profesionales de la sede y quién hace el servicio no dependen la una
+    // de la otra: se piden a la vez para ahorrar un viaje a la base de
+    // datos (el paso de "Barbero, día y hora" tardaba en mostrarlos).
+    const [{ data: sedeProfesionales }, profesionalServiciosRes] = await Promise.all([
       supabase
-        .from("destinos_puntuales")
-        .select("profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)")
+        .from("profesional_sedes")
+        .select("profesional_id, profesionales!inner(id, nombre, activo)")
         .eq("sede_id", sedeId)
-        .eq("fecha", fecha),
-    ];
-    if (idsPermanentes.length > 0) {
-      consultasDestinos.push(
+        .eq("profesionales.activo", true),
+      servicioId
+        ? supabase.from("profesional_servicios").select("profesional_id").eq("servicio_id", servicioId)
+        : Promise.resolve(null),
+    ]);
+
+    const candidatosPermanentes = (sedeProfesionales ?? []).map((sp) => {
+      const prof = Array.isArray(sp.profesionales) ? sp.profesionales[0] : sp.profesionales;
+      return { id: sp.profesional_id as string, nombre: (prof as { nombre: string })?.nombre ?? "" };
+    });
+
+    const idsConServicio: Set<string> | null = profesionalServiciosRes
+      ? new Set((profesionalServiciosRes.data ?? []).map((p) => p.profesional_id as string))
+      : null;
+
+    let candidatos = candidatosPermanentes;
+    if (fecha) {
+      const idsPermanentes = candidatosPermanentes.map((c) => c.id);
+      const consultasDestinos = [
         supabase
           .from("destinos_puntuales")
           .select("profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)")
-          .eq("fecha", fecha)
-          .in("profesional_id", idsPermanentes)
-      );
-    }
-    const resultadosDestinos = await Promise.all(consultasDestinos);
-    const destinosPorProfesional = new Map<
-      string,
-      { profesional_id: string; nombre: string; sede_id: string; fecha: string; hora_inicio: string; hora_fin: string }
-    >();
-    for (const { data } of resultadosDestinos) {
-      for (const fila of data ?? []) {
-        const prof = Array.isArray(fila.profesionales) ? fila.profesionales[0] : fila.profesionales;
-        destinosPorProfesional.set(fila.profesional_id, {
-          profesional_id: fila.profesional_id,
-          nombre: (prof as { nombre: string } | null)?.nombre ?? "",
-          sede_id: fila.sede_id,
-          fecha: fila.fecha,
-          hora_inicio: fila.hora_inicio,
-          hora_fin: fila.hora_fin,
-        });
+          .eq("sede_id", sedeId)
+          .eq("fecha", fecha),
+      ];
+      if (idsPermanentes.length > 0) {
+        consultasDestinos.push(
+          supabase
+            .from("destinos_puntuales")
+            .select("profesional_id, sede_id, fecha, hora_inicio, hora_fin, profesionales!inner(nombre)")
+            .eq("fecha", fecha)
+            .in("profesional_id", idsPermanentes)
+        );
       }
+      const resultadosDestinos = await Promise.all(consultasDestinos);
+      const destinosPorProfesional = new Map<
+        string,
+        { profesional_id: string; nombre: string; sede_id: string; fecha: string; hora_inicio: string; hora_fin: string }
+      >();
+      for (const { data } of resultadosDestinos) {
+        for (const fila of data ?? []) {
+          const prof = Array.isArray(fila.profesionales) ? fila.profesionales[0] : fila.profesionales;
+          destinosPorProfesional.set(fila.profesional_id, {
+            profesional_id: fila.profesional_id,
+            nombre: (prof as { nombre: string } | null)?.nombre ?? "",
+            sede_id: fila.sede_id,
+            fecha: fila.fecha,
+            hora_inicio: fila.hora_inicio,
+            hora_fin: fila.hora_fin,
+          });
+        }
+      }
+      const destinosDelDia = [...destinosPorProfesional.values()];
+
+      ({ candidatos } = resolverCandidatosConDestinosPuntuales({
+        candidatosPermanentes,
+        destinosDelDia,
+        sedeId,
+        // Si no se pidió filtrar por servicio, que un destino puntual no
+        // quede fuera solo por no saber si lo hace o no: se le deja pasar
+        // igual, y el filtro de servicio de más abajo (si lo hay) se le
+        // aplica exactamente igual que a un profesional permanente.
+        idsQueHacenServicio: idsConServicio ?? new Set(destinosDelDia.map((d) => d.profesional_id)),
+      }));
     }
-    const destinosDelDia = [...destinosPorProfesional.values()];
 
-    ({ candidatos } = resolverCandidatosConDestinosPuntuales({
-      candidatosPermanentes,
-      destinosDelDia,
-      sedeId,
-      // Si no se pidió filtrar por servicio, que un destino puntual no
-      // quede fuera solo por no saber si lo hace o no: se le deja pasar
-      // igual, y el filtro de servicio de más abajo (si lo hay) se le
-      // aplica exactamente igual que a un profesional permanente.
-      idsQueHacenServicio: idsConServicio ?? new Set(destinosDelDia.map((d) => d.profesional_id)),
+    const profesionalesSinFoto = candidatos.filter((c) => !idsConServicio || idsConServicio.has(c.id));
+
+    // Foto de perfil (pedido de Diego, 19/09/2026): se añade aparte, en vez
+    // de meterla en los selects de arriba, para no tener que tocar el
+    // tipado de resolverCandidatosConDestinosPuntuales (compartido con el
+    // cálculo real de disponibilidad en lib/availability.ts).
+    const ids = profesionalesSinFoto.map((p) => p.id);
+    // Valoración media (★ y nº de opiniones), comparación con la ficha de
+    // negocio de Booksy — pedido de Diego 19/10/2026. null si todavía no
+    // tiene ninguna, para que el paso de elegir profesional no muestre un
+    // "0,0 ★" engañoso. Fotos y valoraciones se piden a la vez.
+    const [{ data: fotos }, valoraciones] = await Promise.all([
+      ids.length > 0
+        ? supabase.from("profesionales").select("id, foto_url").in("id", ids)
+        : Promise.resolve({ data: [] as { id: string; foto_url: string | null }[] }),
+      valoracionesPorColumna(supabase, "profesional_id", ids),
+    ]);
+    const fotoPorId = new Map((fotos ?? []).map((f) => [f.id as string, f.foto_url as string | null]));
+
+    const profesionales = profesionalesSinFoto.map((p) => ({
+      ...p,
+      foto_url: fotoPorId.get(p.id) ?? null,
+      valoracion: valoraciones.get(p.id) ?? null,
     }));
+
+    return NextResponse.json({ profesionales });
+  } catch (err) {
+    await registrarError({
+      origen: "reserva",
+      mensaje: "Fallo listando profesionales disponibles para el paso de elegir profesional.",
+      detalle: err,
+    });
+    return NextResponse.json({ error: "No se pudieron cargar los profesionales." }, { status: 500 });
   }
-
-  const profesionalesSinFoto = candidatos.filter((c) => !idsConServicio || idsConServicio.has(c.id));
-
-  // Foto de perfil (pedido de Diego, 19/09/2026): se añade aparte, en vez
-  // de meterla en los selects de arriba, para no tener que tocar el
-  // tipado de resolverCandidatosConDestinosPuntuales (compartido con el
-  // cálculo real de disponibilidad en lib/availability.ts).
-  const ids = profesionalesSinFoto.map((p) => p.id);
-  // Valoración media (★ y nº de opiniones), comparación con la ficha de
-  // negocio de Booksy — pedido de Diego 19/10/2026. null si todavía no
-  // tiene ninguna, para que el paso de elegir profesional no muestre un
-  // "0,0 ★" engañoso. Fotos y valoraciones se piden a la vez.
-  const [{ data: fotos }, valoraciones] = await Promise.all([
-    ids.length > 0
-      ? supabase.from("profesionales").select("id, foto_url").in("id", ids)
-      : Promise.resolve({ data: [] as { id: string; foto_url: string | null }[] }),
-    valoracionesPorColumna(supabase, "profesional_id", ids),
-  ]);
-  const fotoPorId = new Map((fotos ?? []).map((f) => [f.id as string, f.foto_url as string | null]));
-
-  const profesionales = profesionalesSinFoto.map((p) => ({
-    ...p,
-    foto_url: fotoPorId.get(p.id) ?? null,
-    valoracion: valoraciones.get(p.id) ?? null,
-  }));
-
-  return NextResponse.json({ profesionales });
 }
