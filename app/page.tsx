@@ -8,6 +8,8 @@ import { BotonCompartir } from "@/components/brand/BotonCompartir";
 import { BotonInstalarApp } from "@/components/pwa/BotonInstalarApp";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { cargarResenasExternas } from "@/lib/portafolio";
+import { Tarjeta } from "@/components/ui/Tarjeta";
+import { Boton } from "@/components/ui/Boton";
 
 export const dynamic = "force-dynamic";
 
@@ -49,66 +51,65 @@ export default async function Home() {
       : null;
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-brand-black px-4 py-16 text-center">
-      <HeroBackdrop />
+    <main className="min-h-screen bg-stone-50">
+      {/* Franja oscura: aquí vive el logo (PNG blanco sobre transparente,
+          pensado para fondo oscuro) y el vídeo de fondo — sin tocar. */}
+      <div className="relative flex flex-col items-center overflow-hidden bg-brand-black px-4 py-16 text-center">
+        <HeroBackdrop />
+        <div className="relative z-10 flex flex-col items-center">
+          <GrassoLogo className="h-auto w-64 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:w-80" />
+          <p className="mt-5 font-heading text-xl italic text-brand-white-dim">
+            {cliente ? `Hola, ${cliente.nombre.split(" ")[0]}` : "Reserva tu cita en 1 minuto"}
+          </p>
+        </div>
+      </div>
 
-      <div className="relative z-10 flex flex-col items-center">
-        <GrassoLogo className="h-auto w-64 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:w-80" />
-        <p className="mt-5 font-heading text-xl italic text-brand-white-dim">
-          {cliente ? `Hola, ${cliente.nombre.split(" ")[0]}` : "Reserva tu cita en 1 minuto"}
-        </p>
-
-        <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:gap-10">
+      {/* Cuerpo claro: mismo tono que el panel de admin (bg-stone-50),
+          para que cliente y admin compartan la misma base. */}
+      <div className="flex flex-col items-center px-4 py-10 text-center">
+        <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
           {(sedes ?? []).map((sede) => (
-            <div key={sede.id} className="max-w-[15rem]">
-              <p className="font-mono text-xs uppercase tracking-widest text-brand-yellow">{sede.nombre}</p>
-              {sede.direccion && (
-                <p className="mt-1 font-body text-sm text-brand-white-dim">{sede.direccion}</p>
-              )}
+            <Tarjeta key={sede.id} className="max-w-[15rem]">
+              <p className="font-heading text-sm text-stone-900">{sede.nombre}</p>
+              {sede.direccion && <p className="mt-1 font-body text-sm text-stone-600">{sede.direccion}</p>}
               {sede.maps_url && (
                 <a
                   href={sede.maps_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 inline-block font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+                  className="mt-1 inline-block font-body text-xs text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-stone-900"
                 >
                   Cómo llegar
                 </a>
               )}
               <NotasResenas resenas={resenas[sede.id]} className="mt-2 items-center" />
-            </div>
+            </Tarjeta>
           ))}
         </div>
 
-        <Link
-          href="/reservar"
-          className="mt-10 rounded-none bg-brand-white px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-opacity hover:opacity-85"
-        >
+        <Boton href="/reservar" variante="primario" className="mt-10">
           Reservar cita
-        </Link>
+        </Boton>
 
         {repetir && (
-          <Link
-            href={repetir.href}
-            className="mt-4 flex flex-col items-center rounded-none border border-brand-white/70 px-6 py-2.5 font-body text-brand-white transition-colors hover:bg-brand-white/10"
-          >
-            <span className="text-sm font-semibold uppercase tracking-wide">Reservar de nuevo</span>
-            <span className="text-xs text-brand-white-dim">
+          <Boton href={repetir.href} variante="secundario" className="mt-4 flex-col gap-0.5 py-2.5">
+            <span className="text-sm font-semibold">Reservar de nuevo</span>
+            <span className="text-xs text-stone-500">
               {repetir.servicio} con {repetir.barbero}
             </span>
-          </Link>
+          </Boton>
         )}
 
         <div className="mt-4 flex gap-6">
           <Link
             href="/portafolio"
-            className="font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
+            className="font-body text-sm font-semibold text-stone-700 underline decoration-brand-yellow-dark/60 underline-offset-4 hover:text-stone-900"
           >
             Nuestros trabajos
           </Link>
           <Link
             href="/tienda"
-            className="font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
+            className="font-body text-sm font-semibold text-stone-700 underline decoration-brand-yellow-dark/60 underline-offset-4 hover:text-stone-900"
           >
             Tienda
           </Link>
@@ -116,12 +117,9 @@ export default async function Home() {
 
         {/* Botón bien visible para todos. Si este móvil no le reconoce,
             /perfil le lleva a entrar con su teléfono y un código. */}
-        <Link
-          href="/perfil"
-          className="mt-5 rounded-full border-2 border-brand-yellow px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow transition-colors hover:bg-brand-yellow/10"
-        >
+        <Boton href="/perfil" variante="acento" className="mt-5">
           {cliente ? "Mi perfil y mis citas" : "Mi perfil"}
-        </Link>
+        </Boton>
 
         <BotonInstalarApp />
 
@@ -135,7 +133,7 @@ export default async function Home() {
 
         <Link
           href="/politica-privacidad"
-          className="mt-8 font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+          className="mt-8 font-body text-xs text-stone-400 underline decoration-stone-300 underline-offset-4 hover:text-stone-700"
         >
           Política de privacidad
         </Link>
