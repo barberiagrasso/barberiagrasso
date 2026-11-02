@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizarTelefono } from "@/lib/booking";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, firmaWebhookValida } from "@/lib/whatsapp";
 import { ejecutarAsistente } from "@/lib/aiAssistant";
 import { registrarError } from "@/lib/errorLog";
 
@@ -23,9 +23,33 @@ export async function GET(request: NextRequest) {
 
 // Mensajes entrantes de WhatsApp.
 export async function POST(request: NextRequest) {
-  const payload = await request.json().catch(() => null);
-
   try {
+    const cuerpoCrudo = await request.text();
+    const payload = JSON.parse(cuerpoCrudo || "null");
+
+    // Comprueba que el mensaje viene de verdad de Meta (y no de cualquiera
+    // que conozca la URL del webhook). Sin WHATSAPP_APP_SECRET configurada
+    // (todavía no existe en Vercel en el momento de escribir esto) este
+    // bloque no hace nada, igual que ya pasa con HUBSPOT_ACCESS_TOKEN
+    // cuando falta. Al activarse, empieza en modo AVISO: una firma que no
+    // cuadra se registra pero el mensaje se sigue procesando igual que
+    // hoy — pasar a rechazar de verdad (401) es poner
+    // WHATSAPP_FIRMA_ESTRICTA=true en Vercel, sin volver a desplegar nada.
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (appSecret) {
+      const firmaHeader = request.headers.get("x-hub-signature-256");
+      if (!firmaWebhookValida(cuerpoCrudo, firmaHeader, appSecret)) {
+        await registrarError({
+          origen: "webhook_whatsapp",
+          mensaje:
+            "Firma inválida en un mensaje entrante de WhatsApp (revisa WHATSAPP_APP_SECRET en Vercel si esto se repite para todos los mensajes).",
+        });
+        if (process.env.WHATSAPP_FIRMA_ESTRICTA === "true") {
+          return NextResponse.json({ ok: false }, { status: 401 });
+        }
+      }
+    }
+
     const value = payload?.entry?.[0]?.changes?.[0]?.value;
     const mensajeEntrante = value?.messages?.[0];
 
