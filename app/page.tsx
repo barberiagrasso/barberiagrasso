@@ -58,7 +58,7 @@ export default async function Home() {
         <HeroBackdrop />
         <div className="relative z-10 flex flex-col items-center">
           <GrassoLogo className="h-auto w-64 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:w-80" />
-          <p className="mt-5 font-heading text-xl italic text-brand-white-dim">
+          <p className="mt-5 font-heading text-xl text-brand-white-dim">
             {cliente ? `Hola, ${cliente.nombre.split(" ")[0]}` : "Reserva tu cita en 1 minuto"}
           </p>
         </div>
@@ -82,7 +82,7 @@ export default async function Home() {
                   Cómo llegar
                 </a>
               )}
-              <NotasResenas resenas={resenas[sede.id]} className="mt-2 items-center" />
+              <NotasResenas resenas={resenas[sede.id]} claro className="mt-2 items-center" />
             </Tarjeta>
           ))}
         </div>
@@ -92,7 +92,7 @@ export default async function Home() {
         </Boton>
 
         {repetir && (
-          <Boton href={repetir.href} variante="secundario" className="mt-4 flex-col gap-0.5 py-2.5">
+          <Boton href={repetir.href} variante="secundario" className="mt-4 flex-col">
             <span className="text-sm font-semibold">Reservar de nuevo</span>
             <span className="text-xs text-stone-500">
               {repetir.servicio} con {repetir.barbero}
@@ -128,12 +128,13 @@ export default async function Home() {
             path="/"
             titulo="Barbería Grasso"
             texto="Reserva tu cita en Barbería Grasso desde el móvil."
+            className="inline-flex items-center gap-1.5 font-body text-xs text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-stone-900"
           />
         </div>
 
         <Link
           href="/politica-privacidad"
-          className="mt-8 font-body text-xs text-stone-400 underline decoration-stone-300 underline-offset-4 hover:text-stone-700"
+          className="mt-8 font-body text-xs text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-stone-900"
         >
           Política de privacidad
         </Link>

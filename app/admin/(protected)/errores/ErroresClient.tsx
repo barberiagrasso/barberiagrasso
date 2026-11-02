@@ -66,7 +66,7 @@ export default function ErroresClient({
         ) : (
           <Tarjeta sinRelleno className="divide-y divide-stone-100">
             {pendientes.map((e) => (
-              <div key={e.id} className="p-4">
+              <div key={e.id} className="p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -108,7 +108,7 @@ export default function ErroresClient({
         ) : (
           <Tarjeta sinRelleno className="divide-y divide-stone-100 opacity-70">
             {resueltos.map((e) => (
-              <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
+              <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                 <span className="text-stone-600">
                   <Insignia variante="neutral" className="mr-2">
                     {ETIQUETA_ORIGEN[e.origen] ?? e.origen}

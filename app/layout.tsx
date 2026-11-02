@@ -6,6 +6,7 @@ import "@fontsource/sora/700.css";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
 // Lato se mantiene cargada (sin que ninguna clase de Tailwind la use ya)
 // porque app/perfil/tarjeta/TarjetaClient.tsx la dibuja directamente en
 // un <canvas> vía document.fonts — fuera del alcance de esta etapa.
