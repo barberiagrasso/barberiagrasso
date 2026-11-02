@@ -28,71 +28,80 @@ export async function POST(request: NextRequest) {
 
   const telefono = normalizarTelefono(telefonoBruto);
 
-  // Mismos límites que el login: por teléfono (alguien probando códigos
-  // contra una cuenta) y por IP (probando muchos teléfonos distintos).
-  const [porTelefono, porIp] = await Promise.all([
-    comprobarLimite(`recuperar-confirmar:tel:${telefono}`, { maxIntentos: 8, ventanaMinutos: 15 }),
-    comprobarLimite(`recuperar-confirmar:ip:${ipDePeticion(request)}`, { maxIntentos: 30, ventanaMinutos: 15 }),
-  ]);
-  if (!porTelefono.permitido || !porIp.permitido) {
-    return NextResponse.json(RESPUESTA_DEMASIADOS_INTENTOS, { status: 429 });
-  }
+  try {
+    // Mismos límites que el login: por teléfono (alguien probando códigos
+    // contra una cuenta) y por IP (probando muchos teléfonos distintos).
+    const [porTelefono, porIp] = await Promise.all([
+      comprobarLimite(`recuperar-confirmar:tel:${telefono}`, { maxIntentos: 8, ventanaMinutos: 15 }),
+      comprobarLimite(`recuperar-confirmar:ip:${ipDePeticion(request)}`, { maxIntentos: 30, ventanaMinutos: 15 }),
+    ]);
+    if (!porTelefono.permitido || !porIp.permitido) {
+      return NextResponse.json(RESPUESTA_DEMASIADOS_INTENTOS, { status: 429 });
+    }
 
-  const admin = createAdminClient();
+    const admin = createAdminClient();
 
-  const { data: cliente } = await admin
-    .from("clientes")
-    .select("id, nombre, user_id")
-    .eq("telefono", telefono)
-    .maybeSingle();
+    const { data: cliente } = await admin
+      .from("clientes")
+      .select("id, nombre, user_id")
+      .eq("telefono", telefono)
+      .maybeSingle();
 
-  if (!cliente?.user_id) {
-    return NextResponse.json(ERROR_CODIGO, { status: 401 });
-  }
+    if (!cliente?.user_id) {
+      return NextResponse.json(ERROR_CODIGO, { status: 401 });
+    }
 
-  const { data: registro } = await admin
-    .from("codigos_recuperacion")
-    .select("id, codigo_hash, intentos, expira_at, usado_at")
-    .eq("cliente_id", cliente.id)
-    .is("usado_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data: registro } = await admin
+      .from("codigos_recuperacion")
+      .select("id, codigo_hash, intentos, expira_at, usado_at")
+      .eq("cliente_id", cliente.id)
+      .is("usado_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!registro || new Date(registro.expira_at) < new Date() || registro.intentos >= MAX_INTENTOS_CODIGO) {
-    return NextResponse.json(ERROR_CODIGO, { status: 401 });
-  }
+    if (!registro || new Date(registro.expira_at) < new Date() || registro.intentos >= MAX_INTENTOS_CODIGO) {
+      return NextResponse.json(ERROR_CODIGO, { status: 401 });
+    }
 
-  if (!codigoRecuperacionCoincide(codigo, registro.codigo_hash)) {
-    await admin.from("codigos_recuperacion").update({ intentos: registro.intentos + 1 }).eq("id", registro.id);
-    return NextResponse.json(ERROR_CODIGO, { status: 401 });
-  }
+    if (!codigoRecuperacionCoincide(codigo, registro.codigo_hash)) {
+      await admin.from("codigos_recuperacion").update({ intentos: registro.intentos + 1 }).eq("id", registro.id);
+      return NextResponse.json(ERROR_CODIGO, { status: 401 });
+    }
 
-  // Código correcto: lo marcamos usado ANTES de tocar la contraseña,
-  // para que no se pueda reutilizar aunque algo falle después.
-  await admin.from("codigos_recuperacion").update({ usado_at: new Date().toISOString() }).eq("id", registro.id);
+    // Código correcto: lo marcamos usado ANTES de tocar la contraseña,
+    // para que no se pueda reutilizar aunque algo falle después.
+    await admin.from("codigos_recuperacion").update({ usado_at: new Date().toISOString() }).eq("id", registro.id);
 
-  const { error: errorPassword } = await admin.auth.admin.updateUserById(cliente.user_id, { password: passwordNueva });
-  if (errorPassword) {
+    const { error: errorPassword } = await admin.auth.admin.updateUserById(cliente.user_id, { password: passwordNueva });
+    if (errorPassword) {
+      await registrarError({
+        origen: "recuperacion_password",
+        mensaje: `No se pudo actualizar la contraseña de ${cliente.nombre ?? "un cliente"} tras verificar el código.`,
+        detalle: errorPassword,
+      });
+      return NextResponse.json({ error: "No se pudo actualizar la contraseña. Inténtalo de nuevo." }, { status: 500 });
+    }
+
+    // Inicia sesión directamente, igual que en el registro, para que el
+    // cliente no tenga que volver a escribir la contraseña que acaba de
+    // elegir.
+    const supabase = await createClient();
+    const { error: errorSesion } = await supabase.auth.signInWithPassword({
+      email: emailSinteticoParaTelefono(telefono),
+      password: passwordNueva,
+    });
+    if (errorSesion) {
+      return NextResponse.json({ ok: true, sesionIniciada: false });
+    }
+
+    return NextResponse.json({ ok: true, sesionIniciada: true });
+  } catch (err) {
     await registrarError({
       origen: "recuperacion_password",
-      mensaje: `No se pudo actualizar la contraseña de ${cliente.nombre ?? "un cliente"} tras verificar el código.`,
-      detalle: errorPassword,
+      mensaje: "Fallo inesperado confirmando un código de recuperación de contraseña.",
+      detalle: err,
     });
-    return NextResponse.json({ error: "No se pudo actualizar la contraseña. Inténtalo de nuevo." }, { status: 500 });
+    return NextResponse.json({ error: "Algo ha fallado. Inténtalo de nuevo." }, { status: 500 });
   }
-
-  // Inicia sesión directamente, igual que en el registro, para que el
-  // cliente no tenga que volver a escribir la contraseña que acaba de
-  // elegir.
-  const supabase = await createClient();
-  const { error: errorSesion } = await supabase.auth.signInWithPassword({
-    email: emailSinteticoParaTelefono(telefono),
-    password: passwordNueva,
-  });
-  if (errorSesion) {
-    return NextResponse.json({ ok: true, sesionIniciada: false });
-  }
-
-  return NextResponse.json({ ok: true, sesionIniciada: true });
 }
