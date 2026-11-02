@@ -1,4 +1,5 @@
 import "server-only";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // Nota: v21.0 es una versión reciente de la Graph API en el momento de
 // escribir esto. Meta va sacando versiones nuevas cada pocos meses; si
@@ -103,4 +104,39 @@ export async function sendWhatsAppTemplate(
     console.error("Error enviando plantilla de WhatsApp", res.status, detalle);
     throw new Error(`WhatsApp respondió ${res.status}: ${detalle}`);
   }
+}
+
+
+/**
+ * Comprueba que una petición entrante al webhook de WhatsApp viene de
+ * verdad de Meta: recalcula el HMAC-SHA256 del cuerpo CRUDO (antes de
+ * parsear el JSON) con el "App Secret" de la app de Meta y lo compara,
+ * en tiempo constante, con la cabecera `X-Hub-Signature-256` que Meta
+ * manda en cada mensaje (formato `sha256=<hex>`).
+ *
+ * Devuelve `false` de inmediato, sin calcular nada, si falta cualquiera
+ * de las tres cosas (cuerpo, cabecera o secreto) o si la cabecera no
+ * tiene el prefijo esperado — un secreto vacío nunca se considera
+ * "válido" aunque matemáticamente cuadre con una firma calculada con clave
+ * vacía.
+ */
+export function firmaWebhookValida(
+  cuerpoCrudo: string,
+  firmaRecibida: string | null,
+  appSecret: string
+): boolean {
+  if (!appSecret || !firmaRecibida) {
+    return false;
+  }
+  const PREFIJO = "sha256=";
+  if (!firmaRecibida.startsWith(PREFIJO)) {
+    return false;
+  }
+  const firmaEsperada = createHmac("sha256", appSecret).update(cuerpoCrudo).digest("hex");
+  const bufferRecibido = Buffer.from(firmaRecibida.slice(PREFIJO.length), "hex");
+  const bufferEsperado = Buffer.from(firmaEsperada, "hex");
+  if (bufferRecibido.length !== bufferEsperado.length) {
+    return false;
+  }
+  return timingSafeEqual(bufferRecibido, bufferEsperado);
 }
