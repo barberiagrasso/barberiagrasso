@@ -1,17 +1,18 @@
 import type { Metadata, Viewport } from "next";
-// Una sola familia (Lato) en todos sus grosores: la jerarquía visual
-// (titulares / subtítulos / texto / precios y horas) se consigue con el
-// peso de la letra, no cambiando de tipografía — ver globals.css.
-import "@fontsource/lato/100.css";
-import "@fontsource/lato/100-italic.css";
+// Sora (titulares) + Inter (cuerpo): el sistema de diseño nuevo — ver
+// globals.css para qué clase de utilidad usa cada una.
+import "@fontsource/sora/600.css";
+import "@fontsource/sora/700.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
+// Lato se mantiene cargada (sin que ninguna clase de Tailwind la use ya)
+// porque app/perfil/tarjeta/TarjetaClient.tsx la dibuja directamente en
+// un <canvas> vía document.fonts — fuera del alcance de esta etapa.
 import "@fontsource/lato/300.css";
-import "@fontsource/lato/300-italic.css";
 import "@fontsource/lato/400.css";
-import "@fontsource/lato/400-italic.css";
 import "@fontsource/lato/700.css";
-import "@fontsource/lato/700-italic.css";
-import "@fontsource/lato/900.css";
-import "@fontsource/lato/900-italic.css";
 import "./globals.css";
 import RegistrarServiceWorker from "@/components/pwa/RegistrarServiceWorker";
 
