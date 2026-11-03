@@ -40,10 +40,10 @@
   --color-brand-yellow-dark: var(--brand-yellow-dark);
   --color-brand-yellow-ink: var(--brand-yellow-ink);
 
-  --font-display: "Sora", "Helvetica Neue", Arial, sans-serif;
-  --font-heading: "Sora", "Helvetica Neue", Arial, sans-serif;
-  --font-body: "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Lato", "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Lato", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Lato", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Lato", "Helvetica Neue", Arial, sans-serif;
 }
 
 html {
@@ -57,15 +57,16 @@ body {
   font-weight: 400;
 }
 
-/* Sora para titulares, Inter para el resto — la jerarquía viene del
-   peso y el tamaño, no de mayúsculas forzadas. */
+/* Titulares: el peso máximo (Black) hace de sustituto de la condensada
+   que había antes; el tracking le da aire a tamaños grandes. */
 .font-display {
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .font-heading {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .font-body {
@@ -73,9 +74,10 @@ body {
 }
 
 /* Precios, horas y duraciones: negrita + cifras tabulares para que
-   siempre se alineen en columna. */
+   siempre se alineen en columna, aunque ya no sea una monoespaciada de
+   verdad. */
 .font-mono {
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 

@@ -1,10 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Tarjeta } from "@/components/ui/Tarjeta";
-import { Boton } from "@/components/ui/Boton";
-import { Insignia } from "@/components/ui/Insignia";
-import { EstadoVacio } from "@/components/ui/EstadoVacio";
 
 interface ErrorFila {
   id: string;
@@ -62,15 +58,19 @@ export default function ErroresClient({
           Sin resolver ({pendientes.length})
         </h2>
         {pendientes.length === 0 ? (
-          <EstadoVacio titulo="No hay ningún error pendiente" descripcion="Todo en orden." />
+          <p className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-500">
+            No hay ningún error pendiente. Todo en orden.
+          </p>
         ) : (
-          <Tarjeta sinRelleno className="divide-y divide-stone-100">
+          <div className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
             {pendientes.map((e) => (
               <div key={e.id} className="p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <Insignia variante="error">{ETIQUETA_ORIGEN[e.origen] ?? e.origen}</Insignia>
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800">
+                        {ETIQUETA_ORIGEN[e.origen] ?? e.origen}
+                      </span>
                       <span className="text-stone-400">{formatoFecha(e.created_at)}</span>
                     </div>
                     <button
@@ -85,19 +85,17 @@ export default function ErroresClient({
                       </pre>
                     )}
                   </div>
-                  <Boton
-                    variante="secundario"
-                    tamano="sm"
+                  <button
                     onClick={() => marcarResuelto(e.id)}
                     disabled={marcando === e.id}
-                    className="shrink-0"
+                    className="shrink-0 rounded-lg border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
                   >
                     Marcar resuelto
-                  </Boton>
+                  </button>
                 </div>
               </div>
             ))}
-          </Tarjeta>
+          </div>
         )}
       </section>
 
@@ -106,19 +104,19 @@ export default function ErroresClient({
         {resueltos.length === 0 ? (
           <p className="text-sm text-stone-400">Todavía no has resuelto ninguno.</p>
         ) : (
-          <Tarjeta sinRelleno className="divide-y divide-stone-100 opacity-70">
+          <div className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white opacity-70">
             {resueltos.map((e) => (
               <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                 <span className="text-stone-600">
-                  <Insignia variante="neutral" className="mr-2">
+                  <span className="mr-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
                     {ETIQUETA_ORIGEN[e.origen] ?? e.origen}
-                  </Insignia>
+                  </span>
                   {e.mensaje}
                 </span>
                 <span className="text-xs text-stone-400">{formatoFecha(e.created_at)}</span>
               </div>
             ))}
-          </Tarjeta>
+          </div>
         )}
       </section>
     </div>
