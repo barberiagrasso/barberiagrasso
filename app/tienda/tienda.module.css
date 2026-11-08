@@ -1,5 +1,5 @@
 .body { max-width: 1100px; margin: 0 auto; padding: 0 var(--pad) clamp(90px, 10vw, 140px); }
-.lede { max-width: 46em; margin: -8px 0 0; font-size: 15px; color: rgba(245, 241, 230, .75); }
+.lede { max-width: 46em; margin: 18px 0 0; font-size: 15px; color: rgba(245, 241, 230, .75); }
 .coins { margin-top: 18px; display: inline-block; font-size: 14px; font-weight: 600; color: var(--brand-yellow); text-decoration: underline; text-decoration-color: rgba(242, 211, 104, .4); text-underline-offset: 4px; }
 .empty { text-align: center; font-size: 15px; color: rgba(245, 241, 230, .6); padding: 40px 0; }
 
