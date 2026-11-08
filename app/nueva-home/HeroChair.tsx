@@ -19,11 +19,6 @@ import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import styles from "./nueva-home.module.css";
 
 gsap.registerPlugin(ScrollTrigger);
-// Evita que una simple transición CSS :hover (p. ej. al ampliar una sede) dispare un
-// recálculo del ScrollTrigger fijado del hero: con el pin activo, ese recálculo puede
-// devolver al usuario arriba del todo si está desplazado. Solo refrescamos a mano cuando
-// de verdad cambia la altura de la página (ver toggleSede en NuevaHomeClient).
-ScrollTrigger.config({ autoRefreshEvents: "visibilitychange,DOMContentLoaded,load" });
 
 export function HeroChair({ works }: { works: string[] }) {
   const introRef = useRef<HTMLElement>(null);
@@ -42,6 +37,15 @@ export function HeroChair({ works }: { works: string[] }) {
     const intro = introRef.current, canvas = canvasRef.current, loaderEl = loaderRef.current;
     const loaderBar = loaderBarRef.current, loaderPct = loaderPctRef.current;
     if (!intro || !canvas || !loaderEl || !loaderBar || !loaderPct) return;
+
+    // Evita que una simple transición CSS :hover (p. ej. al ampliar una sede) dispare un
+    // recálculo del ScrollTrigger fijado del hero: con el pin activo, ese recálculo puede
+    // devolver al usuario arriba del todo si está desplazado. Solo refrescamos a mano cuando
+    // de verdad cambia la altura de la página (ver toggleSede en NuevaHomeClient). Esto tiene
+    // que ir aquí dentro (no a nivel de módulo): en el servidor, durante el renderizado SSR de
+    // este componente de cliente, ScrollTrigger todavía no tiene el entorno del navegador listo
+    // y "ScrollTrigger.config" revienta ahí fuera; dentro de useEffect solo se ejecuta en el navegador.
+    ScrollTrigger.config({ autoRefreshEvents: "visibilitychange,DOMContentLoaded,load" });
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const isMobile = () => window.innerWidth < 760;
