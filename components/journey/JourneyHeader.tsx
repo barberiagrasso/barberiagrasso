@@ -44,7 +44,7 @@ export function JourneyHeader({ cliente }: JourneyHeaderProps) {
       </Link>
 
       <div className={`${styles.siteHeaderSide} ${styles.siteHeaderSideEnd ?? ""}`}>
-        <Link href="/perfil">{cliente ? "Mi perfil" : "Entrar"}</Link>
+        <Link href="/perfil" className={styles.siteHeaderAccount}>{cliente ? "Mi perfil" : "Entrar"}</Link>
         <Link href="/reservar" className={`${styles.btn} ${styles.btnSmall}`}>Reservar cita</Link>
       </div>
     </header>

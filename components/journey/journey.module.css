@@ -110,6 +110,8 @@
 .siteHeaderNav a:hover::after { transform: scaleX(1); transform-origin: left; }
 .siteHeaderSide { display: flex; align-items: center; gap: 14px; flex: 1 1 0; min-width: 0; }
 .siteHeaderSide:last-child { justify-content: flex-end; }
+.siteHeaderAccount { text-decoration: none; font-size: 14px; color: rgba(245, 241, 230, .8); white-space: nowrap; }
+.siteHeaderAccount:hover { color: var(--brand-white); }
 
 /* ---------- pie compartido (JourneyFooter) ---------- */
 .siteFooter { padding: 70px var(--pad) 44px; text-align: center; color: var(--mute); border-top: 1px solid rgba(245, 241, 230, .08); }
@@ -127,7 +129,11 @@
 .pageHead h1 { font-family: var(--display); text-transform: uppercase; font-size: clamp(40px, 7vw, 100px); line-height: .92; }
 
 @media (max-width: 760px) {
-  .siteHeaderNav { display: none; }
+  /* En móvil, igual que en el primer diseño de /nueva-home que ya vio Diego:
+     solo quedan el logo centrado y "Reservar cita" — el resto de enlaces
+     (Trabajos/Sedes/Tienda y ahora también Entrar/Mi perfil) se ocultan para
+     que no choquen con el logo, que está centrado con position:absolute. */
+  .siteHeaderNav, .siteHeaderAccount { display: none; }
   .siteHeaderLogo img { width: 84px; }
   .siteHeaderSide:last-child { justify-content: flex-end; }
 }
