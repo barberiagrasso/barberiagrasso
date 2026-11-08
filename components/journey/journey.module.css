@@ -1,0 +1,137 @@
+/*
+  Sistema de diseño compartido del nuevo rediseño (grasso-web.zip, pedido de Diego 08/11/2026 y
+  ampliado el mismo mes a "el resto de pasos del user journey"). Vive aparte de
+  app/nueva-home/nueva-home.module.css para que todas las páginas (home nueva, reservar, perfil,
+  portafolio, tienda, política de privacidad) compartan exactamente los mismos tokens, botones,
+  cabecera y pie — en vez de cada página reinventándolos a su manera y acabando desincronizadas.
+  nueva-home.module.css se apoya en estas mismas clases para la cabecera/pie (ver JourneyHeader y
+  JourneyFooter) en vez de llevar las suyas propias.
+
+  Todo vive bajo .journeyPage (nunca en selectores globales como body/img/a/h1) para no chocar con
+  el resto del sitio, que sigue en Tailwind con su propia paleta.
+*/
+
+.journeyPage {
+  --mute: var(--brand-white-dim);
+  --red: #c8202f;
+  --blue: #1f3f94;
+  --display: var(--font-anton), 'Impact', 'Arial Narrow', sans-serif;
+  --script: var(--font-permanent-marker), 'Marker Felt', cursive;
+  --body: var(--font-journey-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --pad: clamp(20px, 5vw, 72px);
+  --ease: cubic-bezier(.7, 0, .2, 1);
+
+  position: relative;
+  min-height: 100%;
+  background: var(--brand-black);
+  color: var(--brand-white);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.journeyPage img { display: block; max-width: 100%; }
+.journeyPage a { color: inherit; }
+/* Ganan a los botones de abajo por especificidad (clase+etiqueta > una sola clase) a propósito:
+   mismo motivo por el que /nueva-home necesitó este mismo truco (si no, el botón hereda el color
+   del texto de su sección en vez del suyo, y el texto deja de verse en botones de fondo claro). */
+.journeyPage a.btn { color: var(--brand-black); }
+.journeyPage a.btnGhost { color: var(--brand-white); }
+.journeyPage a.btnGhost:hover { color: var(--brand-black); }
+.journeyPage a.btnOutlineYellow { color: var(--brand-yellow); }
+.journeyPage h1, .journeyPage h2, .journeyPage h3 { margin: 0; font-weight: 400; }
+.journeyPage :focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 3px; }
+
+/* grano sutil, igual que en /nueva-home */
+.journeyPage::after {
+  content: '';
+  position: fixed; inset: -50%;
+  pointer-events: none; z-index: 90;
+  opacity: .06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.eyebrow {
+  margin: 0 0 18px;
+  font-size: 12px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--brand-yellow);
+  font-weight: 600;
+}
+
+.lead { margin: 0; font-size: clamp(20px, 2.1vw, 28px); line-height: 1.32; letter-spacing: -.01em; font-weight: 500; max-width: 38em; }
+
+/* ---------- botones ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 15px 26px;
+  border-radius: 999px;
+  background: var(--brand-white);
+  color: var(--brand-black);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: .02em;
+  text-decoration: none;
+  border: 1px solid var(--brand-white);
+  transition: background .3s, color .3s, transform .3s var(--ease);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn:hover { background: var(--brand-yellow); border-color: var(--brand-yellow); transform: translateY(-2px); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; }
+.btnGhost { background: transparent; color: var(--brand-white); border-color: rgba(245, 241, 230, .35); }
+.btnGhost:hover { background: var(--brand-white); color: var(--brand-black); border-color: var(--brand-white); }
+.btnSmall { padding: 10px 18px; font-size: 13px; }
+.btnOutlineYellow {
+  border-radius: 999px; border: 2px solid var(--brand-yellow); color: var(--brand-yellow);
+  background: transparent; padding: 13px 26px; font-weight: 600; font-size: 14px;
+}
+.btnOutlineYellow:hover { background: rgba(242, 211, 104, .1); }
+
+/* ---------- cabecera compartida (JourneyHeader) ---------- */
+.siteHeader {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; gap: 24px;
+  padding: 18px var(--pad);
+  transition: background .4s, padding .4s;
+}
+.siteHeader.scrolled { background: rgba(11,11,10,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding-top: 12px; padding-bottom: 12px; }
+/* Logo centrado (pedido de Diego, 08/11/2026): nav e icono de reserva a los lados, en vez de todo
+   pegado a la izquierda como en el primer diseño de la home. */
+.siteHeaderLogo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.siteHeaderLogo img { width: 100px; height: auto; }
+.siteHeaderNav { display: flex; align-items: center; gap: 24px; }
+.siteHeaderNav a { text-decoration: none; font-size: 14px; color: rgba(245, 241, 230, .8); position: relative; }
+.siteHeaderNav a::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform .4s var(--ease); }
+.siteHeaderNav a:hover { color: var(--brand-white); }
+.siteHeaderNav a:hover::after { transform: scaleX(1); transform-origin: left; }
+.siteHeaderSide { display: flex; align-items: center; gap: 14px; flex: 1 1 0; min-width: 0; }
+.siteHeaderSide:last-child { justify-content: flex-end; }
+
+/* ---------- pie compartido (JourneyFooter) ---------- */
+.siteFooter { padding: 70px var(--pad) 44px; text-align: center; color: var(--mute); border-top: 1px solid rgba(245, 241, 230, .08); }
+.siteFooterLogo { width: 150px; margin: 0 auto 18px; }
+.siteFooter p { margin: 4px 0; }
+.siteFooterSmall { font-size: 13px; margin-top: 18px !important; }
+.siteFooterLinks { margin-top: 18px !important; display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.siteFooterLinks a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(245, 241, 230, .35); }
+.siteFooterLinks a:hover { color: var(--brand-yellow); text-decoration-color: var(--brand-yellow); }
+
+/* ---------- cabecera simple de página interior (reservar, perfil, portafolio, tienda, legal) ---------- */
+/* Deja hueco bajo la cabecera fija y da el mismo titular grande que la home a páginas que no
+   tienen un hero 3D propio. */
+.pageHead { padding: clamp(120px, 18vw, 180px) var(--pad) clamp(50px, 7vw, 80px); }
+.pageHead h1 { font-family: var(--display); text-transform: uppercase; font-size: clamp(40px, 7vw, 100px); line-height: .92; }
+
+@media (max-width: 760px) {
+  .siteHeaderNav { display: none; }
+  .siteHeaderLogo img { width: 84px; }
+  .siteHeaderSide:last-child { justify-content: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journeyPage *, .journeyPage *::before, .journeyPage *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

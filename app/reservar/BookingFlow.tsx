@@ -217,8 +217,16 @@ function colorBarraNivel(
 // ---------------------------------------------------------------------
 
 function PasoTitulo({ children }: { children: React.ReactNode }) {
+  // Mismo titular grande en mayúsculas (Anton) que el resto del rediseño de
+  // Diego, 08/11/2026 ("mantén el estilo de la home consistente en el
+  // resto de pasos del user journey") — antes era font-heading italic,
+  // distinto de /nueva-home. Solo cambia la tipografía/tamaño del título
+  // de cada paso; el resto del paso (lógica, estado) no se toca.
   return (
-    <h2 className="font-heading text-2xl italic text-brand-white">
+    <h2
+      className="text-3xl uppercase leading-none tracking-tight text-brand-white sm:text-4xl"
+      style={{ fontFamily: "var(--font-anton), Impact, 'Arial Narrow', sans-serif" }}
+    >
       {children}
     </h2>
   );
@@ -377,11 +385,14 @@ function BotonPrimario({
   onClick: () => void;
   disabled?: boolean;
 }) {
+  // Píldora redondeada igual que los botones de /nueva-home (antes era un
+  // rectángulo recto, rounded-none) — mismo cambio de piel que PasoTitulo,
+  // sin tocar qué hace el botón ni cuándo está disabled.
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-none bg-brand-white px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+      className="rounded-full bg-brand-white px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-black transition-all hover:-translate-y-0.5 hover:bg-brand-yellow disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:hover:bg-brand-white"
     >
       {children}
     </button>
@@ -1067,7 +1078,9 @@ export default function BookingFlow({
               </TarjetaOpcion>
             ))}
 
-            <EnlaceVolver onClick={() => router.push("/")}>
+            {/* "Home" para este enlace es /nueva-home, no /, igual que el
+                logo de la cabecera compartida (elección de Diego, 08/11/2026). */}
+            <EnlaceVolver onClick={() => router.push("/nueva-home")}>
               ← Volver al menú
             </EnlaceVolver>
           </div>
@@ -1721,7 +1734,7 @@ export default function BookingFlow({
             )}
             <div className="flex flex-col items-center gap-2 pt-2 sm:flex-row sm:justify-center">
               <Link
-                href="/"
+                href="/nueva-home"
                 className="rounded-full border border-brand-yellow/50 px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-white transition-colors hover:border-brand-yellow"
               >
                 Ir a inicio
@@ -1731,7 +1744,7 @@ export default function BookingFlow({
               {(clienteInicial || citaConfirmada.guardadoEnMovil) && (
               <Link
                 href="/perfil"
-                className="rounded-none bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
+                className="rounded-full bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
               >
                 Ir a mi perfil
               </Link>

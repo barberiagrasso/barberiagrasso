@@ -13,9 +13,9 @@
   --mute: var(--brand-white-dim);
   --red: #c8202f;
   --blue: #1f3f94;
-  --display: 'Anton', 'Impact', 'Arial Narrow', sans-serif;
-  --script: 'Permanent Marker', 'Marker Felt', cursive;
-  --body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: var(--font-anton), 'Impact', 'Arial Narrow', sans-serif;
+  --script: var(--font-permanent-marker), 'Marker Felt', cursive;
+  --body: var(--font-journey-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
   --pad: clamp(20px, 5vw, 72px);
   --ease: cubic-bezier(.7, 0, .2, 1);
 

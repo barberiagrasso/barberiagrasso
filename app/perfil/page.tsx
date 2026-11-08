@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { requireCliente } from "@/lib/clienteAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { EditarPerfilHeader } from "./EditarPerfilHeader";
 import { HistorialCitas, type CitaNormalizada } from "./HistorialCitas";
 import { BonosSection } from "./BonosSection";
@@ -11,6 +9,11 @@ import { cargarResenasExternas } from "@/lib/portafolio";
 import { fechaCaducidadGrassoCoins } from "@/lib/fidelizacion";
 import { construirRecibo } from "@/lib/recibo";
 import { minutosAgendaExtras } from "@/lib/duracionExtras";
+import { JourneyHeader } from "@/components/journey/JourneyHeader";
+import { JourneyFooter } from "@/components/journey/JourneyFooter";
+import { journeyFontVars } from "@/components/journey/fonts";
+import journeyStyles from "@/components/journey/journey.module.css";
+import styles from "./perfil.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -162,63 +165,54 @@ export default async function PerfilPage() {
   });
 
   return (
-    <main className="min-h-screen bg-brand-black px-4 py-10 sm:py-14">
-      <div className="mx-auto max-w-xl">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <GrassoLogo className="h-auto w-48 text-brand-white sm:w-56" />
-          <h1 className="mt-4 font-heading text-2xl italic text-brand-white">Mi perfil</h1>
-          {/* El nombre iba antes en mayúsculas forzadas con la misma
-              tipografía que las etiquetas de sistema (p. ej. "TU SALDO DE
-              FIDELIZACIÓN") — bien para una etiqueta, pero un nombre
-              propio en mayúsculas de bloque se siente menos cercano.
-              Ahora el nombre se muestra tal cual lo escribió el cliente,
-              y el teléfono mantiene el tratamiento de etiqueta. */}
-          <p className="mt-1 font-body text-base text-brand-white">{cliente.nombre}</p>
-          <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-brand-white-dim">
-            {cliente.telefono}
-          </p>
+    <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
+      <JourneyHeader cliente={{ nombre: cliente.nombre }} />
+
+      <main>
+        <div className={journeyStyles.pageHead} style={{ textAlign: "center", paddingBottom: 0 }}>
+          <p className={journeyStyles.eyebrow}>Mi perfil</p>
+          <h1>{cliente.nombre}</h1>
         </div>
 
-        <div className="mb-6 flex items-center justify-between">
-          <Link
-            href="/"
-            className="font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-          >
-            ← Volver
-          </Link>
-          <EditarPerfilHeader
-            cliente={{
-              nombre: cliente.nombre,
-              telefono: cliente.telefono,
-              email: cliente.email ?? null,
-              fechaNacimiento: cliente.fecha_nacimiento ?? null,
-            }}
-          />
-        </div>
-
-        <Link
-          href="/perfil/tarjeta"
-          className="mb-6 flex items-center justify-between rounded-tl-md bg-brand-black-soft p-5 transition-opacity hover:opacity-90"
-        >
-          <div className="min-w-0 flex-1 pr-4">
-            <p className="font-body text-xs uppercase tracking-widest text-brand-white-dim">Tus GrassoCoins</p>
-            <p className="mt-0.5 font-mono text-2xl text-brand-yellow">{cliente.grassocoins ?? 0}</p>
-            <p className="mt-1 font-body text-xs text-brand-white-dim">1 GrassoCoin por cada euro · canjéalas por servicios</p>
-            {caducanCoins && (
-              <p className="mt-0.5 font-body text-[11px] text-brand-white-dim/70">
-                Caducan el {caducanCoins.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Madrid" })} si no vienes antes
-              </p>
-            )}
+        <div className={styles.body}>
+          <div className={styles.identity}>
+            <p>{cliente.telefono}</p>
           </div>
-          <span className="font-body text-sm text-brand-white-dim">Ver tarjeta →</span>
-        </Link>
 
-        <BonosSection bonos={bonos} />
+          <div className={styles.toolbar}>
+            <EditarPerfilHeader
+              cliente={{
+                nombre: cliente.nombre,
+                telefono: cliente.telefono,
+                email: cliente.email ?? null,
+                fechaNacimiento: cliente.fecha_nacimiento ?? null,
+              }}
+            />
+          </div>
 
-        <h2 className="mb-3 font-heading text-lg text-brand-white">Historial de citas</h2>
+          <a href="/perfil/tarjeta" className={styles.coinsCard}>
+            <div>
+              <p className={styles.coinsLabel}>Tus GrassoCoins</p>
+              <p className={styles.coinsValue}>{cliente.grassocoins ?? 0}</p>
+              <p className={styles.coinsHint}>1 GrassoCoin por cada euro · canjéalas por servicios</p>
+              {caducanCoins && (
+                <p className={styles.coinsExpiry}>
+                  Caducan el {caducanCoins.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Madrid" })} si no vienes antes
+                </p>
+              )}
+            </div>
+            <span className={styles.coinsArrow}>Ver tarjeta →</span>
+          </a>
 
-        <HistorialCitas historialInicial={historial} contactoResenasPorSede={contactoResenasPorSede} />
-      </div>
-    </main>
+          <BonosSection bonos={bonos} />
+
+          <h2 className={styles.sectionTitle}>Historial de citas</h2>
+
+          <HistorialCitas historialInicial={historial} contactoResenasPorSede={contactoResenasPorSede} />
+        </div>
+      </main>
+
+      <JourneyFooter />
+    </div>
   );
 }

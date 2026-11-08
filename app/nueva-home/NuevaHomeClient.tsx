@@ -14,11 +14,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { BotonInstalarApp } from "@/components/pwa/BotonInstalarApp";
 import { BotonCompartir } from "@/components/brand/BotonCompartir";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import type { ResenasExternasSede } from "@/lib/portafolio";
+import { JourneyHeader } from "@/components/journey/JourneyHeader";
+import { JourneyFooter } from "@/components/journey/JourneyFooter";
+import { journeyFontVars } from "@/components/journey/fonts";
 import { HeroChair } from "./HeroChair";
 import styles from "./nueva-home.module.css";
 
@@ -58,7 +60,6 @@ function fotoSede(nombre: string): string | null {
 }
 
 export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: NuevaHomeClientProps) {
-  const headerRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const manifestoRef = useRef<HTMLDivElement>(null);
   const floatARef = useRef<HTMLImageElement>(null);
@@ -71,11 +72,6 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
     .sort((a, b) => b - a)[0];
 
   useEffect(() => {
-    const header = headerRef.current;
-    const onScroll = () => header?.classList.toggle(styles.scrolled, window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-
     const ctx = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) => {
         gsap.from(el, {
@@ -99,7 +95,6 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
     }, rootRef);
 
     return () => {
-      window.removeEventListener("scroll", onScroll);
       ctx.revert();
     };
   }, []);
@@ -112,21 +107,8 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
   const direccionesFooter = sedes.map((s) => s.direccion).filter(Boolean).join(" · ");
 
   return (
-    <div ref={rootRef} className={styles.page}>
-      <header ref={headerRef} className={styles.siteHeader}>
-        <a href="#top" className={styles.siteHeaderLogo} aria-label="Barbería Grasso, inicio">
-          <GrassoLogo />
-        </a>
-        <nav className={styles.siteHeaderNav} aria-label="Principal">
-          <Link href="/portafolio">Trabajos</Link>
-          <a href="#sedes">Sedes</a>
-          <Link href="/tienda">Tienda</Link>
-          <Link href="/perfil">{cliente ? "Mi perfil" : "Entrar"}</Link>
-        </nav>
-        <div className={styles.siteHeaderActions}>
-          <Link href="/reservar" className={`${styles.btn} ${styles.btnSmall}`}>Reservar cita</Link>
-        </div>
-      </header>
+    <div ref={rootRef} className={`${styles.page} ${journeyFontVars}`}>
+      <JourneyHeader cliente={cliente} />
 
       <main id="top">
         <HeroChair works={works} />
@@ -252,20 +234,7 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
         </section>
       </main>
 
-      <footer className={styles.siteFooter}>
-        <GrassoLogo className={styles.siteFooterLogo} />
-        <p>Cuidamos de tu imagen · Men&apos;s salon</p>
-        {direccionesFooter && (
-          <p className={styles.siteFooterSmall}>
-            {direccionesFooter} · © {new Date().getFullYear()} Barbería Grasso®
-          </p>
-        )}
-        <p className={styles.siteFooterLinks}>
-          <Link href="/portafolio">Nuestros trabajos</Link>
-          <Link href="/tienda">Tienda</Link>
-          <Link href="/politica-privacidad">Política de privacidad</Link>
-        </p>
-      </footer>
+      <JourneyFooter direcciones={direccionesFooter} />
     </div>
   );
 }

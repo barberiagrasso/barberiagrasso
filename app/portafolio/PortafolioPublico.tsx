@@ -21,10 +21,10 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       className={
-        "shrink-0 rounded-full border px-3 py-1.5 font-body text-xs transition-colors " +
+        "shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-colors " +
         (activo
           ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
-          : "border-brand-line text-brand-white hover:border-brand-yellow/60")
+          : "border-white/20 text-white/70 hover:border-brand-yellow/60 hover:text-white")
       }
     >
       {children}
@@ -57,7 +57,7 @@ export default function PortafolioPublico({
   );
 
   if (fotos.length === 0) {
-    return <p className="font-body text-sm text-brand-white-dim">Muy pronto podrás ver aquí nuestros trabajos.</p>;
+    return <p className="text-sm text-white/60">Muy pronto podrás ver aquí nuestros trabajos.</p>;
   }
 
   return (
@@ -87,7 +87,7 @@ export default function PortafolioPublico({
         </div>
       )}
       {visibles.length === 0 ? (
-        <p className="font-body text-sm text-brand-white-dim">No hay fotos con este filtro.</p>
+        <p className="text-sm text-white/60">No hay fotos con este filtro.</p>
       ) : (
         <GaleriaTrabajos key={`${servicioId}-${sedeId}`} fotos={visibles} />
       )}

@@ -1,0 +1,24 @@
+/*
+  Página interior simple (sin hero 3D): usa el sistema compartido de components/journey/journey.module.css
+  para cabecera, pie, tokens y tipografía, y aquí solo lo propio del texto legal.
+*/
+.prose {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 var(--pad) clamp(100px, 12vw, 160px);
+}
+.updated { margin: -8px 0 0; font-size: 13px; color: var(--mute); }
+.section { margin-top: clamp(36px, 5vw, 56px); }
+.section h2 {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--brand-yellow);
+}
+.section p, .section li { font-size: 15px; line-height: 1.7; color: rgba(245, 241, 230, .85); }
+.section p { margin: 10px 0 0; }
+.section ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.section li { list-style: none; position: relative; padding-left: 18px; }
+.section li::before { content: ''; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--brand-yellow); }
