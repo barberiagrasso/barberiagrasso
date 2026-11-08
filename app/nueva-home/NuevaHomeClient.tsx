@@ -245,7 +245,7 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
         <p>Cuidamos de tu imagen · Men&apos;s salon</p>
         {direccionesFooter && (
           <p className={styles.siteFooterSmall}>
-            {direccionesFooter} — Getafe, Madrid · © {new Date().getFullYear()} Barbería Grasso®
+            {direccionesFooter} · © {new Date().getFullYear()} Barbería Grasso®
           </p>
         )}
         <p className={styles.siteFooterLinks}>
