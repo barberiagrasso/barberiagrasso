@@ -1,14 +1,16 @@
 <!doctype html>
 <!-- type: place
-     deal: hero [override: 3D clipper render, brief asks for 3D — place-hero-is-always-a-photograph
-     overridden by the skill's own render exception], nav [nav-split], close [close-photo], footer
-     [footer-visit], rhythm [colour-band], buttons [block], mark [real client logo, no dealt mark],
-     grounds [none: flat colour only]
+     deal: hero [override: a code-built 3D render of the clipper (assets/objects/product-render),
+     turning on itself as the page scrolls with a ring of the shop's own photographs turning round it
+     (hero-orbit.css/.js) — brief asks for 3D and a scroll-tied turn, place-hero-is-always-a-photograph
+     overridden twice over by the skill's own render exception, by the client's own explicit brief],
+     nav [nav-split], close [close-photo], footer [footer-visit], rhythm [colour-band], buttons [block],
+     mark [real client logo, no dealt mark], grounds [none: flat colour only]
      offer composition: pair (ph-fade-neon.jpg + ph-styled-chair.jpg)
      place composition: trio dealt, superseded by the moment photo-chapters (not used)
      type moment: address (large street under the Visit h2)
      moments: photo-chapters (the place, 3 chapters) + picture-develops (on the offer's second photo)
-     page length: compact (7 real photographs + 1 AI hero render), 5 screens -->
+     page length: compact (7 real photographs + 1 code-built 3D render), 5 screens -->
 <html lang="es" data-type="place" data-radius="sharp" data-buttons="block" data-motion>
 <head>
 <meta charset="utf-8">
@@ -18,7 +20,7 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Barbería Grasso: cortes y afeitado en Getafe">
 <meta property="og:description" content="Dos sedes en Getafe, Madrid: cortes, barba y afeitado clásico. Reserva tu cita online.">
-<meta property="og:image" content="img/clipper-hero.jpg">
+<meta property="og:image" content="assets/objects/product-render/specs/stills/clipper-three-quarter-grasso-gold.webp">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="img/grasso-logo.png" type="image/png">
 <meta name="theme-color" content="#0b0b0a">
@@ -50,10 +52,15 @@
 <script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
 <script src="assets/backgrounds/backgrounds.js"></script>
 <script>document.documentElement.classList.add('mo-js');setTimeout(()=>document.documentElement.classList.add('mo-safe'),2500)</script>
+<script>document.documentElement.classList.add('sc-js');setTimeout(()=>document.documentElement.classList.add('sc-safe'),2500)</script>
+<link rel="stylesheet" href="assets/scenes/scenes.css">
+<link rel="stylesheet" href="assets/hero-orbit.css">
 <link rel="modulepreload" href="assets/moments/moments.js">
 <link rel="modulepreload" href="assets/moments/lib.js">
 <link rel="modulepreload" href="assets/moments/photo-chapters/moment.js">
 <link rel="modulepreload" href="assets/moments/picture-develops/moment.js">
+<link rel="modulepreload" href="assets/scenes/lib.js">
+<link rel="modulepreload" href="assets/hero-orbit.js">
 <style>
   .type-moment { font: var(--display-weight) clamp(26px, 3.2vw, 38px)/1.1 var(--font-display); letter-spacing: -0.02em; margin: 0 0 var(--s-5); }
   #visit .visit__addresses { display: grid; gap: var(--s-4); }
@@ -98,23 +105,47 @@
 </header>
 
 <main id="top">
-  <!-- HERO (override: see deal note above). Full-bleed 3D clipper render with the real logo engraved
-       into the metal (AI reference-image generation, not a client photograph — sanctioned by the
-       skill's brief-driven 3D exception). h1 + sub-line + the one main action, nothing else on it. -->
-  <section class="hero hero--place" data-enter aria-labelledby="hero-h">
-    <img class="hero__bg" data-phone-fill src="img/clipper-hero.jpg" alt="Maquinilla de corte en negro y dorado con el logo de Grasso grabado en el cuerpo" width="1600" height="1200" style="--ly-pos: 50% 42%" fetchpriority="high" data-source="render" data-subject="maquinilla Grasso, render 3D con IA">
-    <div class="wrap"><div class="hero-text">
-      <div class="hero__text">
-        <h1 id="hero-h">Barbería Grasso: cortes y afeitado</h1>
-        <p class="hero__lead">Dos sedes en Getafe, Madrid: Avenida de las Ciudades y Los Molinos. Corte, barba y afeitado clásico.</p>
-        <div class="btn-row"><a class="btn btn--primary" href="/reservar">Reserva tu cita<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a></div>
-        <dl class="hero-facts">
-          <div><dt>Sedes</dt><dd>Getafe, Madrid</dd></div>
-          <div><dt>Corte</dt><dd>Desde 16 €</dd></div>
-          <div><dt>Barba</dt><dd>Desde 12 €</dd></div>
-        </dl>
+  <!-- HERO (override: see deal note above, now built on it further). The clipper is its own code-built
+       3D render (assets/objects/product-render; brief asks for 3D — place-hero-is-always-a-photograph
+       overridden by the skill's own render exception), turning on itself as the page scrolls, with a
+       ring of the shop's own photographs turning round it (hero-orbit.css/.js). Not one of the dealt
+       catalog scenes (references/scenes.md gates those to tech/software/gaming pages) — this is the
+       brief's own explicit ask for a 3D, scroll-tied hero on a place page, the same kind of named
+       override as the render itself. Phone and reduced motion rest on the clipper's own still (the
+       finished composition below), never the live turn; the real photo-chapters section further down
+       keeps the shop's photographs for every reader regardless. h1 + sub-line + the one main action,
+       nothing else on it. -->
+  <section class="hero" data-big-scene="clipper-orbit" data-enter style="--h: 1" aria-labelledby="hero-h">
+    <div class="sc__stage">
+      <div class="wrap hero-text">
+        <div class="hero__text">
+          <h1 id="hero-h">Barbería Grasso: cortes y afeitado</h1>
+          <p class="hero__lead">Dos sedes en Getafe, Madrid: Avenida de las Ciudades y Los Molinos. Corte, barba y afeitado clásico.</p>
+          <div class="btn-row"><a class="btn btn--primary" href="/reservar">Reserva tu cita<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a></div>
+          <dl class="hero-facts">
+            <div><dt>Sedes</dt><dd>Getafe, Madrid</dd></div>
+            <div><dt>Corte</dt><dd>Desde 16 €</dd></div>
+            <div><dt>Barba</dt><dd>Desde 12 €</dd></div>
+          </dl>
+        </div>
       </div>
-    </div></div>
+      <div class="orbit__zone">
+        <img class="orbit__poster" data-sc-rest src="assets/objects/product-render/specs/stills/clipper-three-quarter-grasso-gold.webp" width="1051" height="303" alt="Maquinilla de corte profesional Grasso en negro y dorado" fetchpriority="high">
+        <div class="orbit__camera" data-sc-live aria-hidden="true">
+          <div class="orbit__turntable" style="--n: 8">
+            <figure class="orbit__item" style="--i:0"><img src="img/ph-shop-wide.jpg" width="720" height="960" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:1"><img src="img/ph-fade-neon.jpg" width="1440" height="1920" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:2"><img src="img/ph-styled-chair.jpg" width="720" height="1280" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:3"><img src="img/ph-comb-window.jpg" width="1600" height="2133" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:4"><img src="img/ph-beard-comb.jpg" width="1440" height="2560" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:5"><img src="img/ph-fade-tattoo.jpg" width="1440" height="1800" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:6"><img src="img/ph-shaka.jpg" width="720" height="1280" alt="" loading="lazy"></figure>
+            <figure class="orbit__item" style="--i:7"><img src="img/ph-beard-detail.jpg" width="1296" height="2304" alt="" loading="lazy"></figure>
+          </div>
+        </div>
+        <div class="orbit__product" data-sc-live aria-hidden="true"></div>
+      </div>
+    </div>
   </section>
 
   <!-- VISIT, screen 2. Two sedes with identical hours: the address type-moment features the first
@@ -242,7 +273,7 @@
           <span>&copy; 2026 Barbería Grasso</span>
           <a href="privacy.html">Privacidad</a>
         </div>
-        <a class="credits" href="credits.html">Fotografías de Barbería Grasso (Instagram @barberia.grasso); maquinilla, render 3D con IA</a>
+        <a class="credits" href="credits.html">Fotografías de Barbería Grasso (Instagram @barberia.grasso); maquinilla, modelo 3D generado por código, girando con el scroll</a>
       </div>
     </div>
   </div>
@@ -255,5 +286,6 @@
 <script type="module" src="assets/system.js"></script>
 <script type="module" src="assets/motion/motion.js"></script>
 <script type="module" src="assets/layout/layout.js"></script>
+<script type="module" src="assets/hero-orbit.js"></script>
 </body>
 </html>

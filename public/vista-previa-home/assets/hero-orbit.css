@@ -1,0 +1,59 @@
+/* hero-orbit.css - a one-off hero moment for Barbería Grasso: the clipper's own 3D render (assets/objects/
+   product-render) turning on itself as the page scrolls, a ring of the shop's own photographs turning
+   round it. Built on the shared held-stage engine (assets/scenes/lib.js, scenes.css) but NOT one of the
+   dealt catalog scenes (references/scenes.md gates those to tech/software/gaming) — this is the brief's own
+   explicit ask for a 3D hero on a place page, the same override already used for the clipper's render
+   itself (see the page's top-of-file deal note). data-big-scene="clipper-orbit" is a styling hook only,
+   never dispatched by scenes.js (this page does not load it); mounting is hero-orbit.js, by hand. */
+[data-big-scene="clipper-orbit"] { background: var(--bg); color: var(--ink); }
+[data-big-scene="clipper-orbit"] .hero__text { max-width: 640px; margin-inline: auto; }
+[data-big-scene="clipper-orbit"] .hero-facts { justify-content: center; }
+[data-big-scene="clipper-orbit"] .btn-row { justify-content: center; }
+
+/* ---------- finished composition (rest: phone, reduced motion, no script, a failed module) */
+[data-big-scene="clipper-orbit"]:not(.is-live) > .sc__stage {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--s-6);
+  width: 100%; height: 100%; max-width: calc(var(--container) + 2 * var(--pad)); margin-inline: auto;
+  padding: calc(var(--nav, var(--nav-h, 72px)) + var(--hgap, 40px)) var(--pad) var(--hpadb, 64px);
+}
+[data-big-scene="clipper-orbit"] .orbit__poster {
+  display: block; width: min(640px, 82vw); height: auto; margin-inline: auto;
+}
+[data-big-scene="clipper-orbit"].is-live .orbit__poster { display: none; }
+[data-big-scene="clipper-orbit"]:not(.is-live) .orbit__camera,
+[data-big-scene="clipper-orbit"]:not(.is-live) .orbit__product { display: none; }
+[data-big-scene="clipper-orbit"]:not(.is-live) .orbit__zone { position: static; width: auto; height: auto; max-width: none; }
+
+/* ---------- the held stage: text up top, the turning clipper and its ring of photos filling the rest */
+[data-big-scene="clipper-orbit"].is-live > .sc__stage {
+  position: relative; width: 100%; height: 100%;
+  padding-top: calc(var(--nav, var(--nav-h, 72px)) + var(--s-5));
+}
+[data-big-scene="clipper-orbit"].is-live .hero-text { position: relative; z-index: 3; text-align: center; margin-inline: auto; }
+[data-big-scene="clipper-orbit"] .orbit__zone { position: absolute; inset: 0; z-index: 1; }
+[data-big-scene="clipper-orbit"] .orbit__camera {
+  position: absolute; left: 50%; top: 78%; transform: translate(-50%, -50%);
+  width: min(60vh, 76vw); height: min(60vh, 76vw);
+  perspective: 1500px; perspective-origin: 50% 45%;
+}
+[data-big-scene="clipper-orbit"] .orbit__turntable {
+  position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform;
+  transform: rotateX(11deg) rotateY(var(--ring-angle, 0deg));
+}
+[data-big-scene="clipper-orbit"] .orbit__item {
+  position: absolute; left: 50%; top: 50%; margin: 0;
+  width: clamp(56px, 8.1vw, 101px); aspect-ratio: 3 / 4;
+  transform: translate(-50%, -50%) rotateY(calc(var(--i) * (360deg / var(--n, 8)))) translateZ(var(--orbit-r, 27vh));
+  transform-style: preserve-3d; backface-visibility: hidden;
+  border-radius: var(--r-md); overflow: hidden; box-shadow: 0 10px 24px -10px rgb(0 0 0 / 0.5);
+}
+[data-big-scene="clipper-orbit"] .orbit__item img { display: block; width: 100%; height: 100%; object-fit: cover; }
+[data-big-scene="clipper-orbit"] .orbit__product {
+  position: absolute; left: 50%; top: 78%; transform: translate(-50%, -50%);
+  width: min(44vh, 54vw); height: min(44vh, 54vw); z-index: 1;
+}
+[data-big-scene="clipper-orbit"] .orbit__camera { z-index: 2; }
+
+@media (prefers-reduced-motion: reduce), (max-width: 767px) {
+  [data-big-scene="clipper-orbit"] .orbit__turntable { transform: rotateX(11deg); }
+}
