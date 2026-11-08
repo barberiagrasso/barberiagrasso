@@ -81,6 +81,7 @@ function AdminLoginForm() {
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
             autoCapitalize="none"
+            autoComplete="username"
             className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
           />
           <input
@@ -89,6 +90,7 @@ function AdminLoginForm() {
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
           />
           {error && <p className="font-body text-sm text-red-400">{error}</p>}

@@ -50,6 +50,7 @@ export default function CambiarPasswordForm({ obligatorio, destino }: { obligato
         placeholder="Contraseña nueva (mínimo 8 caracteres)"
         value={passwordNueva}
         onChange={(e) => setPasswordNueva(e.target.value)}
+        autoComplete="new-password"
         className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
       />
       <input
@@ -58,6 +59,7 @@ export default function CambiarPasswordForm({ obligatorio, destino }: { obligato
         placeholder="Repite la contraseña"
         value={repetir}
         onChange={(e) => setRepetir(e.target.value)}
+        autoComplete="new-password"
         className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
       />
 

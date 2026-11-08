@@ -982,6 +982,42 @@ export default function BookingFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refleja el paso en la URL (?paso=servicio, ?paso=fecha...) para que
+  // "atrás" del navegador retroceda un paso del asistente en vez de
+  // sacar al cliente de /reservar entero. "confirmado" se deja fuera a
+  // propósito: una vez confirmada la cita no tiene sentido poder
+  // "volver atrás" a un formulario que ya se envió.
+  const pasoAlMontar = useRef(true);
+  useEffect(() => {
+    if (pasoAlMontar.current) {
+      pasoAlMontar.current = false;
+      return;
+    }
+    if (paso === "confirmado") return;
+    const actual = searchParams.get("paso");
+    if (actual === paso) return;
+    if (paso === "sede") {
+      router.replace("/reservar");
+    } else {
+      router.push(`/reservar?paso=${paso}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso]);
+
+  // Al pulsar atrás/adelante del navegador, Next.js actualiza
+  // searchParams sin remontar el componente: aquí se relee y se vuelve
+  // al paso que diga la URL (el resto del estado — sede, servicio,
+  // horario ya elegidos — se queda como estaba, igual que en cualquier
+  // asistente de varios pasos).
+  useEffect(() => {
+    const deURL = searchParams.get("paso");
+    if (!deURL || deURL === paso) return;
+    if (PASOS.some((p) => p.clave === deURL && p.clave !== "confirmado")) {
+      setPaso(deURL as Paso);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Solo una franja horaria por hora visible (si "cualquiera" hay varios
   // profesionales libres a la misma hora, se muestra una sola opción).
   const horasUnicas = useMemo(() => {

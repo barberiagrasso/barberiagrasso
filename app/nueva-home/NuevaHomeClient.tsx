@@ -72,21 +72,31 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
     .sort((a, b) => b - a)[0];
 
   useEffect(() => {
+    // Con "reducir movimiento" activado en el sistema, se enseñan los
+    // bloques ya visibles (sin el deslizamiento) y se quita por completo
+    // el parallax de las fotos flotantes — ambos son decorativos, no
+    // aportan información.
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const ctx = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((el) => {
+        if (reduceMotion) {
+          gsap.set(el, { opacity: 1, y: 0 });
+          return;
+        }
         gsap.from(el, {
           opacity: 0, y: 28, duration: 0.9, ease: "power3.out",
           scrollTrigger: { trigger: el, start: "top 85%" },
         });
       });
 
-      if (floatARef.current) {
+      if (!reduceMotion && floatARef.current) {
         gsap.to(floatARef.current, {
           y: -70, ease: "none",
           scrollTrigger: { trigger: manifestoRef.current, start: "top bottom", end: "bottom top", scrub: true },
         });
       }
-      if (floatBRef.current) {
+      if (!reduceMotion && floatBRef.current) {
         gsap.to(floatBRef.current, {
           y: 90, ease: "none",
           scrollTrigger: { trigger: manifestoRef.current, start: "top bottom", end: "bottom top", scrub: true },
@@ -244,6 +254,9 @@ function MarqueeLine({ text, outline, duration }: { text: string; outline: boole
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Movimiento puramente decorativo: con "reducir movimiento" en el
+    // sistema, el texto se queda quieto en vez de desplazarse sin parar.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const tween = gsap.fromTo(el, { xPercent: 0 }, { xPercent: -50, duration, ease: "none", repeat: -1 });
     return () => { tween.kill(); };
   }, [duration]);
