@@ -30,6 +30,14 @@
 }
 .page img { display: block; max-width: 100%; }
 .page a { color: inherit; }
+/* ".page a" de arriba gana por especificidad a ".btn"/".btnGhost"/".btnOutlineYellow" solos
+   (clase+etiqueta pesa más que una sola clase), así que el botón heredaba el color del texto
+   de su sección (blanco dentro de las partes oscuras) en vez de usar el suyo propio: por eso
+   no se veía la letra en los botones blancos. Se repite aquí con más peso para que gane. */
+.page a.btn { color: var(--brand-black); }
+.page a.btnGhost { color: var(--brand-white); }
+.page a.btnGhost:hover { color: var(--brand-black); }
+.page a.btnOutlineYellow { color: var(--brand-yellow); }
 .page h1, .page h2, .page h3 { margin: 0; font-weight: 400; }
 .page :focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 3px; }
 
