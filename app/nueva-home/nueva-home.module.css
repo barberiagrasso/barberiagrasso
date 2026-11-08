@@ -261,6 +261,49 @@
 .sede.isOpen .sedeHint { opacity: 0; }
 .sedesGrid.hasOpen .sede:not(.isOpen) h3 { font-size: clamp(32px, 3.2vw, 52px); }
 
+/* ---------- reseñas de Google ---------- */
+.resenas { padding: clamp(80px, 10vw, 140px) var(--pad); border-top: 1px solid rgba(245, 241, 230, .08); }
+.resenasHead { margin-bottom: clamp(32px, 4vw, 56px); }
+.resenasHead h2 { font-family: var(--display); text-transform: uppercase; font-size: clamp(44px, 6.4vw, 96px); line-height: .92; }
+.resenasGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(14px, 1.6vw, 22px); }
+.resenaCard {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: clamp(26px, 3vw, 36px);
+  border-radius: 22px;
+  background: rgba(245, 241, 230, .04);
+  border: 1px solid rgba(245, 241, 230, .12);
+  text-decoration: none;
+  transition: border-color .3s, transform .3s, background .3s;
+}
+.resenaCard:hover { border-color: var(--brand-yellow); background: rgba(245, 241, 230, .07); transform: translateY(-3px); }
+.resenaMarca {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--mute);
+}
+.resenaNota { font-family: var(--display); font-size: clamp(48px, 5vw, 72px); line-height: 1; color: var(--brand-white); }
+.resenaEstrellas {
+  position: relative; display: inline-block;
+  font-size: 18px; letter-spacing: .1em; line-height: 1;
+  color: rgba(245, 241, 230, .22);
+}
+.resenaEstrellas::before {
+  content: '★★★★★';
+  position: absolute; inset: 0;
+  width: var(--pct);
+  overflow: hidden; white-space: nowrap;
+  color: var(--brand-yellow);
+}
+.resenaSede { margin-top: 6px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-yellow); }
+.resenaTotal { font-size: 14px; color: var(--mute); }
+.resenaCta {
+  margin-top: auto; padding-top: 10px;
+  font-size: 13px; font-weight: 600;
+  text-decoration: underline; text-decoration-color: rgba(245, 241, 230, .35); text-underline-offset: 4px;
+  transition: color .3s, text-decoration-color .3s;
+}
+.resenaCard:hover .resenaCta { color: var(--brand-yellow); text-decoration-color: var(--brand-yellow); }
+
 /* ---------- cta ---------- */
 .cta { position: relative; text-align: center; padding: clamp(110px, 14vw, 200px) var(--pad); border-top: 1px solid rgba(245, 241, 230, .08); overflow: hidden; }
 .cta h2 { font-family: var(--display); text-transform: uppercase; font-size: clamp(46px, 7.6vw, 124px); line-height: .92; }
