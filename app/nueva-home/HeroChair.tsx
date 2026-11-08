@@ -71,7 +71,11 @@ export function HeroChair({ works }: { works: string[] }) {
       setProgress(1);
       gsap.to(loaderEl, {
         yPercent: -100, duration: 1, ease: "power4.inOut", delay: 0.25,
-        onComplete: () => { if (!disposed) loaderEl!.style.display = "none"; ScrollTrigger.refresh(); },
+        // Nota: aquí NO se llama a ScrollTrigger.refresh(). El loader es position:fixed
+        // (no ocupa espacio en el flujo del documento), así que ocultarlo no cambia ninguna
+        // medida; y si alguien ya ha empezado a hacer scroll mientras carga (perfectamente
+        // posible, dura ~1-2s), ese refresh podía recalcular el pin y devolverlo arriba.
+        onComplete: () => { if (!disposed) loaderEl!.style.display = "none"; },
       });
       if (titleRef.current) {
         gsap.from(titleRef.current.querySelectorAll(":scope > span > span"), {
