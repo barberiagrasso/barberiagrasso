@@ -10,6 +10,15 @@
 [data-big-scene="clipper-orbit"] .hero-facts { justify-content: center; }
 [data-big-scene="clipper-orbit"] .btn-row { justify-content: center; }
 
+/* a quiet dashed thread above and below the hero copy - a print spec-sheet's measurement line, the one
+   motif borrowed from Diego's ORYZO reference, kept brand-neutral: no new copy, pure ornament */
+[data-big-scene="clipper-orbit"] .hero__text::before,
+[data-big-scene="clipper-orbit"] .hero__text::after {
+  content: ""; display: block; width: min(200px, 56%); height: 1px; margin: 0 auto var(--s-5);
+  background-image: repeating-linear-gradient(90deg, color-mix(in oklab, var(--accent) 65%, transparent) 0 6px, transparent 6px 13px);
+}
+[data-big-scene="clipper-orbit"] .hero__text::after { margin: var(--s-6) auto 0; }
+
 /* ---------- finished composition (rest: phone, reduced motion, no script, a failed module) */
 [data-big-scene="clipper-orbit"]:not(.is-live) > .sc__stage {
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--s-6);
@@ -17,7 +26,7 @@
   padding: calc(var(--nav, var(--nav-h, 72px)) + var(--hgap, 40px)) var(--pad) var(--hpadb, 64px);
 }
 [data-big-scene="clipper-orbit"] .orbit__poster {
-  display: block; width: min(640px, 82vw); height: auto; margin-inline: auto;
+  display: block; width: auto; height: min(66vh, 620px); max-width: 88vw; margin-inline: auto;
 }
 [data-big-scene="clipper-orbit"].is-live .orbit__poster { display: none; }
 [data-big-scene="clipper-orbit"]:not(.is-live) .orbit__camera,
@@ -31,10 +40,19 @@
 }
 [data-big-scene="clipper-orbit"].is-live .hero-text { position: relative; z-index: 3; text-align: center; margin-inline: auto; }
 [data-big-scene="clipper-orbit"] .orbit__zone { position: absolute; inset: 0; z-index: 1; }
+
+/* a held dashed ring round the turning object, still while the photos and the clipper both turn inside
+   it - the spec-sheet frame, not a photo, so it never spins with the ring */
+[data-big-scene="clipper-orbit"].is-live .orbit__zone::before {
+  content: ""; position: absolute; left: 50%; top: 80%; transform: translate(-50%, -50%);
+  width: min(58vh, 72vw); height: min(58vh, 72vw); border-radius: 50%;
+  border: 1px dashed color-mix(in oklab, var(--accent) 42%, transparent);
+  z-index: 0; pointer-events: none;
+}
 [data-big-scene="clipper-orbit"] .orbit__camera {
-  position: absolute; left: 50%; top: 78%; transform: translate(-50%, -50%);
-  width: min(60vh, 76vw); height: min(60vh, 76vw);
-  perspective: 1500px; perspective-origin: 50% 45%;
+  position: absolute; left: 50%; top: 80%; transform: translate(-50%, -50%);
+  width: min(63vh, 78vw); height: min(63vh, 78vw);
+  perspective: 1600px; perspective-origin: 50% 45%;
 }
 [data-big-scene="clipper-orbit"] .orbit__turntable {
   position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform;
@@ -42,15 +60,18 @@
 }
 [data-big-scene="clipper-orbit"] .orbit__item {
   position: absolute; left: 50%; top: 50%; margin: 0;
-  width: clamp(56px, 8.1vw, 101px); aspect-ratio: 3 / 4;
-  transform: translate(-50%, -50%) rotateY(calc(var(--i) * (360deg / var(--n, 8)))) translateZ(var(--orbit-r, 27vh));
+  width: clamp(54px, 7.8vw, 98px); aspect-ratio: 3 / 4;
+  transform: translate(-50%, -50%) rotateY(calc(var(--i) * (360deg / var(--n, 8)))) translateZ(var(--orbit-r, 29vh));
   transform-style: preserve-3d; backface-visibility: hidden;
-  border-radius: var(--r-md); overflow: hidden; box-shadow: 0 10px 24px -10px rgb(0 0 0 / 0.5);
+  border-radius: var(--r-sm); overflow: hidden; box-shadow: none;
+  border: 1px solid color-mix(in oklab, var(--ink) 16%, transparent);
 }
-[data-big-scene="clipper-orbit"] .orbit__item img { display: block; width: 100%; height: 100%; object-fit: cover; }
+[data-big-scene="clipper-orbit"] .orbit__item img {
+  display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.92) contrast(1.03);
+}
 [data-big-scene="clipper-orbit"] .orbit__product {
-  position: absolute; left: 50%; top: 78%; transform: translate(-50%, -50%);
-  width: min(44vh, 54vw); height: min(44vh, 54vw); z-index: 1;
+  position: absolute; left: 50%; top: 80%; transform: translate(-50%, -50%);
+  width: min(49vh, 58vw); height: min(49vh, 58vw); z-index: 1;
 }
 [data-big-scene="clipper-orbit"] .orbit__camera { z-index: 2; }
 

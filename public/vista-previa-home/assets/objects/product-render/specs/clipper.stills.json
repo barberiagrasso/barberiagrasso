@@ -1,0 +1,48 @@
+{
+ "id": "clipper",
+ "made": "2026-11-08T16:48:45.518Z",
+ "px": 1100,
+ "grounds": [
+  "light",
+  "dark"
+ ],
+ "colors": [
+  "grasso-gold"
+ ],
+ "variants": {
+  "three-quarter": {
+   "view": "three-quarter",
+   "scene": null,
+   "off": false,
+   "grounds": [
+    "light",
+    "dark"
+   ],
+   "stills": {
+    "light": {
+     "grasso-gold": {
+      "file": "stills/clipper-three-quarter-grasso-gold.webp",
+      "half": "stills/clipper-three-quarter-grasso-gold-half.webp",
+      "w": 219,
+      "h": 937
+     }
+    },
+    "dark": {
+     "grasso-gold": {
+      "file": "stills/clipper-three-quarter-grasso-gold-dark.webp",
+      "half": "stills/clipper-three-quarter-grasso-gold-dark-half.webp",
+      "w": 219,
+      "h": 937
+     }
+    }
+   },
+   "box": [
+    0.0274,
+    0.0064,
+    0.9087,
+    0.984
+   ],
+   "px": 1100
+  }
+ }
+}

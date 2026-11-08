@@ -1,45 +1,52 @@
 {
   "id": "clipper",
   "name": "Maquinilla Grasso",
-  "label": "Maquinilla de corte profesional en negro y dorado, girando en el centro de la portada",
+  "label": "Maquinilla de corte profesional en negro y dorado, de pie, girando en el centro de la portada",
   "units": "m",
-  "angle": -28,
-  "camera": { "elev": 14 },
+  "angle": -24,
+  "camera": { "elev": 9 },
   "turn": { "mode": "still" },
   "click": "light",
   "colors": [{ "id": "grasso-gold", "name": "Negro y dorado Grasso", "accent": "#f2d368" }],
   "supports": ["three-quarter", "side", "front"],
   "make": { "variants": ["three-quarter"], "grounds": ["light", "dark"] },
   "materials": {
-    "body": { "kind": "plastic", "color": "#17171a", "finish": "satin" },
-    "blade": { "kind": "chrome" },
-    "trim": { "kind": "paint", "color": "accent", "finish": "gloss" },
-    "button_face": { "kind": "paint", "color": "#0b0b0a", "finish": "matte" },
-    "led": { "kind": "light", "color": "#ffe3a8" }
+    "body": { "kind": "metal", "color": "#19191c", "finish": "satin" },
+    "trim": { "kind": "metal", "color": "accent", "finish": "satin" },
+    "button_face": { "kind": "paint", "color": "#0a0a09", "finish": "matte" },
+    "led": { "kind": "paint", "color": "#ffb347", "finish": "satin", "glow": 0.16 }
   },
   "parts": [
-    { "name": "rear cap", "type": "cylinder", "at": [-0.083, 0.016, 0], "axis": "x", "r": 0.016, "h": 0.006, "round": 0.004, "mat": "body" },
-    { "name": "body rear", "type": "box", "at": [-0.047, 0.017, 0], "size": [0.072, 0.034, 0.030], "round": 0.013, "mat": "body", "seams": [-0.5, 0, 0.5] },
-    { "name": "body mid", "type": "box", "at": [0.013, 0.015, 0], "size": [0.048, 0.030, 0.028], "round": 0.011, "mat": "body", "blend": 0.009 },
-    { "name": "body neck", "type": "box", "at": [0.0535, 0.013, 0], "size": [0.033, 0.026, 0.025], "round": 0.009, "mat": "body", "blend": 0.008 },
-    { "name": "blade shoe", "type": "box", "at": [0.0845, 0.010, 0], "size": [0.028, 0.020, 0.032], "round": 0.004, "mat": "blade", "blend": 0.006 },
+    { "name": "base cap", "type": "cylinder", "at": [0, 0.0045, 0], "axis": "y", "r": 0.0155, "h": 0.009, "round": 0.003, "mat": "trim" },
 
-    { "name": "trim ring", "type": "torus", "at": [0.038, 0.013, 0], "axis": "x", "R": 0.0155, "r": 0.0018, "mat": "trim" },
+    { "name": "body lower", "type": "box", "at": [0, 0.039, 0], "size": [0.030, 0.060, 0.028], "round": 0.012, "mat": "body" },
+    { "name": "body mid", "type": "box", "at": [0, 0.096, 0], "size": [0.032, 0.054, 0.030], "round": 0.011, "mat": "body", "blend": 0.009 },
+    { "name": "body neck", "type": "box", "at": [0, 0.1345, 0], "size": [0.023, 0.023, 0.022], "round": 0.009, "mat": "body", "blend": 0.008 },
+    { "name": "blade shoe", "type": "box", "at": [0, 0.156, 0], "size": [0.030, 0.020, 0.034], "round": 0.004, "mat": "body", "blend": 0.006 },
 
-    { "name": "blade lower", "type": "panel", "at": [0.1065, 0.0205, 0], "size": [0.042, 0.0016, 0.027], "round": 0.001, "mat": "blade" },
-    { "name": "blade upper", "type": "panel", "at": [0.1015, 0.0225, 0], "size": [0.033, 0.0016, 0.0245], "round": 0.001, "mat": "blade" },
+    { "name": "trim left", "type": "tube", "from": [0.0142, 0.012, 0], "to": [0.0148, 0.120, 0], "r": 0.0011, "cap": "round", "mat": "trim" },
+    { "name": "trim right", "type": "tube", "from": [-0.0142, 0.012, 0], "to": [-0.0148, 0.120, 0], "r": 0.0011, "cap": "round", "mat": "trim" },
 
-    { "name": "tooth 1", "type": "beam", "at": [0.126, 0.0205, -0.0105], "axis": "x", "w": 0.009, "d": 0.0022, "round": 0.0006, "mat": "blade" },
-    { "name": "tooth 2", "type": "beam", "at": [0.126, 0.0205, -0.0063], "axis": "x", "w": 0.009, "d": 0.0022, "round": 0.0006, "mat": "blade" },
-    { "name": "tooth 3", "type": "beam", "at": [0.126, 0.0205, -0.0021], "axis": "x", "w": 0.009, "d": 0.0022, "round": 0.0006, "mat": "blade" },
-    { "name": "tooth 4", "type": "beam", "at": [0.126, 0.0205, 0.0021], "axis": "x", "w": 0.009, "d": 0.0022, "round": 0.0006, "mat": "blade" },
-    { "name": "tooth 5", "type": "beam", "at": [0.126, 0.0205, 0.0063], "axis": "x", "w": 0.009, "d": 0.0022, "round": 0.0006, "mat": "blade" },
-    { "name": "tooth 6", "type": "beam", "at": [0.126, 0.0205, 0.0105], "axis": "x", "w": 0.009, "d": 0.0022, "round": 0.0006, "mat": "blade" },
+    { "name": "blade base", "type": "panel", "at": [0, 0.1675, 0], "size": [0.026, 0.003, 0.030], "round": 0.001, "mat": "trim" },
 
-    { "name": "thumb lever", "type": "box", "at": [0.016, 0.0335, 0], "size": [0.016, 0.0075, 0.012], "round": 0.003, "mat": "trim" },
+    { "name": "tooth 1", "type": "beam", "at": [0, 0.179, -0.0119], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 2", "type": "beam", "at": [0, 0.179, -0.0085], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 3", "type": "beam", "at": [0, 0.179, -0.0051], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 4", "type": "beam", "at": [0, 0.179, -0.0017], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 5", "type": "beam", "at": [0, 0.179, 0.0017], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 6", "type": "beam", "at": [0, 0.179, 0.0051], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 7", "type": "beam", "at": [0, 0.179, 0.0085], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
+    { "name": "tooth 8", "type": "beam", "at": [0, 0.179, 0.0119], "axis": "y", "w": 0.020, "d": 0.0022, "round": 0.0006, "mat": "trim" },
 
-    { "name": "button ring", "type": "torus", "at": [-0.058, 0.0345, 0], "axis": "y", "R": 0.0075, "r": 0.0012, "mat": "trim" },
-    { "name": "button face", "type": "cylinder", "at": [-0.058, 0.0345, 0], "axis": "y", "r": 0.0062, "h": 0.0015, "round": 0.0008, "mat": "button_face" },
-    { "name": "led", "type": "sphere", "at": [-0.034, 0.0355, 0], "r": 0.0018, "mat": "led" }
+    { "name": "lever arm", "type": "box", "at": [0.0185, 0.140, 0.006], "size": [0.009, 0.008, 0.007], "round": 0.003, "mat": "body" },
+    { "name": "lever knob", "type": "cylinder", "at": [0.0225, 0.140, 0.006], "axis": "x", "r": 0.0028, "h": 0.003, "round": 0.0012, "mat": "trim" },
+
+    { "name": "button ring", "type": "torus", "at": [0.0168, 0.112, 0], "axis": "x", "R": 0.0075, "r": 0.0012, "mat": "trim" },
+    { "name": "button face", "type": "cylinder", "at": [0.0165, 0.112, 0], "axis": "x", "r": 0.0062, "h": 0.0015, "round": 0.0008, "mat": "button_face" },
+
+    { "name": "led 1", "type": "box", "at": [0.0168, 0.100, 0], "size": [0.0012, 0.0045, 0.010], "mat": "led" },
+    { "name": "led 2", "type": "box", "at": [0.0168, 0.0935, 0], "size": [0.0012, 0.0045, 0.010], "mat": "led" },
+    { "name": "led 3", "type": "box", "at": [0.0168, 0.087, 0], "size": [0.0012, 0.0045, 0.010], "mat": "led" },
+    { "name": "led 4", "type": "box", "at": [0.0168, 0.0805, 0], "size": [0.0012, 0.0045, 0.010], "mat": "led" }
   ]
 }
