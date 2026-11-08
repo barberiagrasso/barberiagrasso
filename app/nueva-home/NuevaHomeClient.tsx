@@ -45,6 +45,18 @@ const MARQUEE_LINES = [
   { text: "Precisión · Estilo · Actitud · ", outline: false, duration: 26 },
 ];
 
+// Fotos reales de fachada de cada sede (las que mandó Diego, 08/11/2026) — antes se usaba aquí
+// una foto cualquiera de trabajo como relleno, y eso era justo el problema que reportó (además
+// de no ser la fachada real, el texto blanco podía caer sobre una zona clara de la foto). Se
+// identifican por el nombre de la sede en vez de por su id, porque así sigue funcionando si se
+// reordenan o renombran ligeramente en el admin.
+function fotoSede(nombre: string): string | null {
+  const n = nombre.toLowerCase();
+  if (n.includes("molino")) return "/nueva-home/sede-los-molinos.webp";
+  if (n.includes("ciudades")) return "/nueva-home/sede-las-ciudades.webp";
+  return null;
+}
+
 export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: NuevaHomeClientProps) {
   const headerRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -173,7 +185,7 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
           <div className={`${styles.sedesGrid} ${openSede ? styles.hasOpen : ""}`}>
             {sedes.map((sede, i) => {
               const abierta = openSede === sede.id;
-              const foto = works[i % works.length];
+              const foto = fotoSede(sede.nombre) ?? works[i % works.length];
               return (
                 <article
                   key={sede.id}
