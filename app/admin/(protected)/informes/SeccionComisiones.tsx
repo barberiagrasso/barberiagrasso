@@ -63,7 +63,7 @@ export default function SeccionComisiones() {
             ›
           </button>
         </div>
-        <Link href="/admin/comisiones" className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
+        <Link href="/admin/comisiones" className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
           Editar tramos de comisión →
         </Link>
       </div>

@@ -214,7 +214,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
           ›
         </button>
         {!esMesActual && (
-          <button onClick={() => setMes(mesActualStr())} className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
+          <button onClick={() => setMes(mesActualStr())} className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
             Ir al mes actual
           </button>
         )}
@@ -263,7 +263,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
                   )
                 }
                 disabled={(datos?.filas.length ?? 0) === 0}
-                className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark disabled:opacity-40 disabled:no-underline"
+                className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark disabled:opacity-40 disabled:no-underline"
               >
                 Exportar CSV
               </button>
@@ -323,7 +323,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500">Tramos de comisión</h3>
           {rol === "admin" && !editando && (
-            <button onClick={empezarEdicion} className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
+            <button onClick={empezarEdicion} className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
               Editar tramos
             </button>
           )}
@@ -392,7 +392,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
                 </div>
               ))}
             </div>
-            <button onClick={anadirFila} className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
+            <button onClick={anadirFila} className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
               + Añadir tramo
             </button>
 
@@ -419,7 +419,7 @@ export default function ComisionesClient({ rol }: { rol: string }) {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500">Comisión por productos</h3>
           {rol === "admin" && !editandoPct && (
-            <button onClick={empezarEdicionPct} className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
+            <button onClick={empezarEdicionPct} className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark">
               Editar porcentaje
             </button>
           )}
