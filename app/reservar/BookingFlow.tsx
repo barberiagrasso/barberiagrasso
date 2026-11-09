@@ -1087,45 +1087,55 @@ export default function BookingFlow({
         <Stepper paso={paso} />
 
         {paso === "sede" && (
-          <div className="space-y-3">
+          <div>
             <PasoTitulo>Elige tu sede</PasoTitulo>
-            {sedes.map((sede) => (
-              <TarjetaOpcion
-                key={sede.id}
-                onClick={() => {
-                  if (sede.id !== sedeId) {
-                    // El barbero y el día elegidos eran de la otra sede.
-                    setProfesionalId(null);
-                    setFecha(null);
-                    setSlots([]);
-                    setSlotElegido(null);
-                  }
-                  setSedeId(sede.id);
-                  setPaso("servicio");
-                }}
-              >
-                <div className="font-heading text-lg">{sede.nombre}</div>
-                {sede.direccion && (
-                  <div className="mt-0.5 font-body text-sm opacity-70">
-                    {sede.direccion}
-                  </div>
-                )}
-                <EtiquetasSede sede={sede} />
-              </TarjetaOpcion>
-            ))}
 
-            {/* "Home" para este enlace es /nueva-home, no /, igual que el
-                logo de la cabecera compartida (elección de Diego, 08/11/2026). */}
-            <EnlaceVolver onClick={() => router.push("/nueva-home")}>
-              ← Volver al menú
-            </EnlaceVolver>
+            {/* mt-6 en vez de dejar que "space-y-3" (como el resto de tarjetas de
+                debajo) marque también la distancia con el título: quedaba muy
+                pegado al texto (pedido de Diego, 09/11/2026 — más aire entre el
+                título de cada paso y los botones de debajo). */}
+            <div className="mt-6 space-y-3">
+              {sedes.map((sede) => (
+                <TarjetaOpcion
+                  key={sede.id}
+                  onClick={() => {
+                    if (sede.id !== sedeId) {
+                      // El barbero y el día elegidos eran de la otra sede.
+                      setProfesionalId(null);
+                      setFecha(null);
+                      setSlots([]);
+                      setSlotElegido(null);
+                    }
+                    setSedeId(sede.id);
+                    setPaso("servicio");
+                  }}
+                >
+                  <div className="font-heading text-lg">{sede.nombre}</div>
+                  {sede.direccion && (
+                    <div className="mt-0.5 font-body text-sm opacity-70">
+                      {sede.direccion}
+                    </div>
+                  )}
+                  <EtiquetasSede sede={sede} />
+                </TarjetaOpcion>
+              ))}
+
+              {/* "Home" para este enlace es /nueva-home, no /, igual que el
+                  logo de la cabecera compartida (elección de Diego, 08/11/2026). */}
+              <EnlaceVolver onClick={() => router.push("/nueva-home")}>
+                ← Volver al menú
+              </EnlaceVolver>
+            </div>
           </div>
         )}
 
         {paso === "servicio" && (
-          <div className="space-y-3">
+          <div>
             <PasoTitulo>Servicios en {sedeSeleccionada?.nombre}</PasoTitulo>
 
+            {/* mt-6: mismo motivo que en el paso "sede" — más aire entre el
+                título y las tarjetas de debajo (pedido de Diego, 09/11/2026). */}
+            <div className="mt-6 space-y-3">
             <div className="space-y-3">
               {principales.map((servicio) => (
                 <TarjetaServicio
@@ -1193,6 +1203,7 @@ export default function BookingFlow({
             <EnlaceVolver onClick={() => setPaso("sede")}>
               ← Cambiar de sede
             </EnlaceVolver>
+            </div>
           </div>
         )}
 
