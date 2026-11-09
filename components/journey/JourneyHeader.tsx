@@ -12,13 +12,21 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
+import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
 import styles from "./journey.module.css";
 
 export interface JourneyHeaderProps {
   cliente: { nombre: string } | null;
+  /**
+   * "reservando" (pedido de Diego, 09/11/2026): para la propia pantalla de
+   * reserva. Ya estamos dentro, así que no tiene sentido ofrecer "Reservar
+   * cita" — en su lugar se ve el acceso a "Mi perfil" y, si ya hay sesión,
+   * también "Cerrar sesión".
+   */
+  variante?: "reservando";
 }
 
-export function JourneyHeader({ cliente }: JourneyHeaderProps) {
+export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -42,8 +50,21 @@ export function JourneyHeader({ cliente }: JourneyHeaderProps) {
       </nav>
 
       <div className={styles.siteHeaderSide}>
-        <Link href="/perfil" className={styles.siteHeaderAccount}>{cliente ? "Mi perfil" : "Entrar"}</Link>
-        <Link href="/reservar" className={`${styles.btn} ${styles.btnSmall}`}>Reservar cita</Link>
+        {variante === "reservando" ? (
+          cliente ? (
+            <>
+              <Link href="/perfil" className={`${styles.btn} ${styles.btnSmall}`}>Mi perfil</Link>
+              <CerrarSesionButton className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} />
+            </>
+          ) : (
+            <Link href="/acceso?next=%2Freservar" className={`${styles.btn} ${styles.btnSmall}`}>Entrar</Link>
+          )
+        ) : (
+          <>
+            <Link href="/perfil" className={styles.siteHeaderAccount}>{cliente ? "Mi perfil" : "Entrar"}</Link>
+            <Link href="/reservar" className={`${styles.btn} ${styles.btnSmall}`}>Reservar cita</Link>
+          </>
+        )}
       </div>
     </header>
   );

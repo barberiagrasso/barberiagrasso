@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
 import BookingFlow from "./BookingFlow";
@@ -74,7 +75,9 @@ export default async function ReservarPage() {
 
   return (
     <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
-      <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} />
+      {/* "reservando": quita "Reservar cita" (ya estamos dentro) y pone en su
+          lugar "Mi perfil" + "Cerrar sesión" — pedido de Diego, 09/11/2026. */}
+      <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} variante="reservando" />
 
       <main className="relative overflow-hidden" style={{ paddingTop: "clamp(120px, 18vw, 170px)", paddingBottom: "clamp(90px, 10vw, 140px)" }}>
         {/* Fondo ambiental: una foto real de la barbería, muy oscurecida y
@@ -100,6 +103,25 @@ export default async function ReservarPage() {
               Elige y listo.
             </h1>
           </div>
+
+          {/* Restaura el acceso que había antes de que la reserva se abriera sin
+              cuenta (01/11/2026): un enlace discreto, no un muro — quien ya es
+              cliente puede entrar y ver sus datos rellenos; quien no, sigue
+              reservando como invitado sin que nada se lo impida (pedido de
+              Diego, 09/11/2026). */}
+          {!cliente && (
+            <p className="mb-6 text-center font-body text-xs text-brand-white-dim">
+              ¿Ya eres cliente?{" "}
+              <Link
+                href="/acceso?next=%2Freservar"
+                className="underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+              >
+                Inicia sesión
+              </Link>{" "}
+              y verás tus datos ya rellenos.
+            </p>
+          )}
+
           <InstalarApp />
           {/* BookingFlow usa useSearchParams (para recoger la propuesta que
               venga del buscador de la portada, ver AsistenteReservaInicio) —

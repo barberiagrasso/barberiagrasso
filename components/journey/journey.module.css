@@ -110,7 +110,7 @@
 .siteHeaderNav a:hover::after { transform: scaleX(1); transform-origin: left; }
 /* Cuenta + botón de reservar, empujados al borde derecho con margin-left:auto ahora que ya no
    hay un segundo "lado" simétrico con flex:1 a cada punta. */
-.siteHeaderSide { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.siteHeaderSide { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 14px; margin-left: auto; }
 .siteHeaderAccount { text-decoration: none; font-size: 14px; color: rgba(245, 241, 230, .8); white-space: nowrap; }
 .siteHeaderAccount:hover { color: var(--brand-white); }
 /* Gana por especificidad (dos clases + etiqueta) a ".journeyPage a"/".page a" (nueva-home.module.css),

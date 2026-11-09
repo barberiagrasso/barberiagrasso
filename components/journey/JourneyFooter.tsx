@@ -26,6 +26,16 @@ export function JourneyFooter({ direcciones }: JourneyFooterProps) {
         <Link href="/tienda">Tienda</Link>
         <Link href="/politica-privacidad">Política de privacidad</Link>
       </p>
+
+      {/* Acceso del equipo, siempre visible en el pie (pedido de Diego,
+          09/11/2026): para que el administrador pueda entrar al panel desde
+          casi cualquier página, sin tener que escribir la URL a mano.
+          Deliberadamente discreto — no es para clientes. */}
+      <p className="mt-4 font-body text-[11px] text-brand-white-dim/40">
+        <Link href="/admin/login" className="underline decoration-brand-line underline-offset-4 hover:text-brand-yellow">
+          Acceso de administrador
+        </Link>
+      </p>
     </footer>
   );
 }
