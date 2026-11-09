@@ -94,24 +94,30 @@
 /* ---------- cabecera compartida (JourneyHeader) ---------- */
 .siteHeader {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-  display: flex; align-items: center; justify-content: center; gap: 24px;
+  display: flex; align-items: center; gap: 28px;
   padding: 18px var(--pad);
   transition: background .4s, padding .4s;
 }
 .siteHeader.scrolled { background: rgba(11,11,10,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding-top: 12px; padding-bottom: 12px; }
-/* Logo centrado (pedido de Diego, 08/11/2026): nav e icono de reserva a los lados, en vez de todo
-   pegado a la izquierda como en el primer diseño de la home. */
-.siteHeaderLogo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+/* Logo a la izquierda (pedido de Diego, 09/11/2026): antes iba centrado con position:absolute;
+   ahora es un elemento normal del flex, primero en el DOM, pegado al borde izquierdo. */
+.siteHeaderLogo { flex: 0 0 auto; display: flex; align-items: center; }
 .siteHeaderLogo img { width: 100px; height: auto; }
 .siteHeaderNav { display: flex; align-items: center; gap: 24px; }
 .siteHeaderNav a { text-decoration: none; font-size: 14px; color: rgba(245, 241, 230, .8); position: relative; }
 .siteHeaderNav a::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform .4s var(--ease); }
 .siteHeaderNav a:hover { color: var(--brand-white); }
 .siteHeaderNav a:hover::after { transform: scaleX(1); transform-origin: left; }
-.siteHeaderSide { display: flex; align-items: center; gap: 14px; flex: 1 1 0; min-width: 0; }
-.siteHeaderSide:last-child { justify-content: flex-end; }
+/* Cuenta + botón de reservar, empujados al borde derecho con margin-left:auto ahora que ya no
+   hay un segundo "lado" simétrico con flex:1 a cada punta. */
+.siteHeaderSide { display: flex; align-items: center; gap: 14px; margin-left: auto; }
 .siteHeaderAccount { text-decoration: none; font-size: 14px; color: rgba(245, 241, 230, .8); white-space: nowrap; }
 .siteHeaderAccount:hover { color: var(--brand-white); }
+/* Gana por especificidad (dos clases + etiqueta) a ".journeyPage a"/".page a" (nueva-home.module.css),
+   que heredan el color del texto de la sección: sin esto el botón blanco de la cabecera se quedaba con
+   letra blanca (invisible) en vez de negra en /nueva-home, cuya cabecera no vive bajo .journeyPage. */
+.siteHeaderSide a.btn { color: var(--brand-black); }
+.siteHeaderSide a.btn:hover { color: var(--brand-black); }
 
 /* ---------- pie compartido (JourneyFooter) ---------- */
 .siteFooter { padding: 70px var(--pad) 44px; text-align: center; color: var(--mute); border-top: 1px solid rgba(245, 241, 230, .08); }
@@ -135,7 +141,6 @@
      que no choquen con el logo, que está centrado con position:absolute. */
   .siteHeaderNav, .siteHeaderAccount { display: none; }
   .siteHeaderLogo img { width: 84px; }
-  .siteHeaderSide:last-child { justify-content: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {

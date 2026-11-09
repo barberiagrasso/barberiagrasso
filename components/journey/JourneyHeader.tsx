@@ -31,19 +31,17 @@ export function JourneyHeader({ cliente }: JourneyHeaderProps) {
 
   return (
     <header ref={headerRef} className={styles.siteHeader}>
-      <div className={styles.siteHeaderSide}>
-        <nav className={styles.siteHeaderNav} aria-label="Principal">
-          <Link href="/portafolio">Trabajos</Link>
-          <Link href="/nueva-home#sedes">Sedes</Link>
-          <Link href="/tienda">Tienda</Link>
-        </nav>
-      </div>
-
       <Link href="/nueva-home" className={styles.siteHeaderLogo} aria-label="Barbería Grasso, inicio">
         <GrassoLogo />
       </Link>
 
-      <div className={`${styles.siteHeaderSide} ${styles.siteHeaderSideEnd ?? ""}`}>
+      <nav className={styles.siteHeaderNav} aria-label="Principal">
+        <Link href="/portafolio">Trabajos</Link>
+        <Link href="/nueva-home#sedes">Sedes</Link>
+        <Link href="/tienda">Tienda</Link>
+      </nav>
+
+      <div className={styles.siteHeaderSide}>
         <Link href="/perfil" className={styles.siteHeaderAccount}>{cliente ? "Mi perfil" : "Entrar"}</Link>
         <Link href="/reservar" className={`${styles.btn} ${styles.btnSmall}`}>Reservar cita</Link>
       </div>
