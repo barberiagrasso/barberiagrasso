@@ -40,6 +40,7 @@ const NAV = [
   { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
+  { href: "/admin/stock", label: "Stock" },
   { href: "/admin/vacaciones", label: "Vacaciones" },
   { href: "/admin/bloqueos", label: "Cierres" },
   { href: "/admin/campanas", label: "Campañas" },
@@ -50,9 +51,12 @@ const NAV = [
   { href: "/admin/errores", label: "Errores" },
 ];
 
-export default function AdminNav({ rol }: { rol: string }) {
+export default function AdminNav({ rol, encargadoStock = false }: { rol: string; encargadoStock?: boolean }) {
   const pathname = usePathname();
-  const items = rol === "admin" ? NAV : NAV.filter((item) => !SOLO_ADMIN.has(item.href));
+  // "Stock": el dueño y el barbero encargado de stock de alguna sede.
+  const items = (rol === "admin" ? NAV : NAV.filter((item) => !SOLO_ADMIN.has(item.href))).filter(
+    (item) => item.href !== "/admin/stock" || rol === "admin" || encargadoStock,
+  );
 
   return (
     // overflow-x-auto en vez de flex-wrap: con 10 secciones, envolver el

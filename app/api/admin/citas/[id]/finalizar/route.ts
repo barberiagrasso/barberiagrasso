@@ -76,8 +76,9 @@ interface PagoElegido {
  * corregir algo después, se hace a mano en Supabase.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let adminCobro: { id: string; nombre: string | null } | null = null;
   try {
-    await requireAdminApi();
+    ({ admin: adminCobro } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -181,7 +182,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { data: citaActual } = await supabase
     .from("citas")
-    .select("id, cliente_id, estado, saldo_canjeado_centimos, grassocoins_canjeados")
+    .select("id, cliente_id, sede_id, estado, saldo_canjeado_centimos, grassocoins_canjeados")
     .eq("id", id)
     .maybeSingle();
   if (!citaActual) return NextResponse.json({ error: "Cita no encontrada." }, { status: 404 });
@@ -412,11 +413,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // disponible en cuanto queda "completada", así que no hay riesgo de
     // descontar dos veces por una re-edición. Si fallara, no se deshace
     // el cobro ya registrado: solo se registra el error para revisarlo.
+    // Desde el 10/11/2026 el stock es por sede: se descuenta de la sede de
+    // la cita y queda en el historial con quién cobró. Si el script
+    // supabase/anadir-stock-por-sede.sql aún no está ejecutado, se usa el
+    // descuento antiguo (stock único) como hasta ahora.
     for (const p of productosParaGuardar) {
-      const { error: errorStock } = await supabase.rpc("descontar_stock_producto", {
+      let { error: errorStock } = await supabase.rpc("registrar_movimiento_stock", {
         p_producto_id: p.producto_id,
+        p_sede_id: citaActual.sede_id,
+        p_tipo: "venta",
         p_cantidad: p.cantidad,
+        p_cita_id: id,
+        p_admin_id: adminCobro?.id ?? null,
+        p_admin_nombre: adminCobro?.nombre ?? null,
       });
+      if (errorStock) {
+        ({ error: errorStock } = await supabase.rpc("descontar_stock_producto", {
+          p_producto_id: p.producto_id,
+          p_cantidad: p.cantidad,
+        }));
+      }
       if (errorStock) {
         await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock de un producto.", detalle: errorStock });
       }
