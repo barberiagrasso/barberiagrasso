@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
@@ -10,6 +11,22 @@ import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { cargarResenasExternas } from "@/lib/portafolio";
 
 export const dynamic = "force-dynamic";
+
+// Metadata propia de la home (13/11/2026): antes esta página solo heredaba
+// la de app/layout.tsx, que es casi idéntica — se deja explícita, igual que
+// ya hacen /portafolio y /tienda, en vez de depender de que nadie la toque.
+export const metadata: Metadata = {
+  title: "Barbería Grasso — Reserva tu cita",
+  description: "Reserva tu cita online en Barbería Grasso, Getafe: Los Molinos y Avenida de las Ciudades.",
+  openGraph: {
+    title: "Barbería Grasso",
+    description: "Reserva tu cita online en Los Molinos y Avenida de las Ciudades (Getafe).",
+    url: "/",
+    siteName: "Barbería Grasso",
+    locale: "es_ES",
+    type: "website",
+  },
+};
 
 export default async function Home() {
   // Portada abierta a todos (01/11/2026): sin cuenta se puede reservar.

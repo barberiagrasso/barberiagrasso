@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireCliente } from "@/lib/clienteAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EditarPerfilHeader } from "./EditarPerfilHeader";
@@ -16,6 +17,14 @@ import journeyStyles from "@/components/journey/journey.module.css";
 import styles from "./perfil.module.css";
 
 export const dynamic = "force-dynamic";
+
+// Página privada (requiere sesión de cliente) con datos personales: sin
+// openGraph (nada que compartir) y con noindex, para que Google no la
+// indexe ni la muestre en resultados de búsqueda.
+export const metadata: Metadata = {
+  title: "Mi perfil · Barbería Grasso",
+  robots: { index: false, follow: false },
+};
 
 // Incluye tanto lo que ya usaba esta pantalla (nombre de servicio/sede/
 // profesional, precio) como lo que hace falta para poder construir el

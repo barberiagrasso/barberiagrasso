@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -11,6 +12,19 @@ import { journeyFontVars } from "@/components/journey/fonts";
 import journeyStyles from "@/components/journey/journey.module.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Reservar cita · Barbería Grasso",
+  description: "Elige sede, servicio, barbero y hora: reserva tu cita online en Barbería Grasso, Getafe.",
+  openGraph: {
+    title: "Reservar cita · Barbería Grasso",
+    description: "Elige sede, servicio, barbero y hora: reserva tu cita online en Barbería Grasso, Getafe.",
+    url: "/reservar",
+    siteName: "Barbería Grasso",
+    locale: "es_ES",
+    type: "website",
+  },
+};
 
 export default async function ReservarPage() {
   // Se puede reservar sin cuenta (01/11/2026). Si este móvil ya reconoce
