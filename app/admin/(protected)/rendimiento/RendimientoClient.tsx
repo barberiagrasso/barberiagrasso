@@ -381,7 +381,7 @@ function Simulador({ datos }: { datos: AnalisisRendimiento }) {
         </table>
       </div>
       <Leyenda />
-      <p className="mt-1 text-[11px] text-stone-400">Recuadro negro = hora cambiada. "+" = hora nueva (se estima con la ocupación de la sede a esa hora).</p>
+      <p className="mt-1 text-[11px] text-stone-400">Recuadro negro = hora cambiada. &quot;+&quot; = hora nueva (se estima con la ocupación de la sede a esa hora).</p>
 
       <label className="mt-4 block text-xs text-stone-600">
         Clientes de las horas quitadas que se recolocan en otras horas suyas: <b>{retencion} %</b>

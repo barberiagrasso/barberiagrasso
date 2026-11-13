@@ -58,7 +58,7 @@ export function HeroChair({ works }: { works: string[] }) {
     }
 
     const cleanups: Array<() => void> = [];
-    let raf: number | null = null;
+    const raf: number | null = null;
     let disposed = false;
 
     function setProgress(p: number) {

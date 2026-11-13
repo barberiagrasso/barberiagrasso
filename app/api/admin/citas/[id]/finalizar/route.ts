@@ -226,7 +226,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // Un producto canjeado con GrassoCoins se guarda a 0 € (no se cobró) y
   // con las coins que costó: así caja, informes, comisiones y coins
   // ganadas cuadran sin tratarlo aparte en cada sitio.
-  let productosParaGuardar: {
+  const productosParaGuardar: {
     producto_id: string;
     cantidad: number;
     precio_centimos: number;

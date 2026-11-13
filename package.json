@@ -18,7 +18,7 @@
     "date-fns-tz": "^3.2.0",
     "gsap": "^3.15.1",
     "jsonwebtoken": "^9.0.3",
-    "next": "16.3.5",
+    "next": "16.4.6",
     "passkit-generator": "^3.6.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -34,7 +34,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.187.0",
     "eslint": "^9",
-    "eslint-config-next": "16.3.5",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.11"
