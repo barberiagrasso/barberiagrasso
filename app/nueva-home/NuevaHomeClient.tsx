@@ -1,13 +1,16 @@
 "use client";
 
 /*
-  Resto del diseño de Diego (grasso-web.zip) ya con datos reales: cabecera, manifiesto con
-  marquesina + parallax, sedes (de la base de datos real, sin teléfonos — decisión de Diego,
-  08/11/2026), cierre y pie. El hero 3D vive en HeroChair.tsx; aquí solo lo montamos junto al
-  resto de la página y llevamos las animaciones de scroll (GSAP ScrollTrigger) que no son del
-  sillón: revelado de bloques, marquesina continua, parallax de fotos flotantes, cabecera que se
-  oscurece al bajar y sedes que se amplían al pulsarlas (clic/tap en cualquier dispositivo; en
-  escritorio además al pasar el ratón, vía CSS).
+  Resto del diseño de Diego (grasso-web.zip) ya con datos reales: cabecera, sedes (de la base de
+  datos real, sin teléfonos — decisión de Diego, 08/11/2026), reseñas de Google, cierre y pie. El
+  hero 3D vive en HeroChair.tsx; aquí solo lo montamos junto al resto de la página y llevamos las
+  animaciones de scroll (GSAP ScrollTrigger) que no son del sillón: revelado de bloques, cabecera
+  que se oscurece al bajar y sedes que se amplían al pulsarlas (clic/tap en cualquier dispositivo;
+  en escritorio además al pasar el ratón, vía CSS).
+  Antes había una segunda sección ("manifiesto": marquesina + texto + estadísticas) entre el hero
+  y las sedes; Diego pidió quitarla y pasar directo del hero a las sedes, que ahora llevan fondo
+  blanco (antes solo lo llevaba el manifiesto) para que siga habiendo ese contraste justo después
+  del hero oscuro (pedido de Diego, 13/11/2026).
 */
 
 import { useEffect, useRef, useState } from "react";
@@ -41,12 +44,6 @@ export interface NuevaHomeClientProps {
   works: string[];
 }
 
-const MARQUEE_LINES = [
-  { text: "Corte · Barba · Afeitado · ", outline: false, duration: 32 },
-  { text: "Kids Grasso · Grasso Experience · ", outline: true, duration: 40 },
-  { text: "Precisión · Estilo · Actitud · ", outline: false, duration: 26 },
-];
-
 // Fotos reales de fachada de cada sede (las que mandó Diego, 08/11/2026) — antes se usaba aquí
 // una foto cualquiera de trabajo como relleno, y eso era justo el problema que reportó (además
 // de no ser la fachada real, el texto blanco podía caer sobre una zona clara de la foto). Se
@@ -61,15 +58,7 @@ function fotoSede(nombre: string): string | null {
 
 export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: NuevaHomeClientProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const manifestoRef = useRef<HTMLDivElement>(null);
-  const floatARef = useRef<HTMLImageElement>(null);
-  const floatBRef = useRef<HTMLImageElement>(null);
   const [openSede, setOpenSede] = useState<string | null>(null);
-
-  const mejorNota = Object.values(resenas)
-    .flatMap((r) => [r.google?.nota, r.booksy?.nota])
-    .filter((n): n is number => typeof n === "number")
-    .sort((a, b) => b - a)[0];
 
   useEffect(() => {
     // Con "reducir movimiento" activado en el sistema, se enseñan los
@@ -89,19 +78,6 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
           scrollTrigger: { trigger: el, start: "top 85%" },
         });
       });
-
-      if (!reduceMotion && floatARef.current) {
-        gsap.to(floatARef.current, {
-          y: -70, ease: "none",
-          scrollTrigger: { trigger: manifestoRef.current, start: "top bottom", end: "bottom top", scrub: true },
-        });
-      }
-      if (!reduceMotion && floatBRef.current) {
-        gsap.to(floatBRef.current, {
-          y: 90, ease: "none",
-          scrollTrigger: { trigger: manifestoRef.current, start: "top bottom", end: "bottom top", scrub: true },
-        });
-      }
     }, rootRef);
 
     return () => {
@@ -122,51 +98,6 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
 
       <main id="top">
         <HeroChair works={works} />
-
-        <section ref={manifestoRef} className={styles.manifesto} aria-label="Lo que hacemos">
-          <div className={styles.manifestoLines} aria-hidden="true">
-            {MARQUEE_LINES.map((line, i) => (
-              <MarqueeLine key={i} text={line.text} outline={line.outline} duration={line.duration} />
-            ))}
-          </div>
-
-          <div className={styles.manifestoBody}>
-            <div data-reveal>
-              <p className={styles.eyebrow}>Barbería Grasso</p>
-              <p className={styles.lead}>
-                Más que un corte. Tradición, precisión y actitud hecha estilo. Te escuchamos, te
-                asesoramos y cuidamos cada detalle para que salgas viéndote como realmente te sientes.
-              </p>
-            </div>
-            <ul className={styles.manifestoStats} data-reveal>
-              <li><strong>{sedes.length || 2}</strong><span>sedes en Getafe</span></li>
-              <li>
-                <strong>{mejorNota ? mejorNota.toLocaleString("es-ES", { minimumFractionDigits: 1 }) : "★"}</strong>
-                <span>valoración de nuestros clientes</span>
-              </li>
-              <li><strong>2017</strong><span>cuidando de tu imagen</span></li>
-            </ul>
-          </div>
-
-          {works[5] && (
-            <img
-              ref={floatARef}
-              className={`${styles.manifestoFloat} ${styles.manifestoFloatA}`}
-              src={works[5]}
-              alt="Degradado con raya hecho en Grasso"
-              loading="lazy"
-            />
-          )}
-          {works[11] && (
-            <img
-              ref={floatBRef}
-              className={`${styles.manifestoFloat} ${styles.manifestoFloatB}`}
-              src={works[11]}
-              alt="Servicio de cuidado facial en Grasso"
-              loading="lazy"
-            />
-          )}
-        </section>
 
         <section className={styles.sedes} id="sedes">
           <div className={styles.sedesHead}>
@@ -303,24 +234,5 @@ function IconoGoogle() {
       <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" />
       <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.455 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" />
     </svg>
-  );
-}
-
-function MarqueeLine({ text, outline, duration }: { text: string; outline: boolean; duration: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // Movimiento puramente decorativo: con "reducir movimiento" en el
-    // sistema, el texto se queda quieto en vez de desplazarse sin parar.
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const tween = gsap.fromTo(el, { xPercent: 0 }, { xPercent: -50, duration, ease: "none", repeat: -1 });
-    return () => { tween.kill(); };
-  }, [duration]);
-  const repeated = text.repeat(6);
-  return (
-    <div ref={ref} className={`${styles.manifestoLine} ${outline ? styles.manifestoLineOutline : ""}`}>
-      {repeated}
-    </div>
   );
 }
