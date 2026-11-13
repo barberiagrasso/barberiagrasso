@@ -30,12 +30,19 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run lint
-      # Informa de vulnerabilidades sin bloquear todavía: a fecha de
-      # hoy hay 17 señaladas por npm audit (10 moderadas, 7 altas) en
-      # dependencias, pendientes de revisar una a una (hay fixes que
-      # son "breaking", como el downgrade de joi vía
-      # passkit-generator). Pasar a bloquear (quitar
-      # continue-on-error) es tarea aparte, una vez resueltas.
+      # Informa de vulnerabilidades sin bloquear todavía. 13/11/2026:
+      # ya se resolvieron 7 de las 17 originales (zod, node-forge,
+      # vite, source-map-js, brace-expansion...) sin tocar nada a
+      # mano con fixes compatibles. Quedan 10, las dos "altas"
+      # concentradas en joi (vía passkit-generator, la librería de
+      # tarjetas de Apple Wallet: el fix real exige un salto de
+      # versión "breaking" de passkit-generator que no se puede
+      # probar de verdad sin certificados reales de Apple) y las 8
+      # "moderadas" en el propio eslint-config-next (su fix real es,
+      # según el propio npm audit, una vuelta atrás a una versión
+      # anterior de eslint-config-next, que no tiene sentido con
+      # Next.js 16.4.6). Pasar a bloquear (quitar continue-on-error)
+      # es tarea aparte, una vez resueltas de verdad.
       - run: npm audit --audit-level=high
         continue-on-error: true
       - run: npm test
