@@ -1,11 +1,16 @@
-# Verifica cada cambio antes de que llegue a producción: lint, tests y
-# que el proyecto compile. A diferencia de los demás workflows de esta
-# carpeta (backup, recordatorios...), este no dispara nada en la propia
-# app — solo informa aquí, en GitHub, si algo se rompió.
+# Verifica cada cambio antes de que llegue a producción: tipos, lint,
+# vulnerabilidades conocidas, tests y que el proyecto compile. A
+# diferencia de los demás workflows de esta carpeta (backup,
+# recordatorios...), este no dispara nada en la propia app — solo
+# informa aquí, en GitHub, si algo se rompió.
 #
-# De momento solo avisa (una ✗ roja en el Pull Request o el commit): no
-# bloquea que Vercel despliegue igualmente. Bloquear el despliegue de
-# verdad es un paso aparte (regla de protección de rama en GitHub).
+# 13/11/2026: el lint ya se arregló de verdad (ya no hace falta
+# continue-on-error) y se añaden tsc y npm audit. Para que un ✗ rojo
+# aquí bloquee de verdad el merge en GitHub (hoy solo avisa, no lo
+# impide) falta un paso aparte que no se puede hacer desde este
+# repo: Diego tiene que activar, en GitHub → Settings → Branches →
+# Add rule (sobre la rama a proteger), "Require status checks to pass
+# before merging" y marcar el job "verificar" de este workflow.
 
 name: CI
 
@@ -23,12 +28,15 @@ jobs:
           node-version: 20
           cache: "npm"
       - run: npm ci
-      # El lint ya tenía avisos y errores sueltos en código existente antes
-      # de este workflow (sin relación con los cambios de robustez) — se
-      # deja en modo "solo informa" (continue-on-error) para que de entrada
-      # no salga todo en rojo por algo que no tiene que ver con el cambio
-      # que se está revisando. Arreglarlos de verdad es tarea aparte.
+      - run: npx tsc --noEmit
       - run: npm run lint
+      # Informa de vulnerabilidades sin bloquear todavía: a fecha de
+      # hoy hay 17 señaladas por npm audit (10 moderadas, 7 altas) en
+      # dependencias, pendientes de revisar una a una (hay fixes que
+      # son "breaking", como el downgrade de joi vía
+      # passkit-generator). Pasar a bloquear (quitar
+      # continue-on-error) es tarea aparte, una vez resueltas.
+      - run: npm audit --audit-level=high
         continue-on-error: true
       - run: npm test
       - run: npm run build
