@@ -34,7 +34,7 @@ type Paso =
 // precio es mayor, pero que la mayoría reserve con el equipo.
 const CATEGORIA_MASTER = "Grasso Master · con David Grasso";
 function categoriaEfectiva(s: Servicio): string | null {
-  return /david\s+grasso/i.test(s.nombre) ? CATEGORIA_MASTER : s.categoria;
+  return /david\s+grasso/i.test(s.nombre) ? CATEGORIA_MASTER : (s.categoria ?? null);
 }
 
 const CATEGORIAS_ORDEN = [
