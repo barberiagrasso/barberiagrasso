@@ -523,7 +523,9 @@ export default function BookingFlow({
   // Comentario libre del cliente para el último paso ("¿algún
   // comentario o petición para tu visita?"), inspirado en Booksy —
   // pedido de Diego 19/10/2026. Opcional, se guarda junto a la cita.
-  const [notaCliente, setNotaCliente] = useState("");
+  // Si viene del asesor de estilo con IA (/estilo), la recomendación se
+  // rellena como comentario para que el barbero la vea en la cita.
+  const [notaCliente, setNotaCliente] = useState(() => (searchParams.get("nota") ?? "").slice(0, 300));
   // Antes venía premarcada por defecto: el RGPD exige que el
   // consentimiento para comunicaciones comerciales sea un acto positivo
   // del usuario, no una casilla ya marcada de fábrica (pedido de Diego,
