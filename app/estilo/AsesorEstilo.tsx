@@ -14,6 +14,7 @@ interface Resultado {
   cortes: { nombre: string; porQue: string }[];
   evitar: string[];
   barba: { recomendacion: string; porQue: string } | null;
+  extras: { nombre: string; porQue: string }[];
   consejo: string;
   servicios: { id: string; nombre: string }[];
 }
@@ -94,7 +95,13 @@ export default function AsesorEstilo() {
 
   // --- Resultado ---
   if (resultado?.hayCara) {
-    const nota = `Estilo recomendado por la IA: ${resultado.cortes[0]?.nombre ?? ""}${resultado.barba ? ` · Barba: ${resultado.barba.recomendacion}` : ""}`;
+    const nota = [
+      `Estilo IA: ${resultado.cortes[0]?.nombre ?? ""}`,
+      resultado.barba ? `Barba: ${resultado.barba.recomendacion}` : "",
+      resultado.extras.length ? `Ofrecer: ${resultado.extras.map((e) => e.nombre).join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <div className="mt-6 space-y-4">
         <div className="rounded-2xl border border-brand-yellow/40 bg-brand-yellow/10 p-4">
@@ -121,6 +128,19 @@ export default function AsesorEstilo() {
             <p className="font-mono text-xs uppercase tracking-widest text-black/50">Barba</p>
             <p className="mt-1 font-heading text-lg text-black">{resultado.barba.recomendacion}</p>
             <p className="mt-0.5 font-body text-sm text-black/60">{resultado.barba.porQue}</p>
+          </div>
+        )}
+
+        {resultado.extras.length > 0 && (
+          <div className="rounded-xl border border-brand-yellow/40 p-4">
+            <p className="font-mono text-xs uppercase tracking-widest text-brand-yellow">Te recomendamos también</p>
+            {resultado.extras.map((e, i) => (
+              <div key={i} className="mt-2">
+                <p className="font-body text-sm font-semibold text-brand-white">{e.nombre}</p>
+                <p className="font-body text-xs text-brand-white-dim">{e.porQue}</p>
+              </div>
+            ))}
+            <p className="mt-2 font-body text-xs text-brand-white-dim">Pídeselo a tu barbero en la cita o añádelo al reservar.</p>
           </div>
         )}
 
