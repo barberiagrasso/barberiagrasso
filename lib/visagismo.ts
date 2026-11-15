@@ -39,12 +39,20 @@ export const CATALOGO_EXTRAS = [
   "Depilación de nariz y orejas con cera",
   "Limpieza facial",
   "Hidratación capilar",
-  "Sellado capilar",
+  "Alisado (brasileño o botox)",
   "Rubio platino",
   "Perfilado de cejas",
   "Mechas",
   "Camuflaje de canas",
 ];
+
+// Precio orientativo que se enseña al cliente junto al extra sugerido
+// (los que David ha dado; el resto se consulta en la barbería).
+export const PRECIO_EXTRAS: Record<string, string> = {
+  "Alisado (brasileño o botox)": "de 19 € a 30 €",
+  Mechas: "44,99 €",
+  "Rubio platino": "69,90 €",
+};
 
 export const FORMAS_CARA = ["ovalada", "redonda", "cuadrada", "rectangular", "alargada", "triangular", "diamante", "corazon"] as const;
 
@@ -57,7 +65,7 @@ export interface RecomendacionEstilo {
   cortes: { nombre: string; porQue: string }[];
   evitar: string[];
   barba: { recomendacion: string; porQue: string } | null;
-  extras: { nombre: string; porQue: string }[];
+  extras: { nombre: string; porQue: string; precio: string | null }[];
   consejo: string;
   servicioIds: string[];
 }
@@ -103,7 +111,7 @@ const HERRAMIENTA = {
       extras: {
         type: "array",
         maxItems: 2,
-        description: "1-2 servicios extra del catálogo que de verdad le vendrían bien por lo que se ve (canas → camuflaje; pelo seco o encrespado → hidratación o sellado; cejas pobladas → perfilado; piel → limpieza facial). Vacío si nada encaja.",
+        description: "1-2 servicios extra del catálogo que de verdad le vendrían bien por lo que se ve (canas → camuflaje; pelo seco → hidratación; pelo encrespado o con mucho volumen que quiera domar → alisado; cejas pobladas → perfilado; piel → limpieza facial). Vacío si nada encaja.",
         items: {
           type: "object",
           properties: {
@@ -194,7 +202,11 @@ export async function recomendarEstilo(
     barba: barba?.recomendacion ? { recomendacion: String(barba.recomendacion), porQue: String(barba.por_que ?? "") } : null,
     extras: (Array.isArray(r.extras) ? r.extras : [])
       .slice(0, 2)
-      .map((e: { nombre?: string; por_que?: string }) => ({ nombre: String(e.nombre ?? ""), porQue: String(e.por_que ?? "") }))
+      .map((e: { nombre?: string; por_que?: string }) => ({
+        nombre: String(e.nombre ?? ""),
+        porQue: String(e.por_que ?? ""),
+        precio: PRECIO_EXTRAS[String(e.nombre ?? "")] ?? null,
+      }))
       .filter((e) => e.nombre),
     consejo: String(r.consejo ?? ""),
     servicioIds: (Array.isArray(r.servicio_ids) ? r.servicio_ids : []).map(String).filter((id) => idsValidos.has(id)).slice(0, 3),

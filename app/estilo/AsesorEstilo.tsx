@@ -14,7 +14,7 @@ interface Resultado {
   cortes: { nombre: string; porQue: string }[];
   evitar: string[];
   barba: { recomendacion: string; porQue: string } | null;
-  extras: { nombre: string; porQue: string }[];
+  extras: { nombre: string; porQue: string; precio: string | null }[];
   consejo: string;
   servicios: { id: string; nombre: string }[];
 }
@@ -136,7 +136,10 @@ export default function AsesorEstilo() {
             <p className="font-mono text-xs uppercase tracking-widest text-brand-yellow">Te recomendamos también</p>
             {resultado.extras.map((e, i) => (
               <div key={i} className="mt-2">
-                <p className="font-body text-sm font-semibold text-brand-white">{e.nombre}</p>
+                <p className="font-body text-sm font-semibold text-brand-white">
+                  {e.nombre}
+                  {e.precio && <span className="ml-2 font-normal text-brand-yellow">{e.precio}</span>}
+                </p>
                 <p className="font-body text-xs text-brand-white-dim">{e.porQue}</p>
               </div>
             ))}
