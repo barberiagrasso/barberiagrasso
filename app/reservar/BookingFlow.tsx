@@ -28,7 +28,17 @@ type Paso =
 // directamente en el paso de reserva. El resto vive dentro de un
 // desplegable según su `categoria` — este orden es el que pidió Diego;
 // una categoría que no esté aquí se coloca al final, alfabéticamente.
+// Servicios con David Grasso (los que llevan su nombre): ya no salen los
+// primeros, sino en su propio desplegable "premium" justo debajo de los
+// normales (pedido de David, 15/11/2026): que se vea que existe y que su
+// precio es mayor, pero que la mayoría reserve con el equipo.
+const CATEGORIA_MASTER = "Grasso Master · con David Grasso";
+function categoriaEfectiva(s: Servicio): string | null {
+  return /david\s+grasso/i.test(s.nombre) ? CATEGORIA_MASTER : s.categoria;
+}
+
 const CATEGORIAS_ORDEN = [
+  CATEGORIA_MASTER,
   "Grasso Kids (hasta 7 años)",
   "Complementos",
   "Tintes Grasso",
@@ -41,7 +51,8 @@ function esComplemento(servicio: Servicio) {
   return servicio.categoria === CATEGORIA_COMPLEMENTOS;
 }
 
-function agruparServicios(servicios: Servicio[]) {
+function agruparServicios(serviciosOriginales: Servicio[]) {
+  const servicios = serviciosOriginales.map((s) => ({ ...s, categoria: categoriaEfectiva(s) }));
   const principales = servicios
     .filter((s) => !s.categoria)
     .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
@@ -1115,6 +1126,12 @@ export default function BookingFlow({
                       </button>
                       {abierto && (
                         <div className="space-y-2 border-t border-brand-line p-3">
+                          {grupo.nombre === CATEGORIA_MASTER && (
+                            <p className="font-body text-xs text-brand-white-dim">
+                              Servicio exclusivo con el fundador, con plazas limitadas. Todo nuestro equipo trabaja con el
+                              método Grasso.
+                            </p>
+                          )}
                           {grupo.items.map((servicio) => (
                             <div key={servicio.id}>
                               {grupo.nombre === "Tratamientos capilares" &&
