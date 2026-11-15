@@ -68,6 +68,27 @@ export default async function PortafolioPage() {
           </div>
         </div>
 
+        {/* Guía de estilos de Grasso (cartel, 15/11/2026). Al tocarla se
+            abre en grande para poder ampliarla con los dedos. */}
+        <section className="mb-8">
+          <h2 className="mb-2 font-mono text-xs uppercase tracking-widest text-brand-yellow">¿Qué estilo llevas hoy?</h2>
+          <a href="/media/cartel-estilos.jpg" target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-brand-line">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/media/cartel-estilos.jpg"
+              alt="Guía de estilos de Barbería Grasso: cortes, barbas, cortes infantiles y servicios"
+              className="w-full"
+            />
+          </a>
+          <p className="mt-1 text-center font-body text-xs text-brand-white-dim">Toca la imagen para verla en grande.</p>
+          <Link
+            href="/estilo"
+            className="mt-3 block rounded-xl border border-brand-yellow/50 px-4 py-3 text-center font-body text-sm font-semibold text-brand-yellow"
+          >
+            ✨ ¿No sabes cuál elegir? Descubre tu estilo con IA
+          </Link>
+        </section>
+
         <PortafolioPublico fotos={[...fotos, ...FOTOS_PORTAFOLIO_FIJAS]} servicios={servicios ?? []} sedes={sedes ?? []} />
       </div>
     </main>
