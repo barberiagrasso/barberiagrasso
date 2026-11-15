@@ -54,6 +54,40 @@ export const PRECIO_EXTRAS: Record<string, string> = {
   "Rubio platino": "69,90 €",
 };
 
+// Foto de ejemplo de cada estilo (recortes del cartel de Grasso, en
+// public/media/estilos) para enseñarla junto a la recomendación.
+export const FOTO_ESTILO: Record<string, string> = {
+  "Clásico": "clasico",
+  "Degradado alto": "degradado-alto",
+  "Degradado medio": "degradado-medio",
+  "Degradado bajo": "degradado-bajo",
+  "Raya a navaja": "raya-a-navaja",
+  "Falso mohicano": "falso-mohicano",
+  Rapado: "rapado",
+  Undercut: "undercut",
+  "Flequillo corto": "flequillo-corto",
+  "Old money": "old-money",
+  "Old money con degradado suave": "old-money-degradado-suave",
+  "Tupé a tijera": "tupe-a-tijera",
+  Mohicano: "mohicano",
+  Mullet: "mullet",
+  "Rizado (definido arriba)": "rizado-01",
+  "Rizado con degradado": "rizado-02",
+  "Degradado y arriba al 2": "degradado-y-arriba-al-2",
+  "Afro clásico": "afro-clasico",
+  "Afro con esponja": "afro-con-esponja",
+  "Barba italiana": "barba-italiana",
+  "Barba corta": "barba-corta",
+  "Barba clásica": "barba-clasica",
+  "Barba degradada": "barba-degradada",
+  "Barba larga": "barba-larga",
+};
+
+export function fotoDeEstilo(nombre: string): string | null {
+  const archivo = FOTO_ESTILO[nombre];
+  return archivo ? `/media/estilos/${archivo}.jpg` : null;
+}
+
 export const FORMAS_CARA = ["ovalada", "redonda", "cuadrada", "rectangular", "alargada", "triangular", "diamante", "corazon"] as const;
 
 export interface RecomendacionEstilo {
@@ -62,9 +96,9 @@ export interface RecomendacionEstilo {
   formaCara: (typeof FORMAS_CARA)[number];
   explicacionForma: string;
   tipoPelo: string;
-  cortes: { nombre: string; porQue: string }[];
+  cortes: { nombre: string; porQue: string; foto: string | null }[];
   evitar: string[];
-  barba: { recomendacion: string; porQue: string } | null;
+  barba: { recomendacion: string; porQue: string; foto: string | null } | null;
   extras: { nombre: string; porQue: string; precio: string | null }[];
   consejo: string;
   servicioIds: string[];
@@ -196,10 +230,16 @@ export async function recomendarEstilo(
     tipoPelo: String(r.tipo_pelo ?? ""),
     cortes: (Array.isArray(r.cortes) ? r.cortes : [])
       .slice(0, 3)
-      .map((c: { nombre?: string; por_que?: string }) => ({ nombre: String(c.nombre ?? ""), porQue: String(c.por_que ?? "") }))
+      .map((c: { nombre?: string; por_que?: string }) => ({
+        nombre: String(c.nombre ?? ""),
+        porQue: String(c.por_que ?? ""),
+        foto: fotoDeEstilo(String(c.nombre ?? "")),
+      }))
       .filter((c) => c.nombre),
     evitar: (Array.isArray(r.evitar) ? r.evitar : []).slice(0, 3).map(String),
-    barba: barba?.recomendacion ? { recomendacion: String(barba.recomendacion), porQue: String(barba.por_que ?? "") } : null,
+    barba: barba?.recomendacion
+      ? { recomendacion: String(barba.recomendacion), porQue: String(barba.por_que ?? ""), foto: fotoDeEstilo(String(barba.recomendacion)) }
+      : null,
     extras: (Array.isArray(r.extras) ? r.extras : [])
       .slice(0, 2)
       .map((e: { nombre?: string; por_que?: string }) => ({

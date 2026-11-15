@@ -11,9 +11,9 @@ interface Resultado {
   formaCara: string;
   explicacionForma: string;
   tipoPelo: string;
-  cortes: { nombre: string; porQue: string }[];
+  cortes: { nombre: string; porQue: string; foto: string | null }[];
   evitar: string[];
-  barba: { recomendacion: string; porQue: string } | null;
+  barba: { recomendacion: string; porQue: string; foto: string | null } | null;
   extras: { nombre: string; porQue: string; precio: string | null }[];
   consejo: string;
   servicios: { id: string; nombre: string }[];
@@ -114,20 +114,32 @@ export default function AsesorEstilo() {
         <div className="space-y-2">
           <p className="font-mono text-xs uppercase tracking-widest text-brand-yellow">Cortes que te favorecen</p>
           {resultado.cortes.map((c, i) => (
-            <div key={i} className="rounded-xl bg-white p-4">
-              <p className="font-heading text-lg text-black">
-                {i + 1}. {c.nombre}
-              </p>
-              <p className="mt-0.5 font-body text-sm text-black/60">{c.porQue}</p>
+            <div key={i} className="flex gap-3 rounded-xl bg-white p-3">
+              {c.foto && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.foto} alt={`Ejemplo de ${c.nombre}`} className="h-24 w-24 shrink-0 rounded-lg object-cover" />
+              )}
+              <div>
+                <p className="font-heading text-lg text-black">
+                  {i + 1}. {c.nombre}
+                </p>
+                <p className="mt-0.5 font-body text-sm text-black/60">{c.porQue}</p>
+              </div>
             </div>
           ))}
         </div>
 
         {resultado.barba && (
-          <div className="rounded-xl bg-white p-4">
-            <p className="font-mono text-xs uppercase tracking-widest text-black/50">Barba</p>
-            <p className="mt-1 font-heading text-lg text-black">{resultado.barba.recomendacion}</p>
-            <p className="mt-0.5 font-body text-sm text-black/60">{resultado.barba.porQue}</p>
+          <div className="flex gap-3 rounded-xl bg-white p-3">
+            {resultado.barba.foto && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={resultado.barba.foto} alt={`Ejemplo de ${resultado.barba.recomendacion}`} className="h-24 w-24 shrink-0 rounded-lg object-cover" />
+            )}
+            <div>
+              <p className="font-mono text-xs uppercase tracking-widest text-black/50">Barba</p>
+              <p className="mt-1 font-heading text-lg text-black">{resultado.barba.recomendacion}</p>
+              <p className="mt-0.5 font-body text-sm text-black/60">{resultado.barba.porQue}</p>
+            </div>
           </div>
         )}
 
