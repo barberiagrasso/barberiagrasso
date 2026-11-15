@@ -4,6 +4,7 @@ import { cargarFotosPortafolio, cargarResenasExternas } from "@/lib/portafolio";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import PortafolioPublico from "./PortafolioPublico";
+import { FOTOS_PORTAFOLIO_FIJAS } from "@/lib/portafolioFijo";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function PortafolioPage() {
           </div>
         </div>
 
-        <PortafolioPublico fotos={fotos} servicios={servicios ?? []} sedes={sedes ?? []} />
+        <PortafolioPublico fotos={[...fotos, ...FOTOS_PORTAFOLIO_FIJAS]} servicios={servicios ?? []} sedes={sedes ?? []} />
       </div>
     </main>
   );
