@@ -40,4 +40,7 @@ export const FOTOS_PORTAFOLIO_FIJAS: FotoPortafolio[] = [
   { id: "grasso-33", url: "/media/portafolio/33-buzz-degradado.jpg", servicio_id: null, sede_id: null, descripcion: "Buzz cut con degradado", created_at: "2026-11-18T00:00:00Z" },
   { id: "grasso-34", url: "/media/portafolio/34-mullet-hacia-atras.jpg", servicio_id: null, sede_id: null, descripcion: "Mullet peinado hacia atrás", created_at: "2026-11-18T00:00:00Z" },
   { id: "grasso-35", url: "/media/portafolio/35-crop-barba.jpg", servicio_id: null, sede_id: null, descripcion: "Crop y barba", created_at: "2026-11-18T00:00:00Z" },
+  { id: "grasso-36", url: "/media/portafolio/36-mullet-rizado-barba.jpg", servicio_id: null, sede_id: null, descripcion: "Mullet rizado con barba", created_at: "2026-11-18T00:00:00Z" },
+  { id: "grasso-37", url: "/media/portafolio/37-mullet-barba-perfilada.jpg", servicio_id: null, sede_id: null, descripcion: "Mullet con barba perfilada", created_at: "2026-11-18T00:00:00Z" },
+  { id: "grasso-38", url: "/media/portafolio/38-flequillo-texturizado.jpg", servicio_id: null, sede_id: null, descripcion: "Texturizado con degradado bajo", created_at: "2026-11-18T00:00:00Z" },
 ];
