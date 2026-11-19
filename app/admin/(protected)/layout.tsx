@@ -70,7 +70,7 @@ export default async function ProtectedAdminLayout({
   ]);
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 md:pl-20 print:pl-0">
       <InactividadAutoLogout />
       <header className="border-b border-black/10 bg-brand-black print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -92,7 +92,7 @@ export default async function ProtectedAdminLayout({
           </div>
         </div>
         <div className="border-t border-white/[0.06] bg-brand-black-soft">
-          <div className="mx-auto max-w-6xl px-4">
+          <div className="mx-auto max-w-6xl px-4 py-1 md:py-0">
             <AdminNav rol={admin.rol} encargadoStock={encargadoStock} />
           </div>
         </div>
