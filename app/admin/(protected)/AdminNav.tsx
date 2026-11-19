@@ -47,6 +47,7 @@ const GRUPOS: { label: string; items: { href: string; label: string }[] }[] = [
     { href: "/admin/opiniones", label: "Opiniones" },
   ] },
   { label: "Personal", items: [
+    { href: "/admin/personal", label: "Personal" },
     { href: "/admin/asesor", label: "Asesor" },
     { href: "/admin/vacaciones", label: "Vacaciones" },
   ] },
