@@ -34,55 +34,82 @@ const SOLO_ADMIN = new Set([
 // /admin/profesionales, /admin/lista-espera y /admin/conversaciones
 // siguen existiendo por si hay algún enlace guardado, solo que ya no
 // aparecen aquí.
-const NAV = [
-  { href: "/admin/dashboard", label: "Agenda" },
-  { href: "/admin/asesor", label: "Asesor" },
-  { href: "/admin/rendimiento", label: "Rendimiento" },
-  { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/mi-barberia", label: "Mi barbería" },
-  { href: "/admin/comisiones", label: "Comisiones" },
-  { href: "/admin/stock", label: "Stock" },
-  { href: "/admin/vacaciones", label: "Vacaciones" },
-  { href: "/admin/bloqueos", label: "Cierres" },
-  { href: "/admin/campanas", label: "Campañas" },
-  { href: "/admin/plantillas", label: "Plantillas" },
-  { href: "/admin/informes", label: "Informes" },
-  { href: "/admin/opiniones", label: "Opiniones" },
-  { href: "/admin/auditoria", label: "Auditoría" },
-  { href: "/admin/errores", label: "Errores" },
+// Menú agrupado por áreas, al estilo de Booksy (pedido de David,
+// 19/11/2026): pocas pestañas arriba y, dentro de cada área, una segunda
+// tira con sus secciones. Cada sección vive en un único sitio.
+const GRUPOS: { label: string; items: { href: string; label: string }[] }[] = [
+  { label: "Agenda", items: [
+    { href: "/admin/dashboard", label: "Agenda" },
+    { href: "/admin/bloqueos", label: "Cierres" },
+  ] },
+  { label: "Clientes", items: [
+    { href: "/admin/clientes", label: "Clientes" },
+    { href: "/admin/opiniones", label: "Opiniones" },
+  ] },
+  { label: "Personal", items: [
+    { href: "/admin/asesor", label: "Asesor" },
+    { href: "/admin/vacaciones", label: "Vacaciones" },
+  ] },
+  { label: "Finanzas", items: [
+    { href: "/admin/rendimiento", label: "Rendimiento" },
+    { href: "/admin/comisiones", label: "Comisiones" },
+    { href: "/admin/informes", label: "Informes" },
+    { href: "/admin/stock", label: "Stock" },
+  ] },
+  { label: "Marketing", items: [
+    { href: "/admin/campanas", label: "Campañas" },
+    { href: "/admin/plantillas", label: "Plantillas" },
+  ] },
+  { label: "Ajustes", items: [
+    { href: "/admin/mi-barberia", label: "Mi barbería" },
+    { href: "/admin/auditoria", label: "Auditoría" },
+    { href: "/admin/errores", label: "Errores" },
+  ] },
 ];
+
+const claseTab = (activo: boolean) =>
+  "shrink-0 whitespace-nowrap rounded-full px-4 py-2 transition-colors " +
+  (activo
+    ? "bg-brand-yellow font-semibold text-brand-yellow-ink"
+    : "text-brand-white-dim hover:bg-white/[0.08] hover:text-brand-white");
 
 export default function AdminNav({ rol, encargadoStock = false }: { rol: string; encargadoStock?: boolean }) {
   const pathname = usePathname();
-  // "Stock": el dueño y el barbero encargado de stock de alguna sede.
-  const items = (rol === "admin" ? NAV : NAV.filter((item) => !SOLO_ADMIN.has(item.href))).filter(
-    (item) => item.href !== "/admin/stock" || rol === "admin" || encargadoStock,
-  );
+  const visible = (href: string) =>
+    (rol === "admin" || !SOLO_ADMIN.has(href)) && (href !== "/admin/stock" || rol === "admin" || encargadoStock);
+  const grupos = GRUPOS.map((g) => ({ ...g, items: g.items.filter((i) => visible(i.href)) })).filter((g) => g.items.length > 0);
+  const actual = grupos.find((g) => g.items.some((i) => pathname?.startsWith(i.href)));
 
   return (
-    // overflow-x-auto en vez de flex-wrap: con 10 secciones, envolver el
-    // menú en varias líneas dentro de la cabecera quedaba desordenado
-    // (y en el rol "admin" empujaba el resto de la cabecera). Ahora es
-    // una sola tira que se desplaza en horizontal si no cabe — el patrón
-    // habitual de pestañas en paneles (GitHub, Linear, Stripe...).
-    <nav className="flex gap-1 overflow-x-auto rounded-full bg-white/[0.06] p-1 font-body text-sm">
-      {items.map((item) => {
-        const activo = pathname?.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={
-              "shrink-0 whitespace-nowrap rounded-full px-4 py-2 transition-colors " +
-              (activo
-                ? "bg-brand-yellow font-semibold text-brand-yellow-ink"
-                : "text-brand-white-dim hover:bg-white/[0.08] hover:text-brand-white")
-            }
-          >
-            {item.label}
+    <div className="flex flex-col gap-2">
+      <nav className="flex gap-1 overflow-x-auto rounded-full bg-white/[0.06] p-1 font-body text-sm">
+        {grupos.map((g) => (
+          <Link key={g.label} href={g.items[0].href} className={claseTab(g === actual)}>
+            {g.label}
           </Link>
-        );
-      })}
-    </nav>
+        ))}
+      </nav>
+      {actual && actual.items.length > 1 && (
+        <nav className="flex gap-1 overflow-x-auto px-1 font-body text-xs">
+          {actual.items.map((item) => {
+            const activo = pathname?.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={
+                  "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 transition-colors " +
+                  (activo
+                    ? "border-brand-yellow text-brand-yellow"
+                    : "border-white/10 text-brand-white-dim hover:text-brand-white")
+                }
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
+    </div>
   );
 }
