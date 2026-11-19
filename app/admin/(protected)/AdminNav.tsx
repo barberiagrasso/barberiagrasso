@@ -51,6 +51,7 @@ const GRUPOS: { label: string; items: { href: string; label: string }[] }[] = [
     { href: "/admin/vacaciones", label: "Vacaciones" },
   ] },
   { label: "Finanzas", items: [
+    { href: "/admin/caja", label: "Caja" },
     { href: "/admin/rendimiento", label: "Rendimiento" },
     { href: "/admin/comisiones", label: "Comisiones" },
     { href: "/admin/informes", label: "Informes" },

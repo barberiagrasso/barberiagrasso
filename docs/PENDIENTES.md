@@ -37,6 +37,14 @@ Ejecutar en el SQL Editor, en este orden (se pueden ejecutar más de una vez):
 - [ ] `supabase/anadir-stock-por-sede.sql`: sección Stock (stock por sede,
       encargados y pedidos). Sin esto, la pantalla Stock avisa de que
       falta activarlo y el cobro descuenta stock como antes.
+- [ ] `supabase/anadir-cierre-caja.sql`: apertura y cierre de caja
+      (Finanzas → Caja). Crea la tabla `caja_dias`, el encargado de caja
+      por sede y el bucket privado `caja` para la foto del sobre.
+- [ ] Vercel: añadir `CAJA_AVISO_TELEFONO` (móvil de David, formato
+      34600000000) para que le llegue el resumen de cada cierre por
+      WhatsApp. Ojo: WhatsApp solo entrega texto libre si David ha escrito
+      al número de la barbería en las últimas 24 h; para que llegue
+      siempre hay que crear una plantilla aprobada en Meta.
 
 Mejor todavía: transferir el proyecto de Supabase a la organización de
 David ("barberiagrasso's Org") para que la base de datos sea suya.
@@ -50,6 +58,7 @@ David ("barberiagrasso's Org") para que la base de datos sea suya.
       orejas) y pulsar "Crear servicios".
 - [ ] Stock (cuando esté el SQL): elegir el encargado de cada sede y hacer
       el primer recuento.
+- [ ] Caja (cuando esté el SQL): elegir el encargado de caja de cada sede.
 
 ## 4. Otros pendientes
 
