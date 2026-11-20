@@ -140,6 +140,14 @@ export default async function Home() {
           {cliente ? "Mi perfil y mis citas" : "Mi perfil"}
         </Link>
 
+        <Link
+          href="/estilo"
+          className="mt-5 flex flex-col items-center rounded-none border border-brand-yellow/60 bg-black/20 px-6 py-3 font-body text-brand-white backdrop-blur-sm transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"
+        >
+          <span className="text-sm font-semibold uppercase tracking-wide">✨ Descubre tu estilo con IA</span>
+          <span className="text-xs text-brand-white-dim">Qué corte y barba te favorecen según tu cara</span>
+        </Link>
+
         <BotonInstalarApp />
 
         <div className="mt-5">

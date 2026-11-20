@@ -16,6 +16,7 @@ export type OrigenError =
   | "aviso_disponibilidad"
   | "recibo_whatsapp"
   | "asistente_reserva"
+  | "asesor_estilo"
   | "recuperacion_password"
   | "aviso_alta"
   | "resena"

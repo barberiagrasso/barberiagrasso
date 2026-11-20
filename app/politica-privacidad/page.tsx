@@ -54,7 +54,12 @@ export default async function PoliticaPrivacidadPage() {
               </li>
               <li>
                 el contenido de tus mensajes cuando nos escribes por WhatsApp o usas el buscador de citas de
-                la app, incluidas las respuestas automáticas de nuestro asistente.
+                la app, incluidas las respuestas automáticas de nuestro asistente;
+              </li>
+              <li>
+                si usas el asesor de estilo (&quot;Descubre tu estilo&quot;), la foto que subes. Solo se envía a nuestro
+                proveedor de IA (Anthropic) para analizar la forma de tu cara, tu pelo y tu barba en ese momento, con tu
+                consentimiento, y no se guarda en ningún sitio ni se usa para identificarte.
               </li>
             </ul>
           </div>
