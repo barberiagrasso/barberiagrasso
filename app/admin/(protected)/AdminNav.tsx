@@ -42,6 +42,13 @@ const NAV = [
   // opiniones (traído de main el 20/11/2026) — visible para los dos
   // roles, cada barbero solo ve y edita la suya (ver PersonalClient.tsx).
   { href: "/admin/personal", label: "Personal" },
+  // Caja: apertura/cierre diario (traído de main el 20/11/2026) —
+  // visible para los dos roles: cualquiera del equipo puede ABRIR la
+  // caja de su sede, pero solo el "encargado de caja" de esa sede (o el
+  // dueño) puede CERRARla. El filtrado real es en el servidor
+  // (sedesDeCaja en lib/cajaServidor.ts), no aquí: un barbero sin sede
+  // asignada ni encargo simplemente no verá sedes dentro de la página.
+  { href: "/admin/caja", label: "Caja" },
   { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
   { href: "/admin/vacaciones", label: "Vacaciones" },
