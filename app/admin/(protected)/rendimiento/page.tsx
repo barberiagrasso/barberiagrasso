@@ -17,6 +17,9 @@ export default async function RendimientoPage() {
       <a href="/admin/importar-horarios" className="mb-4 inline-block text-sm text-stone-700 underline">
         Pasar a la app los horarios de Booksy →
       </a>
+      <a href="/admin/importar-servicios" className="mb-4 ml-4 inline-block text-sm text-stone-700 underline">
+        Crear los servicios del cartel →
+      </a>
       <RendimientoClient />
     </div>
   );
