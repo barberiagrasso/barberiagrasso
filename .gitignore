@@ -42,3 +42,6 @@ next-env.d.ts
 
 # documentos generados por Claude con credenciales reales - nunca subir
 /Claude outputs/
+
+# Entrega puntual de fotos para subir a mano al portafolio (ver commit de PortafolioClient, 20/11/2026) — no es código de la app.
+tmp-fotos-portafolio-grasso/
