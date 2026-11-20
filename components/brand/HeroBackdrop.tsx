@@ -39,6 +39,16 @@ export function HeroBackdrop() {
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  // Solo se muestra el vídeo cuando de verdad está reproduciéndose; si no,
+  // queda la foto fija de debajo (en iPhone con ahorro de energía el
+  // navegador no deja arrancar vídeos solos y antes se veía parado).
+  const [reproduciendo, setReproduciendo] = useState<boolean[]>([]);
+  const marcar = (i: number, valor: boolean) =>
+    setReproduciendo((r) => {
+      const n = [...r];
+      n[i] = valor;
+      return n;
+    });
   // Al abrir la app solo se descarga el primer clip; los otros dos (casi
   // 1 MB más) esperan unos segundos para no frenar la carga de la
   // pantalla, que es lo que el cliente necesita ver primero.
@@ -55,7 +65,11 @@ export function HeroBackdrop() {
   // navegador lo vuelve a bloquear no pasa nada, se reintenta en el
   // próximo evento.
   function intentarReanudar(video: HTMLVideoElement | null) {
-    if (video && video.paused) video.play().catch(() => {});
+    if (!video) return;
+    // iOS solo deja arrancar solo si el silencio está puesto como propiedad
+    // (React a veces solo pone el atributo).
+    video.muted = true;
+    if (video.paused) video.play().catch(() => {});
   }
 
   function reanudarTodos() {
@@ -79,6 +93,17 @@ export function HeroBackdrop() {
 
   // Cada vez que toca cambiar de clip nos aseguramos de que el nuevo
   // (y, ya de paso, el resto) esté reproduciéndose de verdad.
+  // Si un vídeo no arranca en 3 s, no lo ponemos encima (queda la foto).
+  useEffect(() => {
+    const id = setTimeout(() => {
+      videoRefs.current.forEach((v, i) => {
+        if (v && v.paused) marcar(i, false);
+      });
+    }, 3000);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo]);
+
   useEffect(() => {
     reanudarTodos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,6 +127,16 @@ export function HeroBackdrop() {
       aria-hidden="true"
       className="absolute inset-0 overflow-hidden bg-brand-black"
     >
+      {/* Foto fija de fondo: siempre visible si el vídeo no puede arrancar */}
+      {!movimientoReducido && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={CLIPS[activo].poster}
+          alt=""
+          className="absolute inset-0 h-full w-full scale-105 object-cover opacity-70 transition-opacity duration-[1800ms]"
+        />
+      )}
+
       {movimientoReducido ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -121,11 +156,16 @@ export function HeroBackdrop() {
             loop
             playsInline
             preload="auto"
-            poster={clip.poster}
-            onPause={(e) => intentarReanudar(e.currentTarget)}
+            onPlaying={() => marcar(i, true)}
+            onPause={(e) => {
+              marcar(i, false);
+              intentarReanudar(e.currentTarget);
+            }}
+            onError={() => marcar(i, false)}
+            disablePictureInPicture
             className="absolute inset-0 h-full w-full scale-105 object-cover transition-opacity ease-in-out"
             style={{
-              opacity: i === activo ? 0.7 : 0,
+              opacity: i === activo && reproduciendo[i] ? 0.7 : 0,
               transitionDuration: "1800ms",
             }}
           >
