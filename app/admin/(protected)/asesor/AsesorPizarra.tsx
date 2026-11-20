@@ -229,7 +229,7 @@ export default function AsesorPizarra() {
                   key={c}
                   onClick={() => setColor(c)}
                   aria-label={`Color ${c}`}
-                  className={"h-9 w-9 rounded-full border-2 " + (color === c ? "border-brand-black ring-2 ring-stone-400" : "border-stone-200")}
+                  className={"h-11 w-11 rounded-full border-2 " + (color === c ? "border-brand-black ring-2 ring-stone-400" : "border-stone-200")}
                   style={{ background: c }}
                 />
               ))}
