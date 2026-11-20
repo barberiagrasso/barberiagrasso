@@ -84,7 +84,18 @@ export default function CajaClient() {
     void cargar();
   }, [cargar]);
 
-  if (!datos) return <p className="text-sm text-stone-500">{error ?? "Cargando…"}</p>;
+  if (!datos)
+    return error ? (
+      <button
+        role="alert"
+        onClick={() => void cargar()}
+        className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700 hover:bg-red-100"
+      >
+        {error} · Reintentar
+      </button>
+    ) : (
+      <p className="text-sm text-stone-500">Cargando…</p>
+    );
   if (datos.faltaSql)
     return (
       <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -220,7 +231,7 @@ export default function CajaClient() {
       {/* APERTURA */}
       {esHoy && !abierta && !cerrada && (
         <div className={caja}>
-          <h2 className="mb-2 font-semibold text-stone-900">Abrir caja</h2>
+          <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Abrir caja</h2>
           <label htmlFor="caja-fondo" className="mb-1 block text-sm text-stone-600">Cuenta el dinero de la caja y escríbelo (fondo):</label>
           <input id="caja-fondo" inputMode="decimal" placeholder="Ej. 100" value={fondo} onChange={(e) => setFondo(e.target.value)} className={input} />
           {datos.fondoAnterior !== null && fondoC !== null && fondoC !== datos.fondoAnterior && (
@@ -236,7 +247,7 @@ export default function CajaClient() {
 
       {/* COBROS DEL DÍA */}
       <div className={caja}>
-        <h2 className="mb-2 font-semibold text-stone-900">Cobrado {esHoy ? "hoy" : "ese día"}</h2>
+        <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Cobrado {esHoy ? "hoy" : "ese día"}</h2>
         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
           {[
             ["💶 Efectivo", cerrada ? fila!.efectivo_cobrado_centimos : datos.cobros.efectivo],
@@ -279,7 +290,7 @@ export default function CajaClient() {
       {/* CIERRE */}
       {!cerrada && (abierta || !esHoy) && sede.puedeCerrar && (
         <div className={caja}>
-          <h2 className="mb-1 font-semibold text-stone-900">Cerrar caja</h2>
+          <h2 className="mb-1 font-mono text-xs uppercase tracking-wider text-stone-500">Cerrar caja</h2>
           <p className="mb-3 text-sm text-stone-600">
             Debería haber <b>{euros(esperado)}</b> en efectivo ({euros(fondoInicial)} de fondo + {euros(datos.cobros.efectivo)} cobrados).
           </p>
@@ -329,7 +340,7 @@ export default function CajaClient() {
       {/* RESUMEN DEL CIERRE */}
       {cerrada && (
         <div className={caja}>
-          <h2 className="mb-2 font-semibold text-stone-900">Resumen del cierre</h2>
+          <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Resumen del cierre</h2>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-stone-500">Efectivo esperado</dt><dd className="text-right">{euros(fila!.efectivo_esperado_centimos)}</dd>
             <dt className="text-stone-500">Efectivo contado</dt><dd className="text-right">{euros(fila!.efectivo_contado_centimos)}</dd>
@@ -352,7 +363,7 @@ export default function CajaClient() {
       {datos.esAdmin && (
         <>
           <div className={caja}>
-            <h2 className="mb-2 font-semibold text-stone-900">Encargado de caja de {sede.nombre}</h2>
+            <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Encargado de caja de {sede.nombre}</h2>
             <p className="mb-2 text-sm text-stone-500">Solo esta persona (y tú) puede cerrar la caja. Abrir la puede cualquiera del equipo.</p>
             <select value={sede.encargadoId ?? ""} onChange={(e) => void cambiarEncargado(e.target.value)} className={input}>
               <option value="">— Nadie (solo yo) —</option>
@@ -364,7 +375,7 @@ export default function CajaClient() {
 
           <div className={caja}>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-semibold text-stone-900">Últimos cierres · {sede.nombre}</h2>
+              <h2 className="font-mono text-xs uppercase tracking-wider text-stone-500">Últimos cierres · {sede.nombre}</h2>
               <a
                 href="/api/admin/caja/exportar"
                 className="rounded-none bg-brand-black px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85"
