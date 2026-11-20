@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/adminAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GrassoMark } from "@/components/brand/GrassoMark";
 import AdminNav from "./AdminNav";
+import { esEncargadoDeStock } from "@/lib/stockAcceso";
 import SignOutButton from "./SignOutButton";
 import NuevaCitaRapida from "./NuevaCitaRapida";
 import WhatsAppFlotante from "./WhatsAppFlotante";
@@ -26,6 +27,9 @@ export default async function ProtectedAdminLayout({
   children: React.ReactNode;
 }) {
   const { admin } = await requireAdmin();
+  // "Stock" en el menú: el dueño siempre, un barbero solo si es
+  // encargado de stock de alguna sede (ver lib/stockAcceso.ts).
+  const encargadoStock = admin.rol !== "admin" && (await esEncargadoDeStock(admin.id));
 
   // Datos para el botón flotante de "nueva cita rápida", disponible en
   // todas las páginas del panel (no solo en la Agenda), y para el aviso de
@@ -91,7 +95,7 @@ export default async function ProtectedAdminLayout({
         </div>
         <div className="border-t border-white/[0.06] bg-brand-black-soft">
           <div className="mx-auto max-w-6xl px-4">
-            <AdminNav rol={admin.rol} />
+            <AdminNav rol={admin.rol} encargadoStock={encargadoStock} />
           </div>
         </div>
       </header>

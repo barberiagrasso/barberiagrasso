@@ -182,7 +182,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { data: citaActual } = await supabase
     .from("citas")
-    .select("id, cliente_id, estado, saldo_canjeado_centimos, grassocoins_canjeados")
+    .select("id, cliente_id, sede_id, estado, saldo_canjeado_centimos, grassocoins_canjeados")
     .eq("id", id)
     .maybeSingle();
   if (!citaActual) return NextResponse.json({ error: "Cita no encontrada." }, { status: 404 });
@@ -429,6 +429,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       });
       if (errorStock) {
         await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock de un producto.", detalle: errorStock });
+      }
+      // Además, si el stock por sede está activado (ver
+      // supabase/anadir-stock-por-sede.sql), descuenta también el stock de
+      // la sede de esta cita: es un contador independiente del de arriba
+      // (uno es global por producto, este es por producto+sede), pensado
+      // para la sección "Stock" del panel. Si la sede de la cita no está
+      // guardada o la tabla aún no existe, simplemente no hace nada.
+      if (citaActual.sede_id) {
+        const { error: errorStockSede } = await supabase.rpc("registrar_movimiento_stock_sede", {
+          p_producto_id: p.producto_id,
+          p_sede_id: citaActual.sede_id,
+          p_tipo: "venta",
+          p_cantidad: p.cantidad,
+          p_cita_id: id,
+          p_admin_id: admin.id,
+          p_admin_nombre: admin.nombre ?? null,
+        });
+        if (errorStockSede) {
+          await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock por sede de un producto.", detalle: errorStockSede });
+        }
       }
     }
   }

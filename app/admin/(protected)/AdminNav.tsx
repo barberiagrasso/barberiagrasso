@@ -51,6 +51,11 @@ const NAV = [
   { href: "/admin/caja", label: "Caja" },
   { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
+  // Stock por sede: mínimos, pedido, encargado (traído de main el
+  // 20/11/2026) — visible para el dueño y para el barbero encargado de
+  // stock de alguna sede (ver encargadoStock más abajo). Es un sistema
+  // DISTINTO del stock global simple de "Mi barbería → Productos".
+  { href: "/admin/stock", label: "Stock" },
   { href: "/admin/vacaciones", label: "Vacaciones" },
   { href: "/admin/bloqueos", label: "Cierres" },
   { href: "/admin/campanas", label: "Campañas" },
@@ -61,9 +66,11 @@ const NAV = [
   { href: "/admin/errores", label: "Errores" },
 ];
 
-export default function AdminNav({ rol }: { rol: string }) {
+export default function AdminNav({ rol, encargadoStock = false }: { rol: string; encargadoStock?: boolean }) {
   const pathname = usePathname();
-  const items = rol === "admin" ? NAV : NAV.filter((item) => !SOLO_ADMIN.has(item.href));
+  const items = (rol === "admin" ? NAV : NAV.filter((item) => !SOLO_ADMIN.has(item.href))).filter(
+    (item) => item.href !== "/admin/stock" || rol === "admin" || encargadoStock,
+  );
 
   return (
     // overflow-x-auto en vez de flex-wrap: con 10 secciones, envolver el
