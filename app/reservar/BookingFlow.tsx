@@ -1323,6 +1323,7 @@ export default function BookingFlow({
                   ))}
                 {errorProfesionales && (
                   <button
+                    role="alert"
                     onClick={() => setReintentoProfesionales((n) => n + 1)}
                     className="rounded-full border border-brand-line px-3 py-2 font-mono text-xs text-brand-white-dim transition-colors hover:border-brand-yellow/60"
                   >
@@ -1427,7 +1428,7 @@ export default function BookingFlow({
                 </p>
               )}
               {errorMes && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
+                <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
                   <p className="font-body text-sm text-brand-white-dim">
                     No se pudo cargar la disponibilidad.
                   </p>
@@ -1447,7 +1448,7 @@ export default function BookingFlow({
               </p>
             )}
             {fecha && !cargandoSlots && errorSlots && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
+              <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
                 <p className="font-body text-sm text-brand-white-dim">
                   No se pudieron cargar las horas de ese día.
                 </p>
@@ -1502,7 +1503,7 @@ export default function BookingFlow({
                       </div>
                     </div>
                     <input
-                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-base text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                       placeholder="Nombre y apellidos"
                       autoComplete="name"
                       autoCapitalize="words"
@@ -1510,7 +1511,7 @@ export default function BookingFlow({
                       onChange={(e) => setNombre(e.target.value)}
                     />
                     <input
-                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-base text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                       placeholder="Teléfono móvil (WhatsApp)"
                       type="tel"
                       inputMode="tel"
@@ -1519,7 +1520,7 @@ export default function BookingFlow({
                       onChange={(e) => setTelefono(e.target.value.replace(/^\s*\+34\s*/, ""))}
                     />
                     {errorListaEspera && (
-                      <p className="font-body text-xs text-red-400">
+                      <p role="alert" className="font-body text-xs text-red-400">
                         {errorListaEspera}
                       </p>
                     )}
@@ -1541,7 +1542,7 @@ export default function BookingFlow({
                       {buscandoProximo ? "Buscando…" : "Próximos espacios"}
                     </BotonPrimario>
                     {errorProximo && (
-                      <p className="font-body text-xs text-red-400">
+                      <p role="alert" className="font-body text-xs text-red-400">
                         {errorProximo}
                       </p>
                     )}
@@ -1743,7 +1744,7 @@ export default function BookingFlow({
               </span>
             </label>
 
-            {error && <p className="font-body text-sm text-red-400">{error}</p>}
+            {error && <p role="alert" className="font-body text-sm text-red-400">{error}</p>}
 
             <div className="flex items-center justify-between pt-1">
               <EnlaceVolver
