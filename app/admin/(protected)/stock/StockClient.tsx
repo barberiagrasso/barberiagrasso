@@ -349,8 +349,9 @@ function VentanaMovimiento({
         <p className="text-sm text-stone-500">
           {producto.nombre} · ahora hay {producto.contado ? producto.stock : "sin contar"}
         </p>
-        <label className="mt-4 block text-sm text-stone-700">{textos.pregunta}</label>
+        <label htmlFor={`stock-movimiento-cantidad-${producto.id}`} className="mt-4 block text-sm text-stone-700">{textos.pregunta}</label>
         <input
+          id={`stock-movimiento-cantidad-${producto.id}`}
           autoFocus
           inputMode={tipo === "ajuste" ? "text" : "numeric"}
           value={cantidad}

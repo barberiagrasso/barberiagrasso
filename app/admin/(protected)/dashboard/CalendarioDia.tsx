@@ -1571,8 +1571,9 @@ function MenuCreacion({
         {fase === "cita" && (
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Cliente</label>
+              <label htmlFor="calendario-cita-telefono" className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Cliente</label>
               <input
+                id="calendario-cita-telefono"
                 placeholder="Teléfono del cliente"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
@@ -1598,8 +1599,9 @@ function MenuCreacion({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Servicio</label>
+              <label htmlFor="calendario-cita-servicio" className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Servicio</label>
               <select
+                id="calendario-cita-servicio"
                 value={servicioId}
                 onChange={(e) => setServicioId(e.target.value)}
                 className="w-full rounded-lg border border-stone-300 p-2 text-sm"
@@ -1638,8 +1640,9 @@ function MenuCreacion({
             {!horaFinValida && <p className="text-xs text-red-600">La hora de fin debe ser posterior a la de inicio.</p>}
 
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Empleado</label>
+              <label htmlFor="calendario-cita-profesional" className="mb-1 block text-xs font-medium uppercase tracking-wide text-stone-400">Empleado</label>
               <select
+                id="calendario-cita-profesional"
                 value={profesionalIdElegido}
                 onChange={(e) => setProfesionalIdElegido(e.target.value)}
                 className="w-full rounded-lg border border-stone-300 p-2 text-sm"

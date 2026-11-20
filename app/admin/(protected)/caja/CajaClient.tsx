@@ -221,8 +221,8 @@ export default function CajaClient() {
       {esHoy && !abierta && !cerrada && (
         <div className={caja}>
           <h2 className="mb-2 font-semibold text-stone-900">Abrir caja</h2>
-          <label className="mb-1 block text-sm text-stone-600">Cuenta el dinero de la caja y escríbelo (fondo):</label>
-          <input inputMode="decimal" placeholder="Ej. 100" value={fondo} onChange={(e) => setFondo(e.target.value)} className={input} />
+          <label htmlFor="caja-fondo" className="mb-1 block text-sm text-stone-600">Cuenta el dinero de la caja y escríbelo (fondo):</label>
+          <input id="caja-fondo" inputMode="decimal" placeholder="Ej. 100" value={fondo} onChange={(e) => setFondo(e.target.value)} className={input} />
           {datos.fondoAnterior !== null && fondoC !== null && fondoC !== datos.fondoAnterior && (
             <p className="mt-2 text-sm font-medium text-amber-700">
               ⚠️ Ayer se dejaron {euros(datos.fondoAnterior)} de fondo y tú cuentas {euros(fondoC)}. Revísalo antes de abrir.
@@ -283,8 +283,8 @@ export default function CajaClient() {
           <p className="mb-3 text-sm text-stone-600">
             Debería haber <b>{euros(esperado)}</b> en efectivo ({euros(fondoInicial)} de fondo + {euros(datos.cobros.efectivo)} cobrados).
           </p>
-          <label className="mb-1 block text-sm text-stone-600">Efectivo que hay en caja (todo, contando el fondo):</label>
-          <input inputMode="decimal" value={contado} onChange={(e) => setContado(e.target.value)} className={input} />
+          <label htmlFor="caja-contado" className="mb-1 block text-sm text-stone-600">Efectivo que hay en caja (todo, contando el fondo):</label>
+          <input id="caja-contado" inputMode="decimal" value={contado} onChange={(e) => setContado(e.target.value)} className={input} />
           {diferencia !== null && (
             <p className={"mt-2 text-sm font-semibold " + (diferencia === 0 ? "text-green-700" : "text-red-700")}>
               {diferencia === 0 ? "✅ Cuadra" : `⚠️ ${diferencia > 0 ? "Sobran" : "Faltan"} ${euros(Math.abs(diferencia))}`}
@@ -292,24 +292,24 @@ export default function CajaClient() {
           )}
           {diferencia !== null && diferencia !== 0 && (
             <>
-              <label className="mb-1 mt-3 block text-sm text-stone-600">¿Por qué no cuadra?</label>
-              <input value={motivo} onChange={(e) => setMotivo(e.target.value)} className={input} />
+              <label htmlFor="caja-motivo" className="mb-1 mt-3 block text-sm text-stone-600">¿Por qué no cuadra?</label>
+              <input id="caja-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} className={input} />
             </>
           )}
-          <label className="mb-1 mt-3 block text-sm text-stone-600">Fondo que se deja en caja para mañana:</label>
-          <input inputMode="decimal" value={fondoSig} onChange={(e) => setFondoSig(e.target.value)} className={input} />
+          <label htmlFor="caja-fondo-siguiente" className="mb-1 mt-3 block text-sm text-stone-600">Fondo que se deja en caja para mañana:</label>
+          <input id="caja-fondo-siguiente" inputMode="decimal" value={fondoSig} onChange={(e) => setFondoSig(e.target.value)} className={input} />
           {contadoC !== null && aCentimos(fondoSig) !== null && (
             <p className="mt-2 text-sm text-stone-700">
               Al sobre van <b>{euros(Math.max(0, contadoC - (aCentimos(fondoSig) ?? 0)))}</b>.
             </p>
           )}
-          <label className="mb-1 mt-3 block text-sm text-stone-600">Foto del sobre:</label>
-          <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
+          <label htmlFor="caja-foto" className="mb-1 mt-3 block text-sm text-stone-600">Foto del sobre:</label>
+          <input id="caja-foto" ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
           <button type="button" onClick={() => fotoRef.current?.click()} className="w-full rounded-lg border-2 border-dashed border-stone-300 px-4 py-3 text-sm text-stone-700">
             {foto ? `📷 ${foto.name} (cambiar)` : "📷 Hacer foto del sobre"}
           </button>
-          <label className="mb-1 mt-3 block text-sm text-stone-600">Notas (opcional):</label>
-          <input value={notas} onChange={(e) => setNotas(e.target.value)} className={input} />
+          <label htmlFor="caja-notas" className="mb-1 mt-3 block text-sm text-stone-600">Notas (opcional):</label>
+          <input id="caja-notas" value={notas} onChange={(e) => setNotas(e.target.value)} className={input} />
           <button
             disabled={
               enviando || datos.pendientes.length > 0 || contadoC === null || aCentimos(fondoSig) === null || !foto || (diferencia !== 0 && !motivo.trim())
