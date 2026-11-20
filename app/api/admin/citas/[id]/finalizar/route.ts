@@ -76,8 +76,9 @@ interface PagoElegido {
  * corregir algo después, se hace a mano en Supabase.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let admin;
   try {
-    await requireAdminApi();
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -413,9 +414,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // descontar dos veces por una re-edición. Si fallara, no se deshace
     // el cobro ya registrado: solo se registra el error para revisarlo.
     for (const p of productosParaGuardar) {
-      const { error: errorStock } = await supabase.rpc("descontar_stock_producto", {
+      // Deja rastro en movimientos_stock (quién, cuándo, de qué cita) en
+      // vez de solo restar el número — ver
+      // supabase/anadir-historial-movimientos-stock.sql. Si el producto
+      // no lleva stock controlado, el RPC no hace nada (igual
+      // comportamiento que tenía antes descontar_stock_producto).
+      const { error: errorStock } = await supabase.rpc("registrar_movimiento_stock", {
         p_producto_id: p.producto_id,
-        p_cantidad: p.cantidad,
+        p_tipo: "salida",
+        p_delta: -p.cantidad,
+        p_motivo: "Venta en cita",
+        p_cita_id: id,
+        p_creado_por: admin.nombre ?? "sistema",
       });
       if (errorStock) {
         await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock de un producto.", detalle: errorStock });
