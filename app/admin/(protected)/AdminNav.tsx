@@ -36,6 +36,10 @@ const SOLO_ADMIN = new Set([
 // aparecen aquí.
 const NAV = [
   { href: "/admin/dashboard", label: "Agenda" },
+  // Asesor de estilo: pizarra, guía de estilos, visagismo y probador IA
+  // (traído de main el 20/11/2026) — visible para los dos roles, como en
+  // v1 (es una herramienta de consulta en la cita, no de gestión).
+  { href: "/admin/asesor", label: "Asesor" },
   { href: "/admin/rendimiento", label: "Rendimiento" },
   { href: "/admin/clientes", label: "Clientes" },
   // Personal: ficha por barbero con facturación, sueldo, meta y
