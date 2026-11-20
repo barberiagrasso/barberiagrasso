@@ -264,10 +264,14 @@ export default function AsesorEstilo() {
       <button
         onClick={analizar}
         disabled={!foto || !acepta || cargando}
+        aria-busy={cargando}
         className="flex w-full items-center justify-center gap-2 bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black disabled:opacity-40"
       >
+        {/* Se mantiene la misma etiqueta con o sin carga, solo se añade el
+            spinner (hallazgo de la auditoría de diseño web, 20/11/2026) —
+            antes el texto cambiaba a "Analizando tu cara…" mientras carga. */}
         {cargando && <Spinner />}
-        {cargando ? "Analizando tu cara…" : "Descubrir mi estilo"}
+        Descubrir mi estilo
       </button>
     </div>
   );
