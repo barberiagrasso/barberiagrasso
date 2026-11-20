@@ -1024,7 +1024,16 @@ export default function BookingFlow({
   // asistente de varios pasos).
   useEffect(() => {
     const deURL = searchParams.get("paso");
-    if (!deURL || deURL === paso) return;
+    if (deURL === paso) return;
+    if (!deURL) {
+      // Sin ?paso en la URL: es el primer paso ("sede"). Antes esto se
+      // ignoraba, así que volver aquí sin remontar el componente (p.ej.
+      // el logo dentro del propio paso a paso, pedido de Diego,
+      // 20/11/2026) no movía el asistente. "confirmado" se deja tal cual
+      // sigue, como el resto de este efecto.
+      if (paso !== "confirmado") setPaso("sede");
+      return;
+    }
     if (PASOS.some((p) => p.clave === deURL && p.clave !== "confirmado")) {
       setPaso(deURL as Paso);
     }

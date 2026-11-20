@@ -44,7 +44,14 @@ export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
           paso (hallazgo de la auditoría de diseño web, 20/11/2026). */}
       <a href="#contenido" className={styles.skipLink}>Saltar al contenido</a>
 
-      <Link href="/" className={styles.siteHeaderLogo} aria-label="Barbería Grasso, inicio">
+      {/* Dentro del paso a paso de reserva (variante "reservando"), el logo
+          no saca de la reserva a la home con la silla: vuelve al principio
+          de este mismo user journey (pedido de Diego, 20/11/2026). */}
+      <Link
+        href={variante === "reservando" ? "/reservar" : "/"}
+        className={styles.siteHeaderLogo}
+        aria-label={variante === "reservando" ? "Barbería Grasso, volver al inicio de la reserva" : "Barbería Grasso, inicio"}
+      >
         <GrassoLogo />
       </Link>
 
