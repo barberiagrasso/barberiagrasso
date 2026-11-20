@@ -20,7 +20,7 @@ export default async function PoliticaPrivacidadPage() {
     <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
       <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} />
 
-      <main>
+      <main id="contenido">
         <div className={journeyStyles.pageHead}>
           <p className={journeyStyles.eyebrow}>Legal</p>
           <h1>Política de<br />privacidad.</h1>

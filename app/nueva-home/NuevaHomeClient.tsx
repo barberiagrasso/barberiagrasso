@@ -96,7 +96,7 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
     <div ref={rootRef} className={`${styles.page} ${journeyFontVars}`}>
       <JourneyHeader cliente={cliente} />
 
-      <main id="top">
+      <main id="contenido">
         <HeroChair works={works} />
 
         <section className={styles.sedes} id="sedes">

@@ -177,7 +177,7 @@ export default async function PerfilPage() {
     <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
       <JourneyHeader cliente={{ nombre: cliente.nombre }} />
 
-      <main>
+      <main id="contenido">
         <div className={journeyStyles.pageHead} style={{ textAlign: "center", paddingBottom: 0 }}>
           <p className={journeyStyles.eyebrow}>Mi perfil</p>
           <h1>{cliente.nombre}</h1>

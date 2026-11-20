@@ -39,6 +39,11 @@ export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
 
   return (
     <header ref={headerRef} className={styles.siteHeader}>
+      {/* Primer elemento enfocable de la página: oculto hasta que recibe foco
+          por teclado, salta el hero/menú y lleva directo al <main> de cada
+          paso (hallazgo de la auditoría de diseño web, 20/11/2026). */}
+      <a href="#contenido" className={styles.skipLink}>Saltar al contenido</a>
+
       <Link href="/nueva-home" className={styles.siteHeaderLogo} aria-label="Barbería Grasso, inicio">
         <GrassoLogo />
       </Link>

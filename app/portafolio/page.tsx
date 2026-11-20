@@ -39,7 +39,7 @@ export default async function PortafolioPage() {
     <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
       <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} />
 
-      <main>
+      <main id="contenido">
         <div className={journeyStyles.pageHead} style={{ textAlign: "center" }}>
           <p className={journeyStyles.eyebrow}>Trabajos reales · @barberia.grasso</p>
           <h1>Cada silla,<br />un estilo.</h1>

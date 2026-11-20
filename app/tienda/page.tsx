@@ -59,7 +59,7 @@ export default async function TiendaPage() {
     <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
       <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} />
 
-      <main>
+      <main id="contenido">
         <div className={journeyStyles.pageHead}>
           <p className={journeyStyles.eyebrow}>Tienda Grasso</p>
           <h1>Lleva algo<br />de Grasso.</h1>

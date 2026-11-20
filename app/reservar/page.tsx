@@ -93,7 +93,7 @@ export default async function ReservarPage() {
           lugar "Mi perfil" + "Cerrar sesión" — pedido de Diego, 09/11/2026. */}
       <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} variante="reservando" />
 
-      <main className="relative overflow-hidden" style={{ paddingTop: "clamp(120px, 18vw, 170px)", paddingBottom: "clamp(90px, 10vw, 140px)" }}>
+      <main id="contenido" className="relative overflow-hidden" style={{ paddingTop: "clamp(120px, 18vw, 170px)", paddingBottom: "clamp(90px, 10vw, 140px)" }}>
         {/* Fondo ambiental: una foto real de la barbería, muy oscurecida y
             difuminada. Es solo textura — fija, sin animación ni interacción —
             para no distraer ni un ápice del flujo de reserva. */}
