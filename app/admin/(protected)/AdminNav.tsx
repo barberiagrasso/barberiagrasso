@@ -38,6 +38,10 @@ const NAV = [
   { href: "/admin/dashboard", label: "Agenda" },
   { href: "/admin/rendimiento", label: "Rendimiento" },
   { href: "/admin/clientes", label: "Clientes" },
+  // Personal: ficha por barbero con facturación, sueldo, meta y
+  // opiniones (traído de main el 20/11/2026) — visible para los dos
+  // roles, cada barbero solo ve y edita la suya (ver PersonalClient.tsx).
+  { href: "/admin/personal", label: "Personal" },
   { href: "/admin/mi-barberia", label: "Mi barbería" },
   { href: "/admin/comisiones", label: "Comisiones" },
   { href: "/admin/vacaciones", label: "Vacaciones" },
