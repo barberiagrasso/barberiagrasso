@@ -32,9 +32,9 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-stone-900">Agenda</h1>
+      <h1 className="mb-1 hidden text-xl font-bold text-stone-900 sm:block">Agenda</h1>
       {datosIniciales && (
-        <p className="mb-3 text-xs text-stone-400">
+        <p className="mb-3 hidden text-xs text-stone-400 sm:block">
           Resumen de hoy en {sedes?.find((s) => s.id === sedeInicialId)?.nombre ?? "tu primera sede"}:
         </p>
       )}

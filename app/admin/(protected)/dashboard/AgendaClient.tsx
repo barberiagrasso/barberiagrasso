@@ -318,7 +318,7 @@ export default function AgendaClient({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       <div className="flex gap-1 rounded-lg border border-stone-300 p-1 w-fit">
         <button
           onClick={() => setPestana("citas")}
@@ -348,7 +348,7 @@ export default function AgendaClient({
 
       {pestana === "citas" && (
         <>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex flex-wrap gap-2">
               {sedes.map((s) => (
                 <button
@@ -416,7 +416,7 @@ export default function AgendaClient({
                   href={`/admin/dashboard/imprimir?sede=${sedeId}&fecha=${fecha}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-600 hover:border-stone-400"
+                  className="hidden items-center gap-1.5 rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-600 hover:border-stone-400 sm:flex"
                   title="Abrir hoja de ese día lista para imprimir"
                 >
                   <IconPrinter className="h-4 w-4" />

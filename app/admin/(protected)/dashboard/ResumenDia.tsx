@@ -33,7 +33,15 @@ export function ResumenDia({ citas }: { citas: CitaResumen[] }) {
   // reservamos para paneles de "vistazo rápido" como este, no para tarjetas
   // normales de listado (esas siguen con su rounded-lg de siempre).
   return (
-    <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <>
+    {/* Móvil: una sola línea, para que la agenda tenga la pantalla. */}
+    <div className="mb-2 flex items-center justify-between rounded-tl-md bg-stone-100 px-3 py-2 text-sm sm:hidden">
+      <span className="text-stone-600">
+        Hoy <b className="text-stone-900">{activas.length}</b> citas · <b className="text-stone-900">{completadas.length}</b> hechas
+      </span>
+      <b className="text-emerald-700">{euros(cobradoCentimos)}</b>
+    </div>
+    <div className="mb-4 hidden grid-cols-3 gap-2 sm:grid">
       <div className="rounded-tl-md bg-stone-100 p-4">
         <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Citas hoy</div>
         <div className="text-lg font-bold text-stone-900">{activas.length}</div>
@@ -42,10 +50,11 @@ export function ResumenDia({ citas }: { citas: CitaResumen[] }) {
         <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Completadas</div>
         <div className="text-lg font-bold text-stone-900">{completadas.length}</div>
       </div>
-      <div className="col-span-2 rounded-tl-md bg-stone-100 p-4 sm:col-span-1">
+      <div className="rounded-tl-md bg-stone-100 p-4">
         <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Cobrado hoy</div>
         <div className="text-lg font-bold text-emerald-700">{euros(cobradoCentimos)}</div>
       </div>
     </div>
+    </>
   );
 }
