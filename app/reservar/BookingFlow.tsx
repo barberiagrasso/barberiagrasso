@@ -1133,9 +1133,9 @@ export default function BookingFlow({
                 </TarjetaOpcion>
               ))}
 
-              {/* "Home" para este enlace es /nueva-home, no /, igual que el
-                  logo de la cabecera compartida (elección de Diego, 08/11/2026). */}
-              <EnlaceVolver onClick={() => router.push("/nueva-home")}>
+              {/* Desde el cutover a producción (20/11/2026) la home nueva ES "/",
+                  igual que el logo de la cabecera compartida. */}
+              <EnlaceVolver onClick={() => router.push("/")}>
                 ← Volver al menú
               </EnlaceVolver>
             </div>
@@ -1801,7 +1801,7 @@ export default function BookingFlow({
             )}
             <div className="flex flex-col items-center gap-2 pt-2 sm:flex-row sm:justify-center">
               <Link
-                href="/nueva-home"
+                href="/"
                 className="rounded-full border border-brand-yellow/50 px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-white transition-colors hover:border-brand-yellow"
               >
                 Ir a inicio

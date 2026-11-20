@@ -3,10 +3,10 @@
 /*
   Cabecera compartida de todo el user journey (pedido de Diego, 08/11/2026): el mismo logo
   centrado en todos los pasos (home nueva, reservar, perfil, portafolio, tienda, política de
-  privacidad), que siempre lleva de vuelta a /nueva-home — la nueva home es "home" a estos
-  efectos, según eligió Diego al responder las preguntas de alcance.
-  Antes esto vivía duplicado dentro de NuevaHomeClient; ahora /nueva-home usa este mismo
-  componente para que no se puedan desincronizar.
+  privacidad), que siempre lleva de vuelta a / — desde el cutover a producción (20/11/2026)
+  la home nueva ES la portada real, ya no una vista previa en /nueva-home.
+  Antes esto vivía duplicado dentro de NuevaHomeClient; ahora todas las páginas usan este
+  mismo componente para que no se puedan desincronizar.
 */
 
 import { useEffect, useRef } from "react";
@@ -44,13 +44,13 @@ export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
           paso (hallazgo de la auditoría de diseño web, 20/11/2026). */}
       <a href="#contenido" className={styles.skipLink}>Saltar al contenido</a>
 
-      <Link href="/nueva-home" className={styles.siteHeaderLogo} aria-label="Barbería Grasso, inicio">
+      <Link href="/" className={styles.siteHeaderLogo} aria-label="Barbería Grasso, inicio">
         <GrassoLogo />
       </Link>
 
       <nav className={styles.siteHeaderNav} aria-label="Principal">
         <Link href="/portafolio">Trabajos</Link>
-        <Link href="/nueva-home#sedes">Sedes</Link>
+        <Link href="/#sedes">Sedes</Link>
         <Link href="/tienda">Tienda</Link>
       </nav>
 

@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
-import { GrassoLogo } from "@/components/brand/GrassoLogo";
-import { HeroBackdrop } from "@/components/brand/HeroBackdrop";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { BotonCompartir } from "@/components/brand/BotonCompartir";
-import { BotonInstalarApp } from "@/components/pwa/BotonInstalarApp";
-import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { cargarResenasExternas } from "@/lib/portafolio";
+import { NuevaHomeClient } from "./nueva-home/NuevaHomeClient";
 
 export const dynamic = "force-dynamic";
 
-// Metadata propia de la home (13/11/2026): antes esta página solo heredaba
-// la de app/layout.tsx, que es casi idéntica — se deja explícita, igual que
-// ya hacen /portafolio y /tienda, en vez de depender de que nadie la toque.
+const WORKS = Array.from({ length: 12 }, (_, i) => `/nueva-home/ig/trabajo-${String(i + 1).padStart(2, "0")}.jpg`);
+
+// Cutover a producción (20/11/2026, pedido de Diego): esta es ahora la portada real.
+// Antes vivía en app/nueva-home/page.tsx como vista previa aparte (hero 3D del sillón +
+// el resto del rediseño de v2) mientras la home vieja de David seguía en esta ruta; esa
+// vieja home ha sido sustituida. app/nueva-home/page.tsx se deja como redirección a "/"
+// por si queda algún enlace suelto a la ruta antigua. Los componentes (NuevaHomeClient,
+// HeroChair, nueva-home.module.css) se quedan en su carpeta original: solo se movió el
+// page.tsx de la ruta.
 export const metadata: Metadata = {
   title: "Barbería Grasso — Reserva tu cita",
   description: "Reserva tu cita online en Barbería Grasso, Getafe: Los Molinos y Avenida de las Ciudades.",
@@ -29,16 +30,12 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  // Portada abierta a todos (01/11/2026): sin cuenta se puede reservar.
-  // Si este móvil ya reconoce al cliente, se le saluda y se le ofrece
-  // repetir con su barbero y entrar a su perfil.
   const cliente = (await obtenerClienteActual())?.cliente ?? null;
 
   const supabase = createPublicClient();
   const [{ data: sedes }, resenas, { data: ultimas }] = await Promise.all([
     supabase.from("sedes").select("id, nombre, direccion, maps_url").order("nombre"),
     cargarResenasExternas(supabase),
-    // Su última visita, para el botón "Repetir con <barbero>".
     cliente
       ? createAdminClient()
           .from("citas")
@@ -51,7 +48,6 @@ export default async function Home() {
       : Promise.resolve({ data: null }),
   ]);
 
-  // Supabase puede devolver la relación como objeto o como lista.
   const uno = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
   const ultima = ultimas?.[0];
   const barberoUltima = uno(ultima?.profesional as { nombre: string; activo: boolean } | { nombre: string; activo: boolean }[] | null);
@@ -66,105 +62,12 @@ export default async function Home() {
       : null;
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-brand-black px-4 py-16 text-center">
-      <HeroBackdrop />
-
-      <div className="relative z-10 flex flex-col items-center">
-        <GrassoLogo className="h-auto w-64 text-brand-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:w-80" />
-        <p className="mt-5 font-heading text-xl italic text-brand-white-dim">
-          {cliente ? `Hola, ${cliente.nombre.split(" ")[0]}` : "Reserva tu cita en 1 minuto"}
-        </p>
-
-        <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:gap-10">
-          {(sedes ?? []).map((sede) => (
-            <div key={sede.id} className="max-w-[15rem]">
-              <p className="font-mono text-xs uppercase tracking-widest text-brand-yellow">{sede.nombre}</p>
-              {sede.direccion && (
-                <p className="mt-1 font-body text-sm text-brand-white-dim">{sede.direccion}</p>
-              )}
-              {sede.maps_url && (
-                <a
-                  href={sede.maps_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 inline-block font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-                >
-                  Cómo llegar
-                </a>
-              )}
-              <NotasResenas resenas={resenas[sede.id]} className="mt-2 items-center" />
-            </div>
-          ))}
-        </div>
-
-        <Link
-          href="/reservar"
-          className="mt-10 rounded-none bg-brand-white px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-opacity hover:opacity-85"
-        >
-          Reservar cita
-        </Link>
-
-        {repetir && (
-          <Link
-            href={repetir.href}
-            className="mt-4 flex flex-col items-center rounded-none border border-brand-white/70 px-6 py-2.5 font-body text-brand-white transition-colors hover:bg-brand-white/10"
-          >
-            <span className="text-sm font-semibold uppercase tracking-wide">Reservar de nuevo</span>
-            <span className="text-xs text-brand-white-dim">
-              {repetir.servicio} con {repetir.barbero}
-            </span>
-          </Link>
-        )}
-
-        <div className="mt-4 flex gap-6">
-          <Link
-            href="/portafolio"
-            className="font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
-          >
-            Nuestros trabajos
-          </Link>
-          <Link
-            href="/tienda"
-            className="font-body text-sm font-semibold text-brand-white underline decoration-brand-yellow/60 underline-offset-4 hover:text-brand-yellow"
-          >
-            Tienda
-          </Link>
-        </div>
-
-        {/* Botón bien visible para todos. Si este móvil no le reconoce,
-            /perfil le lleva a entrar con su teléfono y un código. */}
-        <Link
-          href="/perfil"
-          className="mt-5 rounded-full border-2 border-brand-yellow px-8 py-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-yellow transition-colors hover:bg-brand-yellow/10"
-        >
-          {cliente ? "Mi perfil y mis citas" : "Mi perfil"}
-        </Link>
-
-        <Link
-          href="/estilo"
-          className="mt-5 flex flex-col items-center rounded-none border border-brand-yellow/60 bg-black/20 px-6 py-3 font-body text-brand-white backdrop-blur-sm transition-colors hover:border-brand-yellow hover:bg-brand-yellow/10"
-        >
-          <span className="text-sm font-semibold uppercase tracking-wide">✨ Descubre tu estilo con IA</span>
-          <span className="text-xs text-brand-white-dim">Qué corte y barba te favorecen según tu cara</span>
-        </Link>
-
-        <BotonInstalarApp />
-
-        <div className="mt-5">
-          <BotonCompartir
-            path="/"
-            titulo="Barbería Grasso"
-            texto="Reserva tu cita en Barbería Grasso desde el móvil."
-          />
-        </div>
-
-        <Link
-          href="/politica-privacidad"
-          className="mt-8 font-body text-xs text-brand-white-dim/70 underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
-        >
-          Política de privacidad
-        </Link>
-      </div>
-    </main>
+    <NuevaHomeClient
+      cliente={cliente ? { nombre: cliente.nombre } : null}
+      sedes={sedes ?? []}
+      resenas={resenas}
+      repetir={repetir}
+      works={WORKS}
+    />
   );
 }

@@ -234,8 +234,13 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
             <Link href="/perfil" className={styles.btnOutlineYellow}>
               {cliente ? "Mi perfil y mis citas" : "Mi perfil"}
             </Link>
+            {/* Portado desde la antigua app/page.tsx en el cutover a producción
+                (20/11/2026): faltaba aquí, solo existía en la home vieja. */}
+            <Link href="/estilo" className={styles.btnOutlineYellow}>
+              ✨ Descubre tu estilo con IA
+            </Link>
             <BotonInstalarApp />
-            <BotonCompartir path="/nueva-home" titulo="Barbería Grasso" texto="Reserva tu cita en Barbería Grasso desde el móvil." />
+            <BotonCompartir path="/" titulo="Barbería Grasso" texto="Reserva tu cita en Barbería Grasso desde el móvil." />
           </div>
         </section>
       </main>
