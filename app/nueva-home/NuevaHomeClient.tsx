@@ -123,7 +123,21 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
                   }}
                 >
                   <div className={styles.sedeMedia}>
-                    {foto && <img src={foto} alt={`Local de Barbería Grasso en ${sede.nombre}`} loading="lazy" />}
+                    {foto && (
+                      <img
+                        src={foto}
+                        alt={`Local de Barbería Grasso en ${sede.nombre}`}
+                        loading="lazy"
+                        // El contenedor (.sedeMedia) es position:absolute con su
+                        // propio tamaño por CSS, así que estos valores no fuerzan
+                        // ningún tamaño real — solo le dan al navegador la
+                        // proporción antes de que cargue la hoja de estilos, para
+                        // evitar un salto de layout (hallazgo de la auditoría de
+                        // diseño web, 20/11/2026).
+                        width={1200}
+                        height={1500}
+                      />
+                    )}
                   </div>
                   <div className={styles.sedeShade} aria-hidden="true" />
                   <span className={styles.sedeNum} aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
@@ -164,14 +178,13 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
               if (google?.nota == null) return null;
               const notaTexto = google.nota.toLocaleString("es-ES", { minimumFractionDigits: 1 });
               const pct = Math.max(0, Math.min(100, (google.nota / 5) * 100));
-              return (
-                <a
-                  key={sede.id}
-                  href={google.url ?? sede.maps_url ?? undefined}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={styles.resenaCard}
-                >
+              // Si la sede no tiene ni google.url ni maps_url (hoy no pasa: las 2
+              // sedes tienen maps_url), se muestra como tarjeta normal en vez de
+              // un <a> sin href — un enlace sin destino no es focuseable/operable
+              // por teclado (hallazgo de la auditoría de diseño web, 20/11/2026).
+              const href = google.url ?? sede.maps_url ?? null;
+              const contenido = (
+                <>
                   <span className={styles.resenaMarca} aria-hidden="true">
                     <IconoGoogle />
                     Google
@@ -189,7 +202,16 @@ export function NuevaHomeClient({ cliente, sedes, resenas, repetir, works }: Nue
                     {google.total ? `${google.total.toLocaleString("es-ES")} reseñas en Google` : "Reseñas en Google"}
                   </span>
                   <span className={styles.resenaCta}>Ver todas las reseñas en Google →</span>
+                </>
+              );
+              return href ? (
+                <a key={sede.id} href={href} target="_blank" rel="noreferrer" className={styles.resenaCard}>
+                  {contenido}
                 </a>
+              ) : (
+                <div key={sede.id} className={styles.resenaCard}>
+                  {contenido}
+                </div>
               );
             })}
           </div>
