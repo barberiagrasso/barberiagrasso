@@ -34,6 +34,11 @@ export default function PortafolioClient({
   const [fotos, setFotos] = useState(fotosIniciales);
   const [servicioId, setServicioId] = useState("");
   const [sedeId, setSedeId] = useState("");
+  // Se aplica a todo el lote que se suba ahora mismo (pedido de Diego,
+  // 20/11/2026, al traer fotos de la v1 que sí tenían descripción cada
+  // una): para subir fotos con descripciones distintas, se sube cada una
+  // por separado, cambiando este campo entre subidas.
+  const [descripcion, setDescripcion] = useState("");
   const [progreso, setProgreso] = useState<{ hechas: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState("todos");
@@ -57,7 +62,7 @@ export default function PortafolioClient({
         const res = await fetch("/api/admin/portafolio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imagenBase64, tipoMime: "image/jpeg", servicioId, sedeId }),
+          body: JSON.stringify({ imagenBase64, tipoMime: "image/jpeg", servicioId, sedeId, descripcion: descripcion.trim() || null }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.foto) throw new Error(json.error || "Error");
@@ -123,6 +128,13 @@ export default function PortafolioClient({
           </label>
         </div>
         <input
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          placeholder="Descripción (opcional, se aplica a todas las que subas ahora)"
+          maxLength={200}
+          className="w-full rounded border border-stone-300 p-2 text-sm"
+        />
+        <input
           ref={inputRef}
           type="file"
           accept="image/*"
@@ -165,6 +177,7 @@ export default function PortafolioClient({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={foto.url} alt={foto.descripcion ?? "Trabajo"} loading="lazy" className="aspect-square w-full object-cover" />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-[11px] text-white">
+                {foto.descripcion && <div className="truncate font-medium">{foto.descripcion}</div>}
                 {foto.servicio_id ? nombreServicio.get(foto.servicio_id) ?? "Servicio" : "Sin servicio"}
                 {foto.sede_id ? ` · ${nombreSede.get(foto.sede_id) ?? ""}` : ""}
               </div>
