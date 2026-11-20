@@ -85,29 +85,40 @@ export function HeroChair({ works }: { works: string[] }) {
       gsap.from([kickerRef.current].filter(Boolean), { opacity: 0, y: 20, duration: 1, delay: 1.1, stagger: 0.1 });
     }
 
-    const tl = gsap.timeline({
-      defaults: { ease: "none" },
-      scrollTrigger: {
-        trigger: intro, start: "top top", end: "+=320%", pin: true, scrub: 1.1, anticipatePin: 1,
-      },
-    });
+    // Con prefers-reduced-motion activado no se crea el timeline de scroll: nada
+    // de pin (que ademas reservaria 320% de scroll extra solo para esta
+    // animacion), nada de camara/sillon/anillo encadenados al scroll -- justo
+    // el tipo de movimiento a gran escala que ese ajuste existe para evitar.
+    // El sillon se queda quieto en su pose inicial y el anillo de fotos se
+    // muestra ya colocado (sin la vuelta completa), asi no se pierde
+    // contenido, solo la coreografia.
     const state = { camZ: 3.1, camY: 0.05, lookY: 0, chairRot: -0.55, chairY: 0, ring: 0, ringRot: 0, ringRadius: 1.6 };
-    tl.to(state, { camZ: 7.4, camY: 1.15, lookY: -0.05, duration: 1 }, 0)
-      .to(state, { chairRot: Math.PI * 2.4, duration: 2.2, ease: "power1.inOut" }, 0)
-      .to(state, { ring: 1, ringRadius: 2.75, duration: 1, ease: "power2.out" }, 0.45)
-      .to(state, { ringRot: -Math.PI * 1.6, duration: 1.75 }, 0.45);
-    if (titleRef.current) tl.to(titleRef.current, { yPercent: -35, opacity: 0, scale: 0.92, duration: 0.55 }, 0);
-    if (kickerRef.current) tl.to(kickerRef.current, { opacity: 0, y: -30, duration: 0.3 }, 0);
-    if (scrollHintRef.current) tl.to(scrollHintRef.current, { opacity: 0, y: -30, duration: 0.3 }, 0);
-    if (giantRef.current) tl.to(giantRef.current, { yPercent: 18, opacity: 0.08, duration: 1 }, 0);
-    if (worksElRef.current) {
-      tl.fromTo(worksElRef.current, { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.4 }, 0.7)
-        .to(worksElRef.current, { opacity: 1, duration: 0.8 }, 1.1);
+    if (reduceMotion) {
+      state.ring = 1;
+    } else {
+      const tl = gsap.timeline({
+        defaults: { ease: "none" },
+        scrollTrigger: {
+          trigger: intro, start: "top top", end: "+=320%", pin: true, scrub: 1.1, anticipatePin: 1,
+        },
+      });
+      tl.to(state, { camZ: 7.4, camY: 1.15, lookY: -0.05, duration: 1 }, 0)
+        .to(state, { chairRot: Math.PI * 2.4, duration: 2.2, ease: "power1.inOut" }, 0)
+        .to(state, { ring: 1, ringRadius: 2.75, duration: 1, ease: "power2.out" }, 0.45)
+        .to(state, { ringRot: -Math.PI * 1.6, duration: 1.75 }, 0.45);
+      if (titleRef.current) tl.to(titleRef.current, { yPercent: -35, opacity: 0, scale: 0.92, duration: 0.55 }, 0);
+      if (kickerRef.current) tl.to(kickerRef.current, { opacity: 0, y: -30, duration: 0.3 }, 0);
+      if (scrollHintRef.current) tl.to(scrollHintRef.current, { opacity: 0, y: -30, duration: 0.3 }, 0);
+      if (giantRef.current) tl.to(giantRef.current, { yPercent: 18, opacity: 0.08, duration: 1 }, 0);
+      if (worksElRef.current) {
+        tl.fromTo(worksElRef.current, { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.4 }, 0.7)
+          .to(worksElRef.current, { opacity: 1, duration: 0.8 }, 1.1);
+      }
+      tl.to(state, { camZ: 9.2, camY: 2.1, duration: 0.4, ease: "power1.in" }, 1.8);
+      if (worksElRef.current) tl.to(worksElRef.current, { opacity: 0, y: -50, duration: 0.3 }, 1.9);
+      cleanups.push(() => tl.scrollTrigger?.kill());
+      cleanups.push(() => tl.kill());
     }
-    tl.to(state, { camZ: 9.2, camY: 2.1, duration: 0.4, ease: "power1.in" }, 1.8);
-    if (worksElRef.current) tl.to(worksElRef.current, { opacity: 0, y: -50, duration: 0.3 }, 1.9);
-    cleanups.push(() => tl.scrollTrigger?.kill());
-    cleanups.push(() => tl.kill());
 
     if (!renderer) {
       finishLoading();
