@@ -7,7 +7,6 @@ import BookingFlow from "./BookingFlow";
 import { contarFotosPorServicio } from "@/lib/portafolio";
 import InstalarApp from "@/components/pwa/InstalarApp";
 import { JourneyHeader } from "@/components/journey/JourneyHeader";
-import { JourneyFooter } from "@/components/journey/JourneyFooter";
 import { journeyFontVars } from "@/components/journey/fonts";
 import journeyStyles from "@/components/journey/journey.module.css";
 
@@ -160,8 +159,11 @@ export default async function ReservarPage() {
           </Suspense>
         </div>
       </main>
-
-      <JourneyFooter />
+      {/* Sin pie de página aquí (pedido de Diego, 20/11/2026): en el paso a
+          paso de la reserva se quita para que se sienta más a app que a
+          web — el enlace de acceso de administrador y el resto de enlaces
+          del pie siguen disponibles desde cualquier otra página del
+          journey (home, perfil, portafolio, tienda...). */}
     </div>
   );
 }
