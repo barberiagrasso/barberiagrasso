@@ -1589,6 +1589,7 @@ function MenuCreacion({
                 <div className="mt-1">
                   <p className="mb-1 text-xs text-amber-700">No hay ningún cliente con este teléfono — se creará uno nuevo.</p>
                   <input
+                    aria-label="Nombre del cliente nuevo"
                     placeholder="Nombre del cliente nuevo"
                     value={nombreNuevo}
                     onChange={(e) => setNombreNuevo(e.target.value)}
