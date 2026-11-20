@@ -1,4 +1,4 @@
--- Apertura y cierre de caja diario por sede (pedido de David, 19/11/2026).
+-- Apertura y cierre de caja diario por sede.
 --
 -- 1. caja_dias: una fila por sede y día. Se crea al ABRIR la caja (con el
 --    fondo contado) y se completa al CERRARLA (cobros del día por método,

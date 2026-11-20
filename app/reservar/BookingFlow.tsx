@@ -28,7 +28,7 @@ type Paso =
 // directamente en el paso de reserva. El resto vive dentro de un
 // desplegable según su `categoria` — este orden es el que pidió Diego;
 // una categoría que no esté aquí se coloca al final, alfabéticamente.
-// Servicios con David Grasso (los que llevan su nombre): ya no salen los
+// Servicios con David Grasso (los que llevan su nombre): no salen los
 // primeros, sino en su propio desplegable "premium" justo debajo de los
 // normales (pedido de David, 15/11/2026): que se vea que existe y que su
 // precio es mayor, pero que la mayoría reserve con el equipo.
@@ -228,8 +228,16 @@ function colorBarraNivel(
 // ---------------------------------------------------------------------
 
 function PasoTitulo({ children }: { children: React.ReactNode }) {
+  // Mismo titular grande en mayúsculas (Anton) que el resto del rediseño de
+  // Diego, 08/11/2026 ("mantén el estilo de la home consistente en el
+  // resto de pasos del user journey") — antes era font-heading italic,
+  // distinto de /nueva-home. Solo cambia la tipografía/tamaño del título
+  // de cada paso; el resto del paso (lógica, estado) no se toca.
   return (
-    <h2 className="font-heading text-2xl italic text-brand-white">
+    <h2
+      className="text-3xl uppercase leading-none tracking-tight text-brand-white sm:text-4xl"
+      style={{ fontFamily: "var(--font-anton), Impact, 'Arial Narrow', sans-serif" }}
+    >
       {children}
     </h2>
   );
@@ -388,11 +396,14 @@ function BotonPrimario({
   onClick: () => void;
   disabled?: boolean;
 }) {
+  // Píldora redondeada igual que los botones de /nueva-home (antes era un
+  // rectángulo recto, rounded-none) — mismo cambio de piel que PasoTitulo,
+  // sin tocar qué hace el botón ni cuándo está disabled.
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-none bg-brand-white px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+      className="rounded-full bg-brand-white px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-black transition-all hover:-translate-y-0.5 hover:bg-brand-yellow disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:hover:bg-brand-white"
     >
       {children}
     </button>
@@ -984,6 +995,42 @@ export default function BookingFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refleja el paso en la URL (?paso=servicio, ?paso=fecha...) para que
+  // "atrás" del navegador retroceda un paso del asistente en vez de
+  // sacar al cliente de /reservar entero. "confirmado" se deja fuera a
+  // propósito: una vez confirmada la cita no tiene sentido poder
+  // "volver atrás" a un formulario que ya se envió.
+  const pasoAlMontar = useRef(true);
+  useEffect(() => {
+    if (pasoAlMontar.current) {
+      pasoAlMontar.current = false;
+      return;
+    }
+    if (paso === "confirmado") return;
+    const actual = searchParams.get("paso");
+    if (actual === paso) return;
+    if (paso === "sede") {
+      router.replace("/reservar");
+    } else {
+      router.push(`/reservar?paso=${paso}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso]);
+
+  // Al pulsar atrás/adelante del navegador, Next.js actualiza
+  // searchParams sin remontar el componente: aquí se relee y se vuelve
+  // al paso que diga la URL (el resto del estado — sede, servicio,
+  // horario ya elegidos — se queda como estaba, igual que en cualquier
+  // asistente de varios pasos).
+  useEffect(() => {
+    const deURL = searchParams.get("paso");
+    if (!deURL || deURL === paso) return;
+    if (PASOS.some((p) => p.clave === deURL && p.clave !== "confirmado")) {
+      setPaso(deURL as Paso);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Solo una franja horaria por hora visible (si "cualquiera" hay varios
   // profesionales libres a la misma hora, se muestra una sola opción).
   const horasUnicas = useMemo(() => {
@@ -1053,43 +1100,55 @@ export default function BookingFlow({
         <Stepper paso={paso} />
 
         {paso === "sede" && (
-          <div className="space-y-3">
+          <div>
             <PasoTitulo>Elige tu sede</PasoTitulo>
-            {sedes.map((sede) => (
-              <TarjetaOpcion
-                key={sede.id}
-                onClick={() => {
-                  if (sede.id !== sedeId) {
-                    // El barbero y el día elegidos eran de la otra sede.
-                    setProfesionalId(null);
-                    setFecha(null);
-                    setSlots([]);
-                    setSlotElegido(null);
-                  }
-                  setSedeId(sede.id);
-                  setPaso("servicio");
-                }}
-              >
-                <div className="font-heading text-lg">{sede.nombre}</div>
-                {sede.direccion && (
-                  <div className="mt-0.5 font-body text-sm opacity-70">
-                    {sede.direccion}
-                  </div>
-                )}
-                <EtiquetasSede sede={sede} />
-              </TarjetaOpcion>
-            ))}
 
-            <EnlaceVolver onClick={() => router.push("/")}>
-              ← Volver al menú
-            </EnlaceVolver>
+            {/* mt-6 en vez de dejar que "space-y-3" (como el resto de tarjetas de
+                debajo) marque también la distancia con el título: quedaba muy
+                pegado al texto (pedido de Diego, 09/11/2026 — más aire entre el
+                título de cada paso y los botones de debajo). */}
+            <div className="mt-6 space-y-3">
+              {sedes.map((sede) => (
+                <TarjetaOpcion
+                  key={sede.id}
+                  onClick={() => {
+                    if (sede.id !== sedeId) {
+                      // El barbero y el día elegidos eran de la otra sede.
+                      setProfesionalId(null);
+                      setFecha(null);
+                      setSlots([]);
+                      setSlotElegido(null);
+                    }
+                    setSedeId(sede.id);
+                    setPaso("servicio");
+                  }}
+                >
+                  <div className="font-heading text-lg">{sede.nombre}</div>
+                  {sede.direccion && (
+                    <div className="mt-0.5 font-body text-sm opacity-70">
+                      {sede.direccion}
+                    </div>
+                  )}
+                  <EtiquetasSede sede={sede} />
+                </TarjetaOpcion>
+              ))}
+
+              {/* Desde el cutover a producción (20/11/2026) la home nueva ES "/",
+                  igual que el logo de la cabecera compartida. */}
+              <EnlaceVolver onClick={() => router.push("/")}>
+                ← Volver al menú
+              </EnlaceVolver>
+            </div>
           </div>
         )}
 
         {paso === "servicio" && (
-          <div className="space-y-3">
+          <div>
             <PasoTitulo>Servicios en {sedeSeleccionada?.nombre}</PasoTitulo>
 
+            {/* mt-6: mismo motivo que en el paso "sede" — más aire entre el
+                título y las tarjetas de debajo (pedido de Diego, 09/11/2026). */}
+            <div className="mt-6 space-y-3">
             <div className="space-y-3">
               {principales.map((servicio) => (
                 <TarjetaServicio
@@ -1163,6 +1222,7 @@ export default function BookingFlow({
             <EnlaceVolver onClick={() => setPaso("sede")}>
               ← Cambiar de sede
             </EnlaceVolver>
+            </div>
           </div>
         )}
 
@@ -1263,6 +1323,7 @@ export default function BookingFlow({
                   ))}
                 {errorProfesionales && (
                   <button
+                    role="alert"
                     onClick={() => setReintentoProfesionales((n) => n + 1)}
                     className="rounded-full border border-brand-line px-3 py-2 font-mono text-xs text-brand-white-dim transition-colors hover:border-brand-yellow/60"
                   >
@@ -1367,7 +1428,7 @@ export default function BookingFlow({
                 </p>
               )}
               {errorMes && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
+                <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
                   <p className="font-body text-sm text-brand-white-dim">
                     No se pudo cargar la disponibilidad.
                   </p>
@@ -1387,7 +1448,7 @@ export default function BookingFlow({
               </p>
             )}
             {fecha && !cargandoSlots && errorSlots && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
+              <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-line bg-black/20 p-3">
                 <p className="font-body text-sm text-brand-white-dim">
                   No se pudieron cargar las horas de ese día.
                 </p>
@@ -1442,7 +1503,7 @@ export default function BookingFlow({
                       </div>
                     </div>
                     <input
-                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-base text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                       placeholder="Nombre y apellidos"
                       autoComplete="name"
                       autoCapitalize="words"
@@ -1450,7 +1511,7 @@ export default function BookingFlow({
                       onChange={(e) => setNombre(e.target.value)}
                     />
                     <input
-                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                      className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-base text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                       placeholder="Teléfono móvil (WhatsApp)"
                       type="tel"
                       inputMode="tel"
@@ -1459,7 +1520,7 @@ export default function BookingFlow({
                       onChange={(e) => setTelefono(e.target.value.replace(/^\s*\+34\s*/, ""))}
                     />
                     {errorListaEspera && (
-                      <p className="font-body text-xs text-red-400">
+                      <p role="alert" className="font-body text-xs text-red-400">
                         {errorListaEspera}
                       </p>
                     )}
@@ -1481,7 +1542,7 @@ export default function BookingFlow({
                       {buscandoProximo ? "Buscando…" : "Próximos espacios"}
                     </BotonPrimario>
                     {errorProximo && (
-                      <p className="font-body text-xs text-red-400">
+                      <p role="alert" className="font-body text-xs text-red-400">
                         {errorProximo}
                       </p>
                     )}
@@ -1683,7 +1744,7 @@ export default function BookingFlow({
               </span>
             </label>
 
-            {error && <p className="font-body text-sm text-red-400">{error}</p>}
+            {error && <p role="alert" className="font-body text-sm text-red-400">{error}</p>}
 
             <div className="flex items-center justify-between pt-1">
               <EnlaceVolver
@@ -1750,7 +1811,7 @@ export default function BookingFlow({
               {(clienteInicial || citaConfirmada.guardadoEnMovil) && (
               <Link
                 href="/perfil"
-                className="rounded-none bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
+                className="rounded-full bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
               >
                 Ir a mi perfil
               </Link>

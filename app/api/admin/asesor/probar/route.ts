@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imagenBase64: resultado });
   } catch (err) {
     if (err instanceof ProbadorNoActivoError) return NextResponse.json({ error: err.message, noActivo: true }, { status: 503 });
-    await registrarError({ origen: "asistente_reserva", mensaje: "Falló el probador de estilos con IA.", detalle: err instanceof Error ? err.message : "error" });
+    await registrarError({ origen: "asesor_estilo", mensaje: "Falló el probador de estilos con IA.", detalle: err instanceof Error ? err.message : "error" });
     return NextResponse.json({ error: "La IA no ha podido generar la foto. Prueba otra vez o con otra foto." }, { status: 502 });
   }
 }

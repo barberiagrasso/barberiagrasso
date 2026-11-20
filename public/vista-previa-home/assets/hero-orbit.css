@@ -1,0 +1,80 @@
+/* hero-orbit.css - a one-off hero moment for Barbería Grasso: the clipper's own 3D render (assets/objects/
+   product-render) turning on itself as the page scrolls, a ring of the shop's own photographs turning
+   round it. Built on the shared held-stage engine (assets/scenes/lib.js, scenes.css) but NOT one of the
+   dealt catalog scenes (references/scenes.md gates those to tech/software/gaming) — this is the brief's own
+   explicit ask for a 3D hero on a place page, the same override already used for the clipper's render
+   itself (see the page's top-of-file deal note). data-big-scene="clipper-orbit" is a styling hook only,
+   never dispatched by scenes.js (this page does not load it); mounting is hero-orbit.js, by hand. */
+[data-big-scene="clipper-orbit"] { background: var(--bg); color: var(--ink); }
+[data-big-scene="clipper-orbit"] .hero__text { max-width: 640px; margin-inline: auto; }
+[data-big-scene="clipper-orbit"] .hero-facts { justify-content: center; }
+[data-big-scene="clipper-orbit"] .btn-row { justify-content: center; }
+
+/* a quiet dashed thread above and below the hero copy - a print spec-sheet's measurement line, the one
+   motif borrowed from Diego's ORYZO reference, kept brand-neutral: no new copy, pure ornament */
+[data-big-scene="clipper-orbit"] .hero__text::before,
+[data-big-scene="clipper-orbit"] .hero__text::after {
+  content: ""; display: block; width: min(200px, 56%); height: 1px; margin: 0 auto var(--s-5);
+  background-image: repeating-linear-gradient(90deg, color-mix(in oklab, var(--accent) 65%, transparent) 0 6px, transparent 6px 13px);
+}
+[data-big-scene="clipper-orbit"] .hero__text::after { margin: var(--s-6) auto 0; }
+
+/* ---------- finished composition (rest: phone, reduced motion, no script, a failed module) */
+[data-big-scene="clipper-orbit"]:not(.is-live) > .sc__stage {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--s-6);
+  width: 100%; height: 100%; max-width: calc(var(--container) + 2 * var(--pad)); margin-inline: auto;
+  padding: calc(var(--nav, var(--nav-h, 72px)) + var(--hgap, 40px)) var(--pad) var(--hpadb, 64px);
+}
+[data-big-scene="clipper-orbit"] .orbit__poster {
+  display: block; width: auto; height: min(66vh, 620px); max-width: 88vw; margin-inline: auto;
+}
+[data-big-scene="clipper-orbit"].is-live .orbit__poster { display: none; }
+[data-big-scene="clipper-orbit"]:not(.is-live) .orbit__camera,
+[data-big-scene="clipper-orbit"]:not(.is-live) .orbit__product { display: none; }
+[data-big-scene="clipper-orbit"]:not(.is-live) .orbit__zone { position: static; width: auto; height: auto; max-width: none; }
+
+/* ---------- the held stage: text up top, the turning clipper and its ring of photos filling the rest */
+[data-big-scene="clipper-orbit"].is-live > .sc__stage {
+  position: relative; width: 100%; height: 100%;
+  padding-top: calc(var(--nav, var(--nav-h, 72px)) + var(--s-5));
+}
+[data-big-scene="clipper-orbit"].is-live .hero-text { position: relative; z-index: 3; text-align: center; margin-inline: auto; }
+[data-big-scene="clipper-orbit"] .orbit__zone { position: absolute; inset: 0; z-index: 1; }
+
+/* a held dashed ring round the turning object, still while the photos and the clipper both turn inside
+   it - the spec-sheet frame, not a photo, so it never spins with the ring */
+[data-big-scene="clipper-orbit"].is-live .orbit__zone::before {
+  content: ""; position: absolute; left: 50%; top: 80%; transform: translate(-50%, -50%);
+  width: min(58vh, 72vw); height: min(58vh, 72vw); border-radius: 50%;
+  border: 1px dashed color-mix(in oklab, var(--accent) 42%, transparent);
+  z-index: 0; pointer-events: none;
+}
+[data-big-scene="clipper-orbit"] .orbit__camera {
+  position: absolute; left: 50%; top: 80%; transform: translate(-50%, -50%);
+  width: min(63vh, 78vw); height: min(63vh, 78vw);
+  perspective: 1600px; perspective-origin: 50% 45%;
+}
+[data-big-scene="clipper-orbit"] .orbit__turntable {
+  position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform;
+  transform: rotateX(11deg) rotateY(var(--ring-angle, 0deg));
+}
+[data-big-scene="clipper-orbit"] .orbit__item {
+  position: absolute; left: 50%; top: 50%; margin: 0;
+  width: clamp(54px, 7.8vw, 98px); aspect-ratio: 3 / 4;
+  transform: translate(-50%, -50%) rotateY(calc(var(--i) * (360deg / var(--n, 8)))) translateZ(var(--orbit-r, 29vh));
+  transform-style: preserve-3d; backface-visibility: hidden;
+  border-radius: var(--r-sm); overflow: hidden; box-shadow: none;
+  border: 1px solid color-mix(in oklab, var(--ink) 16%, transparent);
+}
+[data-big-scene="clipper-orbit"] .orbit__item img {
+  display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.92) contrast(1.03);
+}
+[data-big-scene="clipper-orbit"] .orbit__product {
+  position: absolute; left: 50%; top: 80%; transform: translate(-50%, -50%);
+  width: min(49vh, 58vw); height: min(49vh, 58vw); z-index: 1;
+}
+[data-big-scene="clipper-orbit"] .orbit__camera { z-index: 2; }
+
+@media (prefers-reduced-motion: reduce), (max-width: 767px) {
+  [data-big-scene="clipper-orbit"] .orbit__turntable { transform: rotateX(11deg); }
+}

@@ -1,10 +1,10 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 
-// Asesor de estilo con IA (visagismo), pedido de David 15/11/2026: el
-// cliente sube un selfie y Claude le dice qué corte y qué barba le
-// favorecen según la forma de su cara. La foto NO se guarda: se manda a
-// la IA solo para este análisis y se descarta.
+// Asesor de estilo con IA (visagismo): el cliente sube un selfie y Claude
+// le dice qué corte y qué barba le favorecen según la forma de su cara.
+// La foto NO se guarda: se manda a la IA solo para este análisis y se
+// descarta.
 
 const MODEL = "claude-sonnet-5";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

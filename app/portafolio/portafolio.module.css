@@ -1,0 +1,8 @@
+.body {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 var(--pad) clamp(90px, 10vw, 140px);
+}
+.resenas { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; margin: 0 0 clamp(36px, 5vw, 56px); }
+.resenaSede { text-align: center; }
+.resenaSede p { margin: 0 0 6px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--brand-yellow); }

@@ -91,7 +91,11 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-heading text-lg italic text-brand-white">Editar perfil</h2>
-          <button onClick={onCerrar} className="text-brand-white-dim hover:text-brand-white" aria-label="Cerrar">
+          <button
+            onClick={onCerrar}
+            className="-m-2.5 p-2.5 text-brand-white-dim hover:text-brand-white"
+            aria-label="Cerrar"
+          >
             <IconX className="h-5 w-5" />
           </button>
         </div>
@@ -102,6 +106,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
             <input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
+              autoComplete="name"
               className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white focus:border-brand-yellow focus:outline-none"
             />
           </label>
@@ -111,6 +116,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
               type="tel"
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
+              autoComplete="tel"
               className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white focus:border-brand-yellow focus:outline-none"
             />
           </label>
@@ -121,6 +127,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Opcional"
+              autoComplete="email"
               className="w-full rounded-lg border border-brand-line bg-transparent p-2.5 font-body text-sm text-brand-white placeholder:text-brand-white-dim/60 focus:border-brand-yellow focus:outline-none"
             />
           </label>
@@ -130,6 +137,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
               type="date"
               value={fechaNacimiento}
               onChange={(e) => setFechaNacimiento(e.target.value)}
+              autoComplete="bday"
               // [color-scheme:dark] hace que el propio selector nativo del
               // navegador (icono y calendario emergente) se pinte en modo
               // oscuro en vez de con los colores claros por defecto, que

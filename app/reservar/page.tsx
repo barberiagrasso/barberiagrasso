@@ -1,12 +1,30 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import { createPublicClient } from "@/lib/supabase/public";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
 import BookingFlow from "./BookingFlow";
 import { contarFotosPorServicio } from "@/lib/portafolio";
-import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import InstalarApp from "@/components/pwa/InstalarApp";
+import { JourneyHeader } from "@/components/journey/JourneyHeader";
+import { JourneyFooter } from "@/components/journey/JourneyFooter";
+import { journeyFontVars } from "@/components/journey/fonts";
+import journeyStyles from "@/components/journey/journey.module.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Reservar cita · Barbería Grasso",
+  description: "Elige sede, servicio, barbero y hora: reserva tu cita online en Barbería Grasso, Getafe.",
+  openGraph: {
+    title: "Reservar cita · Barbería Grasso",
+    description: "Elige sede, servicio, barbero y hora: reserva tu cita online en Barbería Grasso, Getafe.",
+    url: "/reservar",
+    siteName: "Barbería Grasso",
+    locale: "es_ES",
+    type: "website",
+  },
+};
 
 export default async function ReservarPage() {
   // Se puede reservar sin cuenta (01/11/2026). Si este móvil ya reconoce
@@ -70,50 +88,80 @@ export default async function ReservarPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-brand-black px-4 py-10 sm:py-14">
-      {/* Fondo ambiental: una foto real de la barbería, muy oscurecida y
-          difuminada. Es solo textura — fija, sin animación ni interacción —
-          para no distraer ni un ápice del flujo de reserva. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-40"
-        style={{ backgroundImage: "url(/media/texturas/reservar-bg.jpg)" }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-brand-black/70"
-      />
+    <div className={`${journeyStyles.journeyPage} ${journeyFontVars}`}>
+      {/* "reservando": quita "Reservar cita" (ya estamos dentro) y pone en su
+          lugar "Mi perfil" + "Cerrar sesión" — pedido de Diego, 09/11/2026. */}
+      <JourneyHeader cliente={cliente ? { nombre: cliente.nombre } : null} variante="reservando" />
 
-      <div className="relative mx-auto max-w-xl">
-        <div className="mb-10 flex flex-col items-center text-center">
-          <GrassoLogo className="h-auto w-28 text-brand-white sm:w-32" />
-          <p className="mt-4 font-heading text-lg italic text-brand-white-dim">
-            Reserva tu cita
-          </p>
+      <main id="contenido" className="relative overflow-hidden" style={{ paddingTop: "clamp(120px, 18vw, 170px)", paddingBottom: "clamp(90px, 10vw, 140px)" }}>
+        {/* Fondo ambiental: una foto real de la barbería, muy oscurecida y
+            difuminada. Es solo textura — fija, sin animación ni interacción —
+            para no distraer ni un ápice del flujo de reserva. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-40"
+          style={{ backgroundImage: "url(/media/texturas/reservar-bg.jpg)" }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-brand-black/70"
+        />
+
+        <div className="relative mx-auto max-w-xl px-4">
+          <div className="mb-10 text-center">
+            <p className={journeyStyles.eyebrow} style={{ textAlign: "center" }}>Reserva tu cita</p>
+            <h1
+              className="text-4xl uppercase leading-none tracking-tight text-brand-white sm:text-5xl"
+              style={{ fontFamily: "var(--font-anton), Impact, 'Arial Narrow', sans-serif" }}
+            >
+              Elige y listo.
+            </h1>
+          </div>
+
+          {/* Restaura el acceso que había antes de que la reserva se abriera sin
+              cuenta (01/11/2026): un enlace discreto, no un muro — quien ya es
+              cliente puede entrar y ver sus datos rellenos; quien no, sigue
+              reservando como invitado sin que nada se lo impida (pedido de
+              Diego, 09/11/2026). */}
+          {!cliente && (
+            <p className="mb-6 text-center font-body text-xs text-brand-white-dim">
+              ¿Ya eres cliente?{" "}
+              <Link
+                href="/acceso?next=%2Freservar"
+                className="underline decoration-brand-line underline-offset-4 hover:text-brand-yellow"
+              >
+                Inicia sesión
+              </Link>{" "}
+              y verás tus datos ya rellenos.
+            </p>
+          )}
+
+          <InstalarApp />
+          {/* BookingFlow usa useSearchParams (para recoger la propuesta que
+              venga del buscador de la portada, ver AsistenteReservaInicio) —
+              Next.js exige envolverlo en Suspense por eso. */}
+          <Suspense fallback={null}>
+            <BookingFlow
+              sedes={sedes ?? []}
+              servicios={servicios ?? []}
+              serviciosReservablesPorSede={serviciosReservablesPorSede}
+              fotosPorServicio={fotosPorServicio}
+              clienteInicial={
+                cliente
+                  ? {
+                      nombre: cliente.nombre,
+                      telefono: cliente.telefono,
+                      email: cliente.email,
+                      grassocoins: cliente.grassocoins ?? 0,
+                    }
+                  : undefined
+              }
+            />
+          </Suspense>
         </div>
-        <InstalarApp />
-        {/* BookingFlow usa useSearchParams (para recoger la propuesta que
-            venga del buscador de la portada, ver AsistenteReservaInicio) —
-            Next.js exige envolverlo en Suspense por eso. */}
-        <Suspense fallback={null}>
-          <BookingFlow
-            sedes={sedes ?? []}
-            servicios={servicios ?? []}
-            serviciosReservablesPorSede={serviciosReservablesPorSede}
-            fotosPorServicio={fotosPorServicio}
-            clienteInicial={
-              cliente
-                ? {
-                    nombre: cliente.nombre,
-                    telefono: cliente.telefono,
-                    email: cliente.email,
-                    grassocoins: cliente.grassocoins ?? 0,
-                  }
-                : undefined
-            }
-          />
-        </Suspense>
-      </div>
-    </main>
+      </main>
+
+      <JourneyFooter />
+    </div>
   );
 }

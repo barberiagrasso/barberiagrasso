@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { reducirFoto } from "@/lib/imagenes";
 
 interface Producto {
@@ -148,6 +148,7 @@ function FilaProducto({
   const inputFotoRef = useRef<HTMLInputElement>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verHistorial, setVerHistorial] = useState(false);
 
   async function subirFoto(archivo: File | undefined) {
     if (!archivo) return;
@@ -200,6 +201,7 @@ function FilaProducto({
 
   if (!editando) {
     return (
+      <>
       <div className="flex flex-wrap items-center justify-between gap-2 p-3">
         <div>
           <div className={"font-medium " + (producto.activo ? "text-stone-900" : "text-stone-400 line-through")}>
@@ -233,8 +235,13 @@ function FilaProducto({
           <button onClick={alternarActivo} className={producto.activo ? "text-red-700 underline" : "text-green-700 underline"}>
             {producto.activo ? "Desactivar" : "Reactivar"}
           </button>
+          <button onClick={() => setVerHistorial((v) => !v)} className="text-stone-500 underline">
+            {verHistorial ? "Ocultar historial" : "Historial"}
+          </button>
         </div>
       </div>
+      {verHistorial && <HistorialStock productoId={producto.id} />}
+      </>
     );
   }
 
@@ -378,6 +385,80 @@ function NuevoProductoForm({ onCreado }: { onCreado: () => void }) {
       <button disabled={enviando} onClick={crear} className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium text-brand-white hover:opacity-85 disabled:opacity-50 transition-opacity">
         {enviando ? "Creando…" : "Crear producto"}
       </button>
+    </div>
+  );
+}
+
+// Historial de movimientos de stock de un producto (entradas, salidas y
+// ajustes manuales — pedido de Diego, 13/11/2026: "no se puede auditar
+// por qué bajan las existencias"). Se carga solo al abrirlo, no de
+// entrada con cada producto, para no disparar 39 peticiones a la vez al
+// listar el catálogo.
+interface MovimientoStock {
+  id: string;
+  tipo: "entrada" | "salida" | "ajuste";
+  cantidad: number;
+  stock_resultante: number;
+  motivo: string | null;
+  creado_por: string;
+  created_at: string;
+}
+
+const ETIQUETA_TIPO_MOVIMIENTO: Record<MovimientoStock["tipo"], string> = {
+  entrada: "Entrada",
+  salida: "Salida",
+  ajuste: "Ajuste",
+};
+
+function HistorialStock({ productoId }: { productoId: string }) {
+  const [movimientos, setMovimientos] = useState<MovimientoStock[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const res = await fetch(`/api/admin/productos/${productoId}/movimientos`);
+      if (cancelado) return;
+      if (!res.ok) {
+        setError("No se pudo cargar el historial.");
+        return;
+      }
+      const json = await res.json();
+      setMovimientos(json.movimientos ?? []);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [productoId]);
+
+  return (
+    <div className="border-t border-stone-200 bg-stone-50 p-3">
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {!error && movimientos === null && <p className="text-xs text-stone-400">Cargando…</p>}
+      {movimientos?.length === 0 && <p className="text-xs text-stone-400">Todavía no hay movimientos de stock registrados.</p>}
+      {movimientos && movimientos.length > 0 && (
+        <ul className="space-y-1.5">
+          {movimientos.map((m) => (
+            <li key={m.id} className="flex flex-wrap items-baseline gap-x-2 text-xs text-stone-600">
+              <span className="text-stone-400">
+                {new Date(m.created_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}
+              </span>
+              <span
+                className={
+                  "rounded px-1.5 py-0.5 font-medium " +
+                  (m.cantidad > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")
+                }
+              >
+                {ETIQUETA_TIPO_MOVIMIENTO[m.tipo]} {m.cantidad > 0 ? "+" : ""}
+                {m.cantidad}
+              </span>
+              <span>→ queda en {m.stock_resultante}</span>
+              {m.motivo && <span className="italic">{m.motivo}</span>}
+              <span className="text-stone-400">· {m.creado_por}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

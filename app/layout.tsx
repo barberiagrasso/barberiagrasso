@@ -14,6 +14,7 @@ import "@fontsource/lato/900.css";
 import "@fontsource/lato/900-italic.css";
 import "./globals.css";
 import RegistrarServiceWorker from "@/components/pwa/RegistrarServiceWorker";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 
 // Dirección pública de la app, para que la vista previa al compartir el
 // enlace (WhatsApp, Instagram...) lleve la imagen con su dirección
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col font-body">
         {children}
         <RegistrarServiceWorker />
+        <GoogleAnalytics />
       </body>
     </html>
   );

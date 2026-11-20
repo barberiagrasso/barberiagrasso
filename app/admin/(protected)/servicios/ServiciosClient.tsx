@@ -28,7 +28,7 @@ function coinsDesdeTexto(texto: string): number | null {
 // Los desplegables ya usados en la reserva, para que Diego pueda elegir
 // uno existente en vez de escribirlo a mano y arriesgarse a una errata
 // que cree un grupo duplicado (p. ej. "Tintes Grasso" vs "tintes grasso").
-const CATEGORIAS_CONOCIDAS = [
+export const CATEGORIAS_CONOCIDAS = [
   "Grasso Kids (hasta 7 años)",
   "Complementos",
   "Tintes Grasso",

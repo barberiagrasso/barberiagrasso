@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const { sedes } = await sedesDeStock(admin);
   if (!sedes.some((s) => s.id === body?.sedeId)) return NextResponse.json({ error: "No puedes tocar el stock de esa sede." }, { status: 403 });
 
-  const { data, error } = await createAdminClient().rpc("registrar_movimiento_stock", {
+  const { data, error } = await createAdminClient().rpc("registrar_movimiento_stock_sede", {
     p_producto_id: body.productoId,
     p_sede_id: body.sedeId,
     p_tipo: tipo,

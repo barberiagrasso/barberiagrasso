@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { CATEGORIAS_CONOCIDAS } from "../servicios/ServiciosClient";
 
-// Servicios del cartel "¿Qué estilo llevas hoy?" (15/11/2026). Precio en
-// euros como texto ("" = falta ponerlo). Duraciones orientativas: revísalas.
+// Servicios del cartel "¿Qué estilo llevas hoy?". Precio en euros como
+// texto ("" = falta ponerlo). Duraciones orientativas: revísalas.
 const PROPUESTOS = [
   { nombre: "Mechas", categoria: "Tintes Grasso", precio: "44,99", minutos: "60", variable: false, descripcion: "" },
   { nombre: "Rubio platino", categoria: "Tintes Grasso", precio: "69,90", minutos: "120", variable: false, descripcion: "" },
@@ -21,8 +22,6 @@ const PROPUESTOS = [
   { nombre: "Perfilado de cejas", categoria: "Complementos", precio: "", minutos: "5", variable: false, descripcion: "" },
   { nombre: "Depilación de nariz y orejas con cera", categoria: "Complementos", precio: "", minutos: "5", variable: false, descripcion: "" },
 ];
-
-const GRUPOS = ["Complementos", "Tintes Grasso", "Tratamientos capilares", "Packs Grasso"];
 
 const normalizar = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
@@ -100,7 +99,7 @@ export default function ImportarServiciosClient({ existentes }: { existentes: st
               <label>
                 Grupo{" "}
                 <select value={f.categoria} onChange={(e) => cambiar(i, "categoria", e.target.value)} className="rounded border border-stone-300 px-2 py-1">
-                  {GRUPOS.map((g) => (
+                  {CATEGORIAS_CONOCIDAS.filter((g) => g !== "Grasso Kids (hasta 7 años)").map((g) => (
                     <option key={g}>{g}</option>
                   ))}
                 </select>
@@ -115,7 +114,7 @@ export default function ImportarServiciosClient({ existentes }: { existentes: st
         <button
           onClick={crear}
           disabled={guardando || aCrear.length === 0 || faltanPrecios.length > 0}
-          className="rounded bg-stone-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          className="rounded-none bg-brand-black px-4 py-2 text-sm font-medium uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85 disabled:opacity-40"
         >
           {guardando ? "Creando…" : `Crear servicios (${aCrear.length})`}
         </button>

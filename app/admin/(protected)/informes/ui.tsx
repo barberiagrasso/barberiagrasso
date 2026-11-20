@@ -71,7 +71,7 @@ export function BotonExportarCSV({ nombreArchivo, filas }: { nombreArchivo: stri
     <button
       onClick={() => descargarCSV(nombreArchivo, filas)}
       disabled={filas.length === 0}
-      className="font-mono text-[11px] uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark disabled:opacity-40 disabled:no-underline"
+      className="font-mono text-sm uppercase tracking-wider text-stone-500 underline decoration-stone-300 underline-offset-2 hover:text-brand-yellow-dark disabled:opacity-40 disabled:no-underline"
     >
       Exportar CSV
     </button>

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const r = await recomendarEstilo(imagen, {}, servicios ?? []);
     return NextResponse.json(r);
   } catch (err) {
-    await registrarError({ origen: "asistente_reserva", mensaje: "Falló el visagismo del panel.", detalle: err instanceof Error ? err.message : "error" });
+    await registrarError({ origen: "asesor_estilo", mensaje: "Falló el visagismo del panel.", detalle: err instanceof Error ? err.message : "error" });
     return NextResponse.json({ error: "No se ha podido analizar la foto." }, { status: 502 });
   }
 }

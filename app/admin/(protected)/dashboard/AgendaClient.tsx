@@ -651,37 +651,37 @@ function VistaSemanal({
                       <button
                         onClick={() => onAvisarDisponible(cita.id)}
                         disabled={avisando === cita.id}
-                        className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white disabled:opacity-50"
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white disabled:opacity-50"
                         title="Avisar por WhatsApp a tu siguiente cliente de que ya estás disponible"
                       >
-                        <IconBell className="h-3 w-3" />
+                        <IconBell className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {cita.estado === "confirmada" && (
                       <>
                         <button
                           onClick={() => onFinalizar(cita)}
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white"
                           title="Cobrar"
                           aria-label="Cobrar"
                         >
-                          <IconCheck className="h-3 w-3" />
+                          <IconCheck className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() =>
                             onCambiarEstado(cita.id, "no_presentada")
                           }
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white"
                           title="Marcar como no presentada"
                         >
-                          <IconAlertCircle className="h-3 w-3" />
+                          <IconAlertCircle className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => onCambiarEstado(cita.id, "cancelada")}
-                          className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white"
                           title="Cancelar"
                         >
-                          <IconX className="h-3 w-3" />
+                          <IconX className="h-3.5 w-3.5" />
                         </button>
                       </>
                     )}

@@ -1,9 +1,8 @@
--- Panel de personal (pedido de David, 19/11/2026): sueldo base y meta
--- mensual de cada barbero, con sus notas. Las comisiones salen de
--- Comisiones y las valoraciones de Opiniones; esta tabla solo añade lo
--- que faltaba para la reunión de pago.
---
--- Se puede ejecutar más de una vez sin romper nada.
+-- Panel de personal (pedido de David, 19/11/2026, traído de main el
+-- 20/11/2026): sueldo base y meta mensual de cada barbero, con sus
+-- notas. Las comisiones salen de Comisiones y las valoraciones de
+-- Opiniones; esta tabla solo añade lo que faltaba para la reunión de
+-- pago. Se puede ejecutar más de una vez sin romper nada.
 
 create table if not exists personal_config (
   profesional_id uuid primary key references profesionales(id) on delete cascade,

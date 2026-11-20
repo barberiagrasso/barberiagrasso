@@ -229,12 +229,12 @@ export default function AsesorPizarra() {
                   key={c}
                   onClick={() => setColor(c)}
                   aria-label={`Color ${c}`}
-                  className={"h-9 w-9 rounded-full border-2 " + (color === c ? "border-stone-900 ring-2 ring-stone-400" : "border-stone-200")}
+                  className={"h-11 w-11 rounded-full border-2 " + (color === c ? "border-brand-black ring-2 ring-stone-400" : "border-stone-200")}
                   style={{ background: c }}
                 />
               ))}
               {GROSORES.map((g) => (
-                <button key={g.id} onClick={() => setGrosor(g.id)} className={botonHerramienta + (grosor === g.id ? " border-stone-900 bg-stone-900 text-white" : " border-stone-300 bg-white")}>
+                <button key={g.id} onClick={() => setGrosor(g.id)} className={botonHerramienta + (grosor === g.id ? " border-brand-black bg-brand-black text-brand-white" : " border-stone-300 bg-white")}>
                   {g.texto}
                 </button>
               ))}
@@ -254,7 +254,7 @@ export default function AsesorPizarra() {
                   {verGenerada ? "Ver antes" : "Ver después (IA)"}
                 </button>
               )}
-              <button onClick={compartir} className={botonHerramienta + " border-stone-900 bg-stone-900 text-white"}>
+              <button onClick={compartir} className={botonHerramienta + " border-brand-black bg-brand-black text-brand-white hover:opacity-85"}>
                 Guardar / mandar al cliente
               </button>
             </div>
@@ -277,7 +277,7 @@ export default function AsesorPizarra() {
             <button
               onClick={analizar}
               disabled={!original || !acepta || ocupado !== null}
-              className="rounded bg-stone-900 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40"
+              className="rounded-none bg-brand-black px-3 py-1 text-xs font-medium uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85 disabled:opacity-40"
             >
               {ocupado === "analizar" ? "Analizando…" : "Analizar cara"}
             </button>
@@ -338,7 +338,7 @@ export default function AsesorPizarra() {
               <button
                 onClick={probar}
                 disabled={!original || !corte || !acepta || ocupado !== null}
-                className="mt-2 w-full rounded bg-amber-400 py-2 text-sm font-semibold text-stone-900 disabled:opacity-40"
+                className="mt-2 w-full rounded-none bg-brand-yellow py-2 text-sm font-medium uppercase tracking-wide text-brand-yellow-ink transition-opacity hover:opacity-85 disabled:opacity-40"
               >
                 {ocupado === "probar" ? "Generando (unos segundos)…" : corte ? `Probar «${corte}»` : "Elige un corte"}
               </button>
@@ -353,7 +353,7 @@ export default function AsesorPizarra() {
 function Miniatura({ nombre, activo, alPulsar }: { nombre: string; activo: boolean; alPulsar: () => void }) {
   const foto = fotoDeEstilo(nombre);
   return (
-    <button onClick={alPulsar} className={"overflow-hidden rounded-lg border-2 text-left " + (activo ? "border-amber-400" : "border-transparent")}>
+    <button onClick={alPulsar} className={"overflow-hidden rounded-lg border-2 text-left " + (activo ? "border-brand-yellow" : "border-transparent")}>
       {foto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={foto} alt="" className="aspect-square w-full object-cover" />

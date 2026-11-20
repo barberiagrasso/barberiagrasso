@@ -2,8 +2,8 @@
 // estilo con IA (servidor) y las pantallas (cliente y panel). Sin "server-only".
 
 // Catálogo de estilos y servicios de Barbería Grasso (cartel "¿Qué estilo
-// llevas hoy?", 15/11/2026). La IA recomienda SOLO de aquí, con estos
-// mismos nombres, para que el cliente pida algo que el barbero reconoce.
+// llevas hoy?"). La IA recomienda SOLO de aquí, con estos mismos nombres,
+// para que el cliente pida algo que el barbero reconoce.
 export const CATALOGO_CORTES = [
   "Clásico",
   "Degradado alto",
@@ -79,4 +79,3 @@ export function fotoDeEstilo(nombre: string): string | null {
   const archivo = FOTO_ESTILO[nombre];
   return archivo ? `/media/estilos/${archivo}.jpg` : null;
 }
-

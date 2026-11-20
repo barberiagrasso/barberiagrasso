@@ -76,9 +76,9 @@ interface PagoElegido {
  * corregir algo después, se hace a mano en Supabase.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  let adminCobro: { id: string; nombre: string | null } | null = null;
+  let admin;
   try {
-    ({ admin: adminCobro } = await requireAdminApi());
+    ({ admin } = await requireAdminApi());
   } catch (err) {
     if (err instanceof NoAutorizadoError) return NextResponse.json({ error: err.message }, { status: 401 });
     throw err;
@@ -227,7 +227,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // Un producto canjeado con GrassoCoins se guarda a 0 € (no se cobró) y
   // con las coins que costó: así caja, informes, comisiones y coins
   // ganadas cuadran sin tratarlo aparte en cada sitio.
-  let productosParaGuardar: {
+  const productosParaGuardar: {
     producto_id: string;
     cantidad: number;
     precio_centimos: number;
@@ -413,28 +413,42 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // disponible en cuanto queda "completada", así que no hay riesgo de
     // descontar dos veces por una re-edición. Si fallara, no se deshace
     // el cobro ya registrado: solo se registra el error para revisarlo.
-    // Desde el 10/11/2026 el stock es por sede: se descuenta de la sede de
-    // la cita y queda en el historial con quién cobró. Si el script
-    // supabase/anadir-stock-por-sede.sql aún no está ejecutado, se usa el
-    // descuento antiguo (stock único) como hasta ahora.
     for (const p of productosParaGuardar) {
-      let { error: errorStock } = await supabase.rpc("registrar_movimiento_stock", {
+      // Deja rastro en movimientos_stock (quién, cuándo, de qué cita) en
+      // vez de solo restar el número — ver
+      // supabase/anadir-historial-movimientos-stock.sql. Si el producto
+      // no lleva stock controlado, el RPC no hace nada (igual
+      // comportamiento que tenía antes descontar_stock_producto).
+      const { error: errorStock } = await supabase.rpc("registrar_movimiento_stock", {
         p_producto_id: p.producto_id,
-        p_sede_id: citaActual.sede_id,
-        p_tipo: "venta",
-        p_cantidad: p.cantidad,
+        p_tipo: "salida",
+        p_delta: -p.cantidad,
+        p_motivo: "Venta en cita",
         p_cita_id: id,
-        p_admin_id: adminCobro?.id ?? null,
-        p_admin_nombre: adminCobro?.nombre ?? null,
+        p_creado_por: admin.nombre ?? "sistema",
       });
       if (errorStock) {
-        ({ error: errorStock } = await supabase.rpc("descontar_stock_producto", {
-          p_producto_id: p.producto_id,
-          p_cantidad: p.cantidad,
-        }));
-      }
-      if (errorStock) {
         await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock de un producto.", detalle: errorStock });
+      }
+      // Además, si el stock por sede está activado (ver
+      // supabase/anadir-stock-por-sede.sql), descuenta también el stock de
+      // la sede de esta cita: es un contador independiente del de arriba
+      // (uno es global por producto, este es por producto+sede), pensado
+      // para la sección "Stock" del panel. Si la sede de la cita no está
+      // guardada o la tabla aún no existe, simplemente no hace nada.
+      if (citaActual.sede_id) {
+        const { error: errorStockSede } = await supabase.rpc("registrar_movimiento_stock_sede", {
+          p_producto_id: p.producto_id,
+          p_sede_id: citaActual.sede_id,
+          p_tipo: "venta",
+          p_cantidad: p.cantidad,
+          p_cita_id: id,
+          p_admin_id: admin.id,
+          p_admin_nombre: admin.nombre ?? null,
+        });
+        if (errorStockSede) {
+          await registrarError({ origen: "servidor", mensaje: "No se pudo descontar el stock por sede de un producto.", detalle: errorStockSede });
+        }
       }
     }
   }

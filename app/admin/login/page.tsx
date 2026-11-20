@@ -3,9 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { GrassoMark } from "@/components/brand/GrassoMark";
-import { emailSinteticoParaUsuarioEquipo } from "@/lib/usuarioEquipo";
 import { rutaSiguienteSegura } from "@/lib/rutaSiguiente";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -36,18 +34,20 @@ function AdminLoginForm() {
     e.preventDefault();
     setCargando(true);
     setError(null);
-    const supabase = createClient();
-    // Tu cuenta entra con tu email real; las cuentas de equipo (cada
-    // barbero) entran con un usuario sencillo, sin @ — que aquí se
-    // traduce al email sintético que espera Supabase Auth por debajo.
+    // El login pasa por /api/admin/login (en vez de llamar a Supabase
+    // directamente desde el navegador) para que el límite de intentos
+    // de lib/rateLimit.ts —el mismo que ya protege el login de
+    // clientes— también cubra al panel de administración.
     const usuarioLimpio = usuario.trim();
-    const emailReal = usuarioLimpio.includes("@")
-      ? usuarioLimpio
-      : emailSinteticoParaUsuarioEquipo(usuarioLimpio.toLowerCase());
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
-      if (error) {
-        setError("Email o contraseña incorrectos.");
+      const respuesta = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario: usuarioLimpio, password }),
+      });
+      const datos = await respuesta.json().catch(() => null);
+      if (!respuesta.ok) {
+        setError(datos?.error ?? "Email o contraseña incorrectos.");
         setCargando(false);
         return;
       }
@@ -81,6 +81,7 @@ function AdminLoginForm() {
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
             autoCapitalize="none"
+            autoComplete="username"
             className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
           />
           <input
@@ -89,6 +90,7 @@ function AdminLoginForm() {
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
           />
           {error && <p className="font-body text-sm text-red-400">{error}</p>}

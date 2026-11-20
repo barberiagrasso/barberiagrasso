@@ -4,7 +4,8 @@ import PersonalClient from "./PersonalClient";
 export const dynamic = "force-dynamic";
 
 // Ficha de cada barbero para la reunión de pago. El dueño ve y edita a
-// todo el equipo; un barbero solo ve la suya.
+// todo el equipo; un barbero solo ve la suya (pedido de David,
+// 19/11/2026, traído de main a esta versión el 20/11/2026).
 export default async function PersonalPage() {
   const { admin } = await requireAdmin();
   return (

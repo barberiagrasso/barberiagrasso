@@ -1,10 +1,10 @@
 import "server-only";
 
-// Probador virtual (15/11/2026): con la foto del cliente, la IA de
-// imágenes de Google (Gemini "Nano Banana 2") genera una foto suya con el
-// corte o la barba elegidos. Solo lo usan los barberos desde el panel.
-// Se activa poniendo GEMINI_API_KEY en Vercel; sin ella, la pantalla lo
-// avisa y todo lo demás funciona igual. La foto no se guarda.
+// Probador virtual: con la foto del cliente, la IA de imágenes de Google
+// (Gemini "Nano Banana 2") genera una foto suya con el corte o la barba
+// elegidos. Solo lo usan los barberos desde el panel. Se activa poniendo
+// GEMINI_API_KEY en Vercel; sin ella, la pantalla lo avisa y todo lo
+// demás funciona igual. La foto no se guarda.
 
 const MODELO = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 

@@ -937,7 +937,12 @@ export default function FinalizarCitaModal({
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{euros(totalServicioCentimos)}€</span>
-                      <button onClick={empezarAEditarPrecio} className="text-stone-400 hover:text-stone-600" title="Editar precio a mano" aria-label="Editar precio">
+                      <button
+                        onClick={empezarAEditarPrecio}
+                        className="-m-2 rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                        title="Editar precio a mano"
+                        aria-label="Editar precio"
+                      >
                         <IconPencil className="h-4 w-4" />
                       </button>
                     </div>

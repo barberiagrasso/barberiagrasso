@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { textoPedido, type EstadoStock } from "@/lib/stock";
 
 interface Producto {
@@ -102,7 +102,7 @@ export default function StockClient() {
             <button
               key={s.id}
               onClick={() => cargar(s.id)}
-              className={"rounded-full px-4 py-1.5 text-sm " + (s.id === sedeId ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600")}
+              className={"rounded-full px-4 py-1.5 text-sm " + (s.id === sedeId ? "bg-brand-black text-brand-white" : "bg-stone-100 text-stone-600")}
             >
               {s.nombre}
             </button>
@@ -175,13 +175,22 @@ export default function StockClient() {
               </span>
               <span className="w-14 text-right text-lg font-bold text-stone-900">{p.contado ? p.stock : "—"}</span>
               <div className="flex gap-1">
-                <button onClick={() => setAccion({ producto: p, tipo: "entrada" })} className="rounded bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white">
+                <button
+                  onClick={() => setAccion({ producto: p, tipo: "entrada" })}
+                  className="min-h-11 rounded-none bg-brand-black px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-brand-white hover:opacity-85"
+                >
                   + Llegó
                 </button>
-                <button onClick={() => setAccion({ producto: p, tipo: "recuento" })} className="rounded border border-stone-300 px-2.5 py-1 text-xs text-stone-700">
+                <button
+                  onClick={() => setAccion({ producto: p, tipo: "recuento" })}
+                  className="min-h-11 rounded border border-stone-300 px-2.5 py-1 text-xs text-stone-700"
+                >
                   Recuento
                 </button>
-                <button onClick={() => setAccion({ producto: p, tipo: "ajuste" })} className="rounded border border-stone-300 px-2.5 py-1 text-xs text-stone-700">
+                <button
+                  onClick={() => setAccion({ producto: p, tipo: "ajuste" })}
+                  className="min-h-11 rounded border border-stone-300 px-2.5 py-1 text-xs text-stone-700"
+                >
                   Ajuste
                 </button>
               </div>
@@ -272,7 +281,7 @@ function Limites({ producto, sedeId, alGuardar }: { producto: Producto; sedeId: 
   const [error, setError] = useState<string | null>(null);
   if (!abierto)
     return (
-      <button onClick={() => setAbierto(true)} className="ml-2 underline">
+      <button onClick={() => setAbierto(true)} className="ml-2 min-h-11 px-1 underline">
         cambiar
       </button>
     );
@@ -289,9 +298,9 @@ function Limites({ producto, sedeId, alGuardar }: { producto: Producto; sedeId: 
   }
   return (
     <span className="mt-1 flex flex-wrap items-center gap-1">
-      mín <input value={minimo} onChange={(e) => setMinimo(e.target.value)} inputMode="numeric" className="w-12 rounded border px-1" />
-      ideal <input value={ideal} onChange={(e) => setIdeal(e.target.value)} inputMode="numeric" className="w-12 rounded border px-1" />
-      <button onClick={guardar} className="rounded bg-stone-900 px-2 text-white">
+      mín <input value={minimo} onChange={(e) => setMinimo(e.target.value)} inputMode="numeric" className="w-12 rounded border border-stone-300 px-1" />
+      ideal <input value={ideal} onChange={(e) => setIdeal(e.target.value)} inputMode="numeric" className="w-12 rounded border border-stone-300 px-1" />
+      <button onClick={guardar} className="rounded-none bg-brand-black px-2 text-brand-white hover:opacity-85">
         OK
       </button>
       {error && <span className="text-red-600">{error}</span>}
@@ -316,6 +325,39 @@ function VentanaMovimiento({
   const [nota, setNota] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const elementoPrevio = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+
+    function alTecla(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        alCerrar();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const foco = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, input, a[href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!foco || foco.length === 0) return;
+      const primero = foco[0];
+      const ultimo = foco[foco.length - 1];
+      if (e.shiftKey && document.activeElement === primero) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault();
+        primero.focus();
+      }
+    }
+    document.addEventListener("keydown", alTecla);
+    return () => {
+      document.removeEventListener("keydown", alTecla);
+      elementoPrevio?.focus();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const textos = {
     entrada: { titulo: "Llegó pedido", pregunta: "¿Cuántas unidades han llegado?", boton: "Sumar al stock" },
@@ -341,13 +383,22 @@ function VentanaMovimiento({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={alCerrar}>
-      <div className="w-full max-w-sm rounded-xl bg-white p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-stone-900">{textos.titulo}</h3>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stock-movimiento-titulo"
+        tabIndex={-1}
+        className="w-full max-w-sm rounded-xl bg-white p-5 outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id="stock-movimiento-titulo" className="text-lg font-bold text-stone-900">{textos.titulo}</h3>
         <p className="text-sm text-stone-500">
           {producto.nombre} · ahora hay {producto.contado ? producto.stock : "sin contar"}
         </p>
-        <label className="mt-4 block text-sm text-stone-700">{textos.pregunta}</label>
+        <label htmlFor={`stock-movimiento-cantidad-${producto.id}`} className="mt-4 block text-sm text-stone-700">{textos.pregunta}</label>
         <input
+          id={`stock-movimiento-cantidad-${producto.id}`}
           autoFocus
           inputMode={tipo === "ajuste" ? "text" : "numeric"}
           value={cantidad}
@@ -365,7 +416,11 @@ function VentanaMovimiento({
           <button onClick={alCerrar} className="flex-1 rounded border border-stone-300 py-2 text-sm">
             Cancelar
           </button>
-          <button onClick={guardar} disabled={guardando} className="flex-1 rounded bg-stone-900 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          <button
+            onClick={guardar}
+            disabled={guardando}
+            className="flex-1 rounded-none bg-brand-black py-2 text-sm font-medium uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85 disabled:opacity-50"
+          >
             {guardando ? "Guardando…" : textos.boton}
           </button>
         </div>

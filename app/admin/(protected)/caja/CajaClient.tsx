@@ -84,10 +84,21 @@ export default function CajaClient() {
     void cargar();
   }, [cargar]);
 
-  if (!datos) return <p className="text-sm text-stone-500">{error ?? "Cargando…"}</p>;
+  if (!datos)
+    return error ? (
+      <button
+        role="alert"
+        onClick={() => void cargar()}
+        className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700 hover:bg-red-100"
+      >
+        {error} · Reintentar
+      </button>
+    ) : (
+      <p className="text-sm text-stone-500">Cargando…</p>
+    );
   if (datos.faltaSql)
     return (
-      <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+      <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
         La caja aún no está activada: falta ejecutar <code>supabase/anadir-cierre-caja.sql</code> en Supabase.
       </p>
     );
@@ -159,9 +170,10 @@ export default function CajaClient() {
     await cargar(sedeId, fecha);
   }
 
-  const caja = "rounded-2xl border border-stone-200 bg-white p-4";
-  const input = "w-full rounded-xl border border-stone-300 px-3 py-2.5 text-base";
-  const boton = "w-full rounded-xl bg-stone-900 px-4 py-3 font-semibold text-white disabled:opacity-40";
+  const caja = "rounded-lg border border-stone-200 bg-white p-4";
+  const input = "w-full rounded border border-stone-300 px-3 py-2.5 text-base";
+  const boton =
+    "w-full rounded-none bg-brand-black px-4 py-3 text-sm font-medium uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85 disabled:opacity-40";
 
   return (
     <div className="space-y-4">
@@ -170,7 +182,7 @@ export default function CajaClient() {
           <button
             key={s.id}
             onClick={() => void cargar(s.id, fecha)}
-            className={"rounded-full px-4 py-2 text-sm " + (s.id === sedeId ? "bg-stone-900 text-white" : "bg-white text-stone-700 border border-stone-300")}
+            className={"rounded-full px-4 py-2 text-sm " + (s.id === sedeId ? "bg-brand-black text-brand-white" : "bg-white text-stone-700 border border-stone-300")}
           >
             {s.nombre}
           </button>
@@ -185,7 +197,7 @@ export default function CajaClient() {
       </div>
 
       {datos.sinCerrar.length > 0 && (
-        <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
           <p className="font-semibold">Hay días sin cerrar. No se puede abrir la caja hasta cerrarlos:</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {datos.sinCerrar.map((f) => (
@@ -197,7 +209,7 @@ export default function CajaClient() {
         </div>
       )}
 
-      {error && <p className="rounded-xl bg-red-100 p-3 text-sm font-medium text-red-800">{error}</p>}
+      {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-800">{error}</p>}
 
       <div className={caja}>
         <p className="text-sm capitalize text-stone-500">{fechaBonita(datos.fecha)} · {sede.nombre}</p>
@@ -219,9 +231,9 @@ export default function CajaClient() {
       {/* APERTURA */}
       {esHoy && !abierta && !cerrada && (
         <div className={caja}>
-          <h2 className="mb-2 font-semibold text-stone-900">Abrir caja</h2>
-          <label className="mb-1 block text-sm text-stone-600">Cuenta el dinero de la caja y escríbelo (fondo):</label>
-          <input inputMode="decimal" placeholder="Ej. 100" value={fondo} onChange={(e) => setFondo(e.target.value)} className={input} />
+          <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Abrir caja</h2>
+          <label htmlFor="caja-fondo" className="mb-1 block text-sm text-stone-600">Cuenta el dinero de la caja y escríbelo (fondo):</label>
+          <input id="caja-fondo" inputMode="decimal" placeholder="Ej. 100" value={fondo} onChange={(e) => setFondo(e.target.value)} className={input} />
           {datos.fondoAnterior !== null && fondoC !== null && fondoC !== datos.fondoAnterior && (
             <p className="mt-2 text-sm font-medium text-amber-700">
               ⚠️ Ayer se dejaron {euros(datos.fondoAnterior)} de fondo y tú cuentas {euros(fondoC)}. Revísalo antes de abrir.
@@ -235,7 +247,7 @@ export default function CajaClient() {
 
       {/* COBROS DEL DÍA */}
       <div className={caja}>
-        <h2 className="mb-2 font-semibold text-stone-900">Cobrado {esHoy ? "hoy" : "ese día"}</h2>
+        <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Cobrado {esHoy ? "hoy" : "ese día"}</h2>
         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
           {[
             ["💶 Efectivo", cerrada ? fila!.efectivo_cobrado_centimos : datos.cobros.efectivo],
@@ -243,7 +255,7 @@ export default function CajaClient() {
             ["📱 Bizum", cerrada ? fila!.bizum_centimos : datos.cobros.bizum],
             ["Otros", cerrada ? fila!.otros_centimos : datos.cobros.otros],
           ].map(([t, v]) => (
-            <div key={t as string} className="rounded-xl bg-stone-50 p-3">
+            <div key={t as string} className="rounded border border-stone-200 bg-stone-50 p-3">
               <p className="text-stone-500">{t}</p>
               <p className="text-lg font-bold text-stone-900">{euros(v as number)}</p>
             </div>
@@ -254,7 +266,7 @@ export default function CajaClient() {
 
       {/* CITAS SIN RESOLVER */}
       {!cerrada && datos.pendientes.length > 0 && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <h2 className="font-semibold text-amber-900">
             {datos.pendientes.length} cita{datos.pendientes.length === 1 ? "" : "s"} sin resolver
           </h2>
@@ -278,12 +290,12 @@ export default function CajaClient() {
       {/* CIERRE */}
       {!cerrada && (abierta || !esHoy) && sede.puedeCerrar && (
         <div className={caja}>
-          <h2 className="mb-1 font-semibold text-stone-900">Cerrar caja</h2>
+          <h2 className="mb-1 font-mono text-xs uppercase tracking-wider text-stone-500">Cerrar caja</h2>
           <p className="mb-3 text-sm text-stone-600">
             Debería haber <b>{euros(esperado)}</b> en efectivo ({euros(fondoInicial)} de fondo + {euros(datos.cobros.efectivo)} cobrados).
           </p>
-          <label className="mb-1 block text-sm text-stone-600">Efectivo que hay en caja (todo, contando el fondo):</label>
-          <input inputMode="decimal" value={contado} onChange={(e) => setContado(e.target.value)} className={input} />
+          <label htmlFor="caja-contado" className="mb-1 block text-sm text-stone-600">Efectivo que hay en caja (todo, contando el fondo):</label>
+          <input id="caja-contado" inputMode="decimal" value={contado} onChange={(e) => setContado(e.target.value)} className={input} />
           {diferencia !== null && (
             <p className={"mt-2 text-sm font-semibold " + (diferencia === 0 ? "text-green-700" : "text-red-700")}>
               {diferencia === 0 ? "✅ Cuadra" : `⚠️ ${diferencia > 0 ? "Sobran" : "Faltan"} ${euros(Math.abs(diferencia))}`}
@@ -291,24 +303,24 @@ export default function CajaClient() {
           )}
           {diferencia !== null && diferencia !== 0 && (
             <>
-              <label className="mb-1 mt-3 block text-sm text-stone-600">¿Por qué no cuadra?</label>
-              <input value={motivo} onChange={(e) => setMotivo(e.target.value)} className={input} />
+              <label htmlFor="caja-motivo" className="mb-1 mt-3 block text-sm text-stone-600">¿Por qué no cuadra?</label>
+              <input id="caja-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} className={input} />
             </>
           )}
-          <label className="mb-1 mt-3 block text-sm text-stone-600">Fondo que se deja en caja para mañana:</label>
-          <input inputMode="decimal" value={fondoSig} onChange={(e) => setFondoSig(e.target.value)} className={input} />
+          <label htmlFor="caja-fondo-siguiente" className="mb-1 mt-3 block text-sm text-stone-600">Fondo que se deja en caja para mañana:</label>
+          <input id="caja-fondo-siguiente" inputMode="decimal" value={fondoSig} onChange={(e) => setFondoSig(e.target.value)} className={input} />
           {contadoC !== null && aCentimos(fondoSig) !== null && (
             <p className="mt-2 text-sm text-stone-700">
               Al sobre van <b>{euros(Math.max(0, contadoC - (aCentimos(fondoSig) ?? 0)))}</b>.
             </p>
           )}
-          <label className="mb-1 mt-3 block text-sm text-stone-600">Foto del sobre:</label>
-          <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
-          <button type="button" onClick={() => fotoRef.current?.click()} className="w-full rounded-xl border-2 border-dashed border-stone-300 px-4 py-3 text-sm text-stone-700">
+          <label htmlFor="caja-foto" className="mb-1 mt-3 block text-sm text-stone-600">Foto del sobre:</label>
+          <input id="caja-foto" ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
+          <button type="button" onClick={() => fotoRef.current?.click()} className="w-full rounded-lg border-2 border-dashed border-stone-300 px-4 py-3 text-sm text-stone-700">
             {foto ? `📷 ${foto.name} (cambiar)` : "📷 Hacer foto del sobre"}
           </button>
-          <label className="mb-1 mt-3 block text-sm text-stone-600">Notas (opcional):</label>
-          <input value={notas} onChange={(e) => setNotas(e.target.value)} className={input} />
+          <label htmlFor="caja-notas" className="mb-1 mt-3 block text-sm text-stone-600">Notas (opcional):</label>
+          <input id="caja-notas" value={notas} onChange={(e) => setNotas(e.target.value)} className={input} />
           <button
             disabled={
               enviando || datos.pendientes.length > 0 || contadoC === null || aCentimos(fondoSig) === null || !foto || (diferencia !== 0 && !motivo.trim())
@@ -328,7 +340,7 @@ export default function CajaClient() {
       {/* RESUMEN DEL CIERRE */}
       {cerrada && (
         <div className={caja}>
-          <h2 className="mb-2 font-semibold text-stone-900">Resumen del cierre</h2>
+          <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Resumen del cierre</h2>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-stone-500">Efectivo esperado</dt><dd className="text-right">{euros(fila!.efectivo_esperado_centimos)}</dd>
             <dt className="text-stone-500">Efectivo contado</dt><dd className="text-right">{euros(fila!.efectivo_contado_centimos)}</dd>
@@ -341,7 +353,7 @@ export default function CajaClient() {
           {datos.fotoUrl && (
             <a href={datos.fotoUrl} target="_blank" rel="noreferrer">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={datos.fotoUrl} alt="Foto del sobre" className="mt-3 max-h-72 rounded-xl border" />
+              <img src={datos.fotoUrl} alt="Foto del sobre" className="mt-3 max-h-72 rounded-lg border border-stone-200" />
             </a>
           )}
         </div>
@@ -351,7 +363,7 @@ export default function CajaClient() {
       {datos.esAdmin && (
         <>
           <div className={caja}>
-            <h2 className="mb-2 font-semibold text-stone-900">Encargado de caja de {sede.nombre}</h2>
+            <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Encargado de caja de {sede.nombre}</h2>
             <p className="mb-2 text-sm text-stone-500">Solo esta persona (y tú) puede cerrar la caja. Abrir la puede cualquiera del equipo.</p>
             <select value={sede.encargadoId ?? ""} onChange={(e) => void cambiarEncargado(e.target.value)} className={input}>
               <option value="">— Nadie (solo yo) —</option>
@@ -363,8 +375,11 @@ export default function CajaClient() {
 
           <div className={caja}>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-semibold text-stone-900">Últimos cierres · {sede.nombre}</h2>
-              <a href="/api/admin/caja/exportar" className="rounded-full bg-green-700 px-3 py-1.5 text-sm font-semibold text-white">
+              <h2 className="font-mono text-xs uppercase tracking-wider text-stone-500">Últimos cierres · {sede.nombre}</h2>
+              <a
+                href="/api/admin/caja/exportar"
+                className="rounded-none bg-brand-black px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-brand-white transition-opacity hover:opacity-85"
+              >
                 Descargar Excel
               </a>
             </div>
@@ -377,7 +392,7 @@ export default function CajaClient() {
                   {datos.historial.map((h) => {
                     const total = (h.efectivo_cobrado_centimos ?? 0) + (h.tarjeta_centimos ?? 0) + (h.bizum_centimos ?? 0) + (h.otros_centimos ?? 0);
                     return (
-                      <tr key={h.id} className="cursor-pointer border-t hover:bg-stone-50" onClick={() => void cargar(sedeId, h.fecha)}>
+                      <tr key={h.id} className="cursor-pointer border-t border-stone-100 hover:bg-stone-50" onClick={() => void cargar(sedeId, h.fecha)}>
                         <td className="py-1.5">{h.fecha.split("-").reverse().join("/")}</td>
                         <td>{h.cerrada_at ? euros(total) : "—"}</td>
                         <td>{h.cerrada_at ? euros(h.efectivo_cobrado_centimos) : "—"}</td>

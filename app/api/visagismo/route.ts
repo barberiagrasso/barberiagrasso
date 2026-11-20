@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       servicios: resultado.servicioIds.map((id) => ({ id, nombre: nombres.get(id) ?? "" })),
     });
   } catch (err) {
-    await registrarError({ origen: "asistente_reserva", mensaje: "Falló el asesor de estilo con IA.", detalle: err instanceof Error ? err.message : "error" });
+    await registrarError({ origen: "asesor_estilo", mensaje: "Falló el asesor de estilo con IA.", detalle: err instanceof Error ? err.message : "error" });
     return NextResponse.json({ error: "No he podido analizar la foto ahora mismo. Inténtalo en un momento." }, { status: 502 });
   }
 }
