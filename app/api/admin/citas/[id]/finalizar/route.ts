@@ -1,3 +1,4 @@
+import { fechaMadrid } from "@/lib/caja";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi, NoAutorizadoError } from "@/lib/adminApiAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -188,6 +189,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!citaActual) return NextResponse.json({ error: "Cita no encontrada." }, { status: 404 });
   if (citaActual.estado !== "confirmada") {
     return NextResponse.json({ error: "Esta cita ya no está pendiente de completar." }, { status: 409 });
+  }
+
+  // No se cobra con la caja sin abrir (o ya cerrada) — pedido de David,
+  // 21/11/2026. Si aún no se ha ejecutado supabase/anadir-cierre-caja.sql
+  // (la tabla no existe), no se bloquea nada.
+  if (citaActual.sede_id) {
+    const { data: caja, error: errCaja } = await supabase
+      .from("caja_dias")
+      .select("abierta_at, cerrada_at")
+      .eq("sede_id", citaActual.sede_id)
+      .eq("fecha", fechaMadrid())
+      .maybeSingle();
+    if (!errCaja) {
+      if (!caja?.abierta_at) {
+        return NextResponse.json({ error: "Primero hay que abrir la caja de hoy (Finanzas → Caja). Sin caja abierta no se puede cobrar." }, { status: 409 });
+      }
+      if (caja.cerrada_at) {
+        return NextResponse.json({ error: "La caja de hoy ya está cerrada: no se puede cobrar más hoy." }, { status: 409 });
+      }
+    }
   }
 
   const { data: servicio } = await supabase.from("servicios").select("id, precio_centimos").eq("id", servicioId).maybeSingle();
