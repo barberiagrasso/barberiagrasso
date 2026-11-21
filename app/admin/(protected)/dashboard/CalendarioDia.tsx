@@ -840,57 +840,11 @@ export default function CalendarioDia({
         )
       : 160;
 
-  // Deslizar de lado con el dedo (como Booksy): la agenda sigue al dedo
-  // mientras se arrastra y, al soltar, encaja en el barbero siguiente o en
-  // el anterior. Se hace a mano en vez de con el scroll lateral nativo
-  // porque en el iPhone ese scroll no respondía dentro de la cuadrícula.
-  // No interviene mientras se está moviendo una cita, el descanso o
-  // creando un bloque nuevo (bloquearScrollTactil activo).
+  // Deslizar de lado con el dedo (como Booksy): ahora lo hace el propio
+  // navegador, con su inercia natural, y al soltar "encaja" en el barbero
+  // más cercano (scroll-snap en las columnas). Antes se hacía a mano y se
+  // notaba frenado (pedido de David, 20/11/2026).
   const ultimoScrollRef = useRef(0);
-  const gestoRef = useRef<{ x: number; y: number; izquierda: number; eje: "x" | "y" | null } | null>(null);
-  const encajarEnColumna = (columna: number) => {
-    if (!zonaScroll) return;
-    const maximo = zonaScroll.scrollWidth - zonaScroll.clientWidth;
-    zonaScroll.scrollTo({ left: Math.min(Math.max(0, columna * anchoColumna), maximo), behavior: "smooth" });
-  };
-  const gestoLateral = {
-    alEmpezar(ev: React.TouchEvent) {
-      if (!zonaScroll || ev.touches.length !== 1) return;
-      gestoRef.current = { x: ev.touches[0].clientX, y: ev.touches[0].clientY, izquierda: zonaScroll.scrollLeft, eje: null };
-    },
-    alMover(ev: React.TouchEvent) {
-      const g = gestoRef.current;
-      if (!g || !zonaScroll) return;
-      if (liberarScrollActivo) {
-        // Empezó a moverse una cita o a crearse un bloque: el gesto deja de
-        // ser un deslizamiento de la agenda (y si ya la había movido un
-        // poco, vuelve a su sitio).
-        if (g.eje === "x") encajarEnColumna(Math.round(g.izquierda / anchoColumna));
-        gestoRef.current = null;
-        return;
-      }
-      const dx = ev.touches[0].clientX - g.x;
-      const dy = ev.touches[0].clientY - g.y;
-      if (g.eje === null) {
-        // Mismo umbral que cancela la pulsación larga: o se desliza la
-        // agenda o se coge una cita, nunca las dos cosas a la vez.
-        if (Math.hypot(dx, dy) <= UMBRAL_CANCELAR_ESPERA_PX) return;
-        g.eje = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      }
-      if (g.eje === "x") zonaScroll.scrollLeft = g.izquierda - dx;
-    },
-    alTerminar(ev: React.TouchEvent) {
-      const g = gestoRef.current;
-      gestoRef.current = null;
-      if (!g || g.eje !== "x" || !zonaScroll || liberarScrollActivo) return;
-      const dx = (ev.changedTouches[0]?.clientX ?? g.x) - g.x;
-      const columnaInicial = Math.round(g.izquierda / anchoColumna);
-      // Un deslizamiento corto mueve un barbero; uno largo, los que haya
-      // recorrido el dedo.
-      const pasos = Math.abs(dx) < 40 ? 0 : Math.max(1, Math.round(Math.abs(dx) / anchoColumna));
-      encajarEnColumna(columnaInicial + (dx < 0 ? pasos : -pasos));
-    },
-  };
 
   // Al abrir el día de hoy, la agenda se coloca sola en la hora actual
   // (con un poco de margen por encima), en vez de al principio del día.
@@ -921,16 +875,16 @@ export default function CalendarioDia({
     <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
       <div
         ref={setZonaScroll}
-        className="max-h-[75vh] overflow-auto overscroll-contain select-none"
-        // touch-action pan-y: con el dedo, el desplazamiento vertical lo hace
-        // el navegador y el horizontal lo hace la propia agenda (ver
-        // gestoLateral): en el iPhone el desplazamiento lateral nativo dentro
-        // de la cuadrícula no respondía y solo se movía tocando los nombres.
-        style={{ WebkitTouchCallout: "none", touchAction: "pan-y" }}
-        onTouchStart={gestoLateral.alEmpezar}
-        onTouchMove={gestoLateral.alMover}
-        onTouchEnd={gestoLateral.alTerminar}
-        onTouchCancel={gestoLateral.alTerminar}
+        // Móvil: la agenda ocupa toda la pantalla (como Booksy) y se mueve con
+        // el scroll nativo del dedo en las dos direcciones. Al llegar arriba
+        // del todo, el gesto sigue y sube la página (para ver sede y fecha).
+        className="h-[calc(100dvh-5.5rem)] overflow-auto select-none md:h-auto md:max-h-[75vh] md:overscroll-contain"
+        style={{
+          WebkitTouchCallout: "none",
+          WebkitOverflowScrolling: "touch",
+          scrollSnapType: "x mandatory",
+          scrollPaddingLeft: ANCHO_EJE_HORAS,
+        }}
         onScroll={() => {
           ultimoScrollRef.current = performance.now();
         }}
@@ -984,13 +938,13 @@ export default function CalendarioDia({
                   onContextMenu={(e) => e.preventDefault()}
                   className={
                     // El dedo desplaza la agenda en las dos direcciones
-                    // (vertical nativo, lateral con gestoLateral). Un toque
+                    // (scroll nativo en las dos direcciones). Un toque
                     // en un hueco libre abre el menú de crear; mantener
                     // pulsado y arrastrar elige la hora (ver iniciarCreacion).
                     "relative isolate shrink-0 border-l border-stone-100" +
                     (col.id !== ID_SIN_ASIGNAR ? " cursor-crosshair" : "")
                   }
-                  style={{ width: anchoColumna }}
+                  style={{ width: anchoColumna, scrollSnapAlign: "start" }}
                 >
                   {/* Franjas "cerrado" (antes de abrir / después de cerrar): puramente
                       visuales, con rayado, para orientarse — nunca se puede arrastrar

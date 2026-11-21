@@ -601,6 +601,7 @@ function InvitacionGoogle({
             href={contacto.googleEscribir}
             target="_blank"
             rel="noreferrer"
+            style={{ color: "var(--brand-black)" }}
             className="rounded-none bg-brand-white px-3 py-1.5 font-body text-xs font-semibold uppercase tracking-wide text-brand-black hover:opacity-85"
           >
             Opinar en Google

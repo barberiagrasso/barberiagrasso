@@ -1820,6 +1820,9 @@ export default function BookingFlow({
               {(clienteInicial || citaConfirmada.guardadoEnMovil) && (
               <Link
                 href="/perfil"
+                // El estilo de la página pone a los enlaces el color del texto
+                // (crema): sin forzar el color aquí, el botón salía en blanco.
+                style={{ color: "var(--brand-black)" }}
                 className="rounded-full bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
               >
                 Ir a mi perfil
