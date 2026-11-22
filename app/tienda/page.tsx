@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
+import { PRODUCTOS_FIJOS } from "@/lib/productosFijos";
 import { JourneyHeader } from "@/components/journey/JourneyHeader";
 import { JourneyFooter } from "@/components/journey/JourneyFooter";
 import { journeyFontVars } from "@/components/journey/fonts";
@@ -19,7 +20,7 @@ interface ProductoTienda {
   nombre: string;
   categoria: string | null;
   descripcion: string | null;
-  precio_centimos: number;
+  precio_centimos: number | null;
   coste_grassocoins: number | null;
   foto_url: string | null;
   orden: number;
@@ -47,6 +48,10 @@ export default async function TiendaPage() {
   } catch {
     productos = [];
   }
+
+  // Productos con foto que se enseñan siempre (lib/productosFijos.ts), sin repetir los del panel.
+  const nombresPanel = new Set(productos.map((x) => x.nombre.trim().toLowerCase()));
+  productos = [...productos, ...PRODUCTOS_FIJOS.filter((x) => !nombresPanel.has(x.nombre.trim().toLowerCase()))];
 
   const grupos = new Map<string, ProductoTienda[]>();
   for (const p of productos) {
@@ -86,7 +91,7 @@ export default async function TiendaPage() {
                       <div className={styles.cardBody}>
                         <p className={styles.cardName}>{p.nombre}</p>
                         {p.descripcion && <p className={styles.cardDesc}>{p.descripcion}</p>}
-                        <p className={styles.cardPrice}>{euros(p.precio_centimos)}</p>
+                        <p className={styles.cardPrice}>{p.precio_centimos != null ? euros(p.precio_centimos) : "Precio en la barbería"}</p>
                         {p.coste_grassocoins && <p className={styles.cardCoins}>o {p.coste_grassocoins} GrassoCoins</p>}
                       </div>
                     </div>
