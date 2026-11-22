@@ -114,6 +114,20 @@ async function cargarJson<T>(url: string, signal: AbortSignal, intentos = 2): Pr
   throw ultimoError;
 }
 
+function solapaIntervalo(aIni: number, aFin: number, bIni: number, bFin: number) {
+  return aIni < bFin && bIni < aFin;
+}
+
+function horaMadrid(iso: string | number) {
+  return new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+}
+
+function duracionTextoMin(min: number) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
+}
+
 function esCancelacion(err: unknown) {
   return err instanceof DOMException && err.name === "AbortError";
 }
@@ -576,6 +590,13 @@ export default function BookingFlow({
   // reservan justo después de la cita principal, en /api/citas/extras (pedido de David, 22/11/2026).
   const [personasExtra, setPersonasExtra] = useState<{ id: string; nombre: string; servicioId: string }[]>([]);
   const [anadiendoPersona, setAnadiendoPersona] = useState(false);
+  // Hueco que se le va a dar a cada persona extra (hora + barbero), calculado ANTES de confirmar para
+  // que el cliente vea a qué hora va cada uno, como en Booksy. "fijadas" = lo que ha cambiado a mano.
+  const [asignaciones, setAsignaciones] = useState<Record<string, FranjaDisponible | null>>({});
+  const [candidatosExtra, setCandidatosExtra] = useState<Record<string, FranjaDisponible[]>>({});
+  const [fijadas, setFijadas] = useState<Record<string, FranjaDisponible>>({});
+  const [cargandoExtra, setCargandoExtra] = useState(false);
+  const [cambiandoId, setCambiandoId] = useState<string | null>(null);
   const [nuevaPersonaNombre, setNuevaPersonaNombre] = useState("");
   const [nuevaPersonaServicio, setNuevaPersonaServicio] = useState("");
   const [resultadosExtra, setResultadosExtra] = useState<
@@ -1096,6 +1117,63 @@ export default function BookingFlow({
 
   // Bloquea el doble toque en "Confirmar cita": sin esto, dos toques muy
   // seguidos podían lanzar dos reservas antes de que el botón se desactivara.
+  const claveExtras =
+    personasExtra.map((x) => x.id + x.servicioId).join("|") +
+    "#" + (slotElegido?.hora_inicio ?? "") + (slotElegido?.profesional_id ?? "") + (fecha ?? "") + (sedeId ?? "") +
+    "#" + (Object.entries(fijadas) as [string, FranjaDisponible][]).map(([k, v]) => k + v.hora_inicio + v.profesional_id).join("|");
+  useEffect(() => {
+    if (!perfilCompleto || editarDatos || !slotElegido || !sedeId || !fecha || personasExtra.length === 0) {
+      setAsignaciones({});
+      setCandidatosExtra({});
+      return;
+    }
+    let cancelado = false;
+    setCargandoExtra(true);
+    (async () => {
+      const porServicio: Record<string, FranjaDisponible[]> = {};
+      for (const sid of Array.from(new Set(personasExtra.map((x) => x.servicioId))) as string[]) {
+        try {
+          const r = await fetch(`/api/disponibilidad?${new URLSearchParams({ sedeId, servicioId: sid, fecha }).toString()}`);
+          const j = await r.json();
+          porServicio[sid] = Array.isArray(j.slots) ? j.slots : [];
+        } catch {
+          porServicio[sid] = [];
+        }
+      }
+      if (cancelado) return;
+      const ini0 = Date.parse(slotElegido.hora_inicio);
+      const dur0 = ((servicioSeleccionado?.duracion_minutos ?? 30) + duracionExtraMinutos) * 60000;
+      const ocupados = [{ pro: slotElegido.profesional_id, ini: ini0, fin: ini0 + dur0 }];
+      const nuevas: Record<string, FranjaDisponible | null> = {};
+      const cand: Record<string, FranjaDisponible[]> = {};
+      for (const x of personasExtra) {
+        const dur = (servicios.find((y) => y.id === x.servicioId)?.duracion_minutos ?? 30) * 60000;
+        const libres = (porServicio[x.servicioId] ?? [])
+          .filter((f) => !ocupados.some((o) => o.pro === f.profesional_id && solapaIntervalo(Date.parse(f.hora_inicio), Date.parse(f.hora_inicio) + dur, o.ini, o.fin)))
+          .sort((a, b) => Date.parse(a.hora_inicio) - Date.parse(b.hora_inicio));
+        cand[x.id] = libres;
+        const fija = fijadas[x.id];
+        let elegido: FranjaDisponible | null =
+          fija && libres.some((f) => f.hora_inicio === fija.hora_inicio && f.profesional_id === fija.profesional_id) ? fija : null;
+        if (!elegido) elegido = libres.find((f) => Date.parse(f.hora_inicio) >= ini0) ?? null;
+        nuevas[x.id] = elegido;
+        if (elegido) {
+          const i = Date.parse(elegido.hora_inicio);
+          ocupados.push({ pro: elegido.profesional_id, ini: i, fin: i + dur });
+        }
+      }
+      setAsignaciones(nuevas);
+      setCandidatosExtra(cand);
+      setCargandoExtra(false);
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveExtras, perfilCompleto, editarDatos]);
+
+  const extrasSinHueco = personasExtra.some((x) => !asignaciones[x.id]);
+
   const reservandoRef = useRef(false);
   async function confirmarReserva() {
     if (!slotElegido || !sedeId || !servicioId || !fecha) return;
@@ -1139,7 +1217,12 @@ export default function BookingFlow({
               sedeId,
               fecha,
               horaInicioISO: slotElegido.hora_inicio,
-              personas: personasExtra.map((x) => ({ nombre: x.nombre, servicioId: x.servicioId })),
+              personas: personasExtra.map((x) => ({
+                nombre: x.nombre,
+                servicioId: x.servicioId,
+                horaInicioISO: asignaciones[x.id]?.hora_inicio,
+                profesionalId: asignaciones[x.id]?.profesional_id,
+              })),
             }),
           });
           const jsonExtra = await resExtra.json().catch(() => null);
@@ -1748,26 +1831,86 @@ export default function BookingFlow({
                   </ul>
 
                   {personasExtra.length > 0 && (
-                    <ul className="space-y-1.5 border-t border-brand-white/10 pt-4">
+                    <ul className="space-y-3 border-t border-brand-white/10 pt-4">
                       {personasExtra.map((x) => {
                         const sv = servicios.find((y) => y.id === x.servicioId);
+                        const a = asignaciones[x.id];
+                        const fin = a && sv ? Date.parse(a.hora_inicio) + sv.duracion_minutos * 60000 : null;
                         return (
-                          <li key={x.id} className="flex items-center justify-between gap-3 text-sm text-brand-white">
-                            <span className="min-w-0">
-                              <span className="font-semibold">{x.nombre}</span>
-                              <span className="text-brand-white-dim"> · {sv?.nombre}</span>
-                            </span>
-                            <span className="flex shrink-0 items-center gap-3 font-mono text-brand-white-dim">
-                              {sv ? formatearPrecioServicio(sv.precio_centimos, Boolean(sv.precio_variable)) : ""}
-                              <button
-                                type="button"
-                                aria-label={`Quitar a ${x.nombre}`}
-                                onClick={() => setPersonasExtra((l) => l.filter((y) => y.id !== x.id))}
-                                className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-line text-brand-white hover:border-brand-yellow"
-                              >
-                                ✕
-                              </button>
-                            </span>
+                          <li key={x.id} className="rounded-xl border border-brand-white/10 bg-black/20 p-3 text-sm text-brand-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-semibold">{x.nombre}</p>
+                                <p className="text-brand-white-dim">{sv?.nombre}</p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <span className="font-mono text-brand-white-dim">
+                                  {sv ? formatearPrecioServicio(sv.precio_centimos, Boolean(sv.precio_variable)) : ""}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Quitar a ${x.nombre}`}
+                                  onClick={() => {
+                                    setPersonasExtra((l) => l.filter((y) => y.id !== x.id));
+                                    setFijadas((f) => {
+                                      const c = { ...f };
+                                      delete c[x.id];
+                                      return c;
+                                    });
+                                  }}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-line hover:border-brand-yellow"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between gap-3 border-t border-brand-white/10 pt-2">
+                              {cargandoExtra && !a ? (
+                                <span className="text-brand-white-dim">Buscando hueco…</span>
+                              ) : a && fin ? (
+                                <span>
+                                  <span className="font-display text-xl text-brand-yellow">{horaMadrid(a.hora_inicio)}</span>
+                                  <span className="text-brand-white-dim"> – {horaMadrid(fin)} · con </span>
+                                  <span className="font-semibold">{a.profesional_nombre}</span>
+                                </span>
+                              ) : (
+                                <span className="text-red-300">Sin hueco este día a esa hora. Quítalo o cambia el día.</span>
+                              )}
+                              {(candidatosExtra[x.id]?.length ?? 0) > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCambiandoId(cambiandoId === x.id ? null : x.id)}
+                                  className="shrink-0 rounded-full border border-brand-line px-3 py-1.5 text-xs font-semibold hover:border-brand-yellow"
+                                >
+                                  Cambiar
+                                </button>
+                              )}
+                            </div>
+                            {cambiandoId === x.id && (
+                              <div className="mt-3 flex max-h-44 flex-wrap gap-2 overflow-y-auto">
+                                {(candidatosExtra[x.id] ?? []).map((f) => {
+                                  const activa = a?.hora_inicio === f.hora_inicio && a?.profesional_id === f.profesional_id;
+                                  return (
+                                    <button
+                                      key={f.hora_inicio + f.profesional_id}
+                                      type="button"
+                                      onClick={() => {
+                                        setFijadas((m) => ({ ...m, [x.id]: f }));
+                                        setCambiandoId(null);
+                                      }}
+                                      className={
+                                        "rounded-lg border px-3 py-2 text-xs font-semibold " +
+                                        (activa
+                                          ? "border-brand-yellow bg-brand-yellow text-brand-yellow-ink"
+                                          : "border-brand-line text-brand-white hover:border-brand-yellow")
+                                      }
+                                    >
+                                      {horaMadrid(f.hora_inicio)} · {f.profesional_nombre.split(" ")[0]}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </li>
                         );
                       })}
@@ -1787,6 +1930,18 @@ export default function BookingFlow({
                       </span>
                     )}
                   </div>
+
+                  {personasExtra.length > 0 && (
+                    <p className="-mt-2 text-right text-xs text-brand-white-dim">
+                      {personasExtra.length + 1} servicios ·{" "}
+                      {duracionTextoMin(
+                        (servicioSeleccionado?.duracion_minutos ?? 0) +
+                          duracionExtraMinutos +
+                          personasExtra.reduce((t, x) => t + (servicios.find((y) => y.id === x.servicioId)?.duracion_minutos ?? 0), 0),
+                      )}{" "}
+                      en total
+                    </p>
+                  )}
 
                   {costeCoinsCita !== null && coinsCubrenCita && (
                     <label className="flex items-start gap-2 rounded-xl border border-brand-yellow/30 bg-brand-yellow/5 p-3 text-sm text-brand-white">
@@ -1890,7 +2045,7 @@ export default function BookingFlow({
               <button
                 type="button"
                 onClick={confirmarReserva}
-                disabled={enviando}
+                disabled={enviando || cargandoExtra || extrasSinHueco}
                 className="w-full rounded-full bg-brand-white px-6 py-4 font-body text-base font-bold uppercase tracking-wider text-brand-black shadow-lg shadow-black/40 transition active:scale-[0.98] disabled:opacity-50"
               >
                 {enviando ? "Reservando…" : personasExtra.length > 0 ? `Confirmar ${personasExtra.length + 1} citas` : "Confirmar cita"}

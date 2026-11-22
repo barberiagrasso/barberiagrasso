@@ -19,6 +19,9 @@ const MAX_CITAS_FUTURAS_GRUPO = 10;
 interface PersonaExtra {
   nombre?: unknown;
   servicioId?: unknown;
+  // Hueco que el cliente vio y aceptó antes de confirmar (hora + barbero). Si no llega, se busca solo.
+  horaInicioISO?: unknown;
+  profesionalId?: unknown;
 }
 
 export async function POST(request: NextRequest) {
@@ -60,11 +63,17 @@ export async function POST(request: NextRequest) {
     }
     try {
       // Se recalcula en cada vuelta: así cuenta lo que ya se ha reservado a las anteriores.
+      const horaPedida = typeof persona.horaInicioISO === "string" ? persona.horaInicioISO : "";
+      const proPedido = typeof persona.profesionalId === "string" ? persona.profesionalId : "";
       const slots = await getAvailableSlots({ sedeId, servicioId, fecha });
       const candidatos = slots
         .filter((s) => Date.parse(s.hora_inicio) >= referencia)
         .sort((a, b) => Date.parse(a.hora_inicio) - Date.parse(b.hora_inicio));
-      const slot = candidatos[0];
+      // Primero el hueco que el cliente vio en pantalla; si ya no está libre, el más cercano.
+      const slot =
+        (horaPedida && proPedido
+          ? slots.find((s) => s.hora_inicio === horaPedida && s.profesional_id === proPedido)
+          : undefined) ?? candidatos[0];
       if (!slot) {
         resultados.push({ nombre, ok: false, error: "No queda hueco ese día a esa hora o después." });
         continue;
