@@ -20,6 +20,9 @@ const CAMPO =
   "w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none";
 const BOTON =
   "flex w-full items-center justify-center gap-2 rounded-none bg-brand-white p-3 font-body text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85 disabled:opacity-70";
+// Número de WhatsApp de la barbería (el de la IA), solo dígitos con prefijo, ej. 34600111222.
+const WHATSAPP_ATENCION = (process.env.NEXT_PUBLIC_WHATSAPP_ATENCION ?? "").replace(/\D/g, "");
+
 const ENLACE = "font-body text-xs text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow";
 
 export default function AccesoPage() {
@@ -204,6 +207,16 @@ function AccesoForm() {
             <button type="button" onClick={() => irAModo("telefono")} className={ENLACE + " w-full"}>
               Pedir otro código
             </button>
+            {WHATSAPP_ATENCION && (
+              <a
+                href={`https://wa.me/${WHATSAPP_ATENCION}?text=${encodeURIComponent("Hola, no me llega el código para entrar a mi perfil")}`}
+                target="_blank"
+                rel="noreferrer"
+                className={ENLACE + " block w-full text-center"}
+              >
+                ¿No te llega? Escríbenos por WhatsApp y te ayudamos al momento
+              </a>
+            )}
           </form>
         )}
 

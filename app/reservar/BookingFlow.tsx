@@ -114,6 +114,9 @@ async function cargarJson<T>(url: string, signal: AbortSignal, intentos = 2): Pr
   throw ultimoError;
 }
 
+// Número de WhatsApp de la barbería (el de la IA), solo dígitos con prefijo.
+const WHATSAPP_ATENCION = (process.env.NEXT_PUBLIC_WHATSAPP_ATENCION ?? "").replace(/\D/g, "");
+
 function solapaIntervalo(aIni: number, aFin: number, bIni: number, bFin: number) {
   return aIni < bFin && bIni < aFin;
 }
@@ -2295,6 +2298,20 @@ export default function BookingFlow({
             {!clienteInicial && !citaConfirmada.guardadoEnMovil && (
               <p className="font-body text-xs text-brand-white-dim">
                 Para ver tu perfil e historial, entra con un código que te mandamos por WhatsApp.
+                {WHATSAPP_ATENCION && (
+                  <>
+                    {" "}¿Algún problema?{" "}
+                    <a
+                      href={`https://wa.me/${WHATSAPP_ATENCION}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      Escríbenos por WhatsApp
+                    </a>
+                    .
+                  </>
+                )}
               </p>
             )}
             <div className="flex flex-col items-center gap-2 pt-2 sm:flex-row sm:justify-center">

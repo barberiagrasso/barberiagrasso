@@ -57,6 +57,10 @@ Ejecutar en el SQL Editor, en este orden (se pueden ejecutar más de una vez):
 - [ ] `supabase/anadir-cierre-caja.sql`: apertura y cierre de caja
       (Finanzas → Caja). Crea la tabla `caja_dias`, el encargado de caja
       por sede y el bucket privado `caja` para la foto del sobre.
+- [ ] Vercel: añadir `NEXT_PUBLIC_WHATSAPP_ATENCION` (número de WhatsApp de
+      la barbería, el que atiende la IA, formato 34600000000). Sin él no
+      sale el enlace "¿No te llega el código? Escríbenos por WhatsApp" en
+      la pantalla de acceso ni al reservar. Después hay que redesplegar.
 - [ ] Vercel: añadir `CAJA_AVISO_TELEFONO` (móvil de David, formato
       34600000000) para que le llegue el resumen de cada cierre por
       WhatsApp. Ojo: WhatsApp solo entrega texto libre si David ha escrito
