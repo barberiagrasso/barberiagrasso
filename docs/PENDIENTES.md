@@ -83,9 +83,9 @@ David ("barberiagrasso's Org") para que la base de datos sea suya.
       plantilla de tipo `recuperacion_password` (o `codigo_acceso` si se
       crea). Comprobar en /admin/plantillas que está activa y aprobada en
       Meta; si falla, sale en Errores.
-- [ ] Velocidad: comprobar la región de Supabase y poner la misma región en
-      las funciones de Vercel (Settings → Functions → Region), por ejemplo
-      `cdg1` o `dub1` si la base de datos está en Europa.
+- [ ] Velocidad: las funciones de Vercel ya se ejecutan en París (`cdg1`, archivo vercel.json). Comprobar en
+      Supabase → Project Settings → región del proyecto: si NO es Europa (Frankfurt, Irlanda, Londres, París),
+      cambiar `regions` en vercel.json a la región más cercana a la base de datos.
 - [ ] Política de privacidad: añadir titular (nombre o empresa), NIF y
       email de contacto en `app/politica-privacidad/page.tsx`.
 - [ ] Casilla de ofertas en la reserva: está desmarcada por la ley
