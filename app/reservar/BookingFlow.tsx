@@ -1015,7 +1015,7 @@ export default function BookingFlow({
     const barbero = searchParams.get("barbero");
     if (!sede || !servicio || !barbero) return;
     if (!sedes.some((s) => s.id === sede) || !servicios.some((s) => s.id === servicio && s.activo)) {
-      router.replace("/reservar");
+      window.history.replaceState(null, "", "/reservar");
       return;
     }
     setSedeId(sede);
@@ -1028,14 +1028,14 @@ export default function BookingFlow({
     // La URL se limpia dejando YA el paso de destino: si se dejaba "/reservar" a secas, el efecto
     // que sigue a la URL veía "sin paso" y devolvía al cliente al paso 1 (sede) — "Reservar de
     // nuevo" no funcionaba (22/11/2026).
-    router.replace(`/reservar?paso=${destino}`);
+    window.history.replaceState(null, "", `/reservar?paso=${destino}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const crudo = searchParams.get("propuesta");
     if (!crudo) return;
-    router.replace("/reservar?paso=datos"); // mismo motivo que arriba: elegirPropuestaAsistente deja el paso "datos"
+    window.history.replaceState(null, "", "/reservar?paso=datos"); // mismo motivo que arriba: elegirPropuestaAsistente deja el paso "datos"
     try {
       const opcion = JSON.parse(crudo) as Partial<OpcionPropuestaCita>;
       if (
@@ -1070,10 +1070,12 @@ export default function BookingFlow({
     if (paso === "confirmado") return;
     const actual = searchParams.get("paso");
     if (actual === paso) return;
+    // Con la API nativa del navegador: Next sigue enterándose (useSearchParams se actualiza) pero ya no
+    // vuelve a pedir al servidor toda la pantalla en cada paso, que era lo que hacía lento "siguiente" y "atrás".
     if (paso === "sede") {
-      router.replace("/reservar");
+      window.history.replaceState(null, "", "/reservar");
     } else {
-      router.push(`/reservar?paso=${paso}`);
+      window.history.pushState(null, "", `/reservar?paso=${paso}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paso]);

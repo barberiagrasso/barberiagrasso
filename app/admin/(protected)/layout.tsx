@@ -28,7 +28,6 @@ export default async function ProtectedAdminLayout({
   children: React.ReactNode;
 }) {
   const { admin } = await requireAdmin();
-  const encargadoStock = admin.rol !== "admin" && (await esEncargadoDeStock(admin.id));
 
   // Datos para el botón flotante de "nueva cita rápida", disponible en
   // todas las páginas del panel (no solo en la Agenda), y para el aviso de
@@ -43,6 +42,8 @@ export default async function ProtectedAdminLayout({
     { count: fallosRecientes },
     { count: erroresSinResolver },
     { count: vacacionesPendientes },
+    encargadoStock,
+    pendientes,
   ] = await Promise.all([
     supabase.from("sedes").select("id, nombre").order("nombre"),
     supabase
@@ -68,9 +69,10 @@ export default async function ProtectedAdminLayout({
       .from("solicitudes_vacaciones")
       .select("id", { count: "exact", head: true })
       .eq("estado", "pendiente"),
+    // Antes iban uno detrás de otro; en paralelo el panel abre antes.
+    admin.rol !== "admin" ? esEncargadoDeStock(admin.id) : Promise.resolve(false),
+    admin.rol === "admin" ? pendientesAbiertos().catch(() => []) : Promise.resolve([]),
   ]);
-
-  const pendientes = admin.rol === "admin" ? await pendientesAbiertos().catch(() => []) : [];
 
   return (
     <div className="min-h-screen bg-stone-50 md:pl-20 print:pl-0">
