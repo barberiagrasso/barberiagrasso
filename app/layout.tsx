@@ -49,6 +49,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1, // evita que la página se agrande/encoja sola con los dedos o al tocar un campo
+  viewportFit: "cover",
   themeColor: "#0b0b0a",
 };
 

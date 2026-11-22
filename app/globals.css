@@ -48,9 +48,18 @@
 
 html {
   background: var(--background);
+  /* En el móvil la página no se puede arrastrar hacia los lados ni se queda "descuadrada"
+     (pasaba en el perfil y en el panel). Los carruseles internos siguen deslizándose. */
+  overflow-x: clip;
+  max-width: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
+  overflow-x: clip;
+  max-width: 100%;
+  touch-action: manipulation; /* sin zoom por doble toque */
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body);
