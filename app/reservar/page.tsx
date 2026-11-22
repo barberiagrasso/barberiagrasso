@@ -107,6 +107,7 @@ export default async function ReservarPage() {
         />
 
         <div className="relative mx-auto max-w-xl px-4">
+          <Link href="/" className="mb-6 inline-flex min-h-11 items-center font-body text-sm text-brand-white-dim underline decoration-brand-line underline-offset-4 hover:text-brand-yellow">← Inicio</Link>
           <div className="mb-10 text-center">
             <p className={journeyStyles.eyebrow} style={{ textAlign: "center" }}>Reserva tu cita</p>
             <h1

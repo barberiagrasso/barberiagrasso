@@ -80,7 +80,7 @@ export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
           </>
         )}
       </div>
-      {pathname !== "/" && (
+      {pathname !== "/" && !pathname?.startsWith("/reservar") && (
         <Link href="/" className={styles.homePill} aria-label="Ir al inicio">
           <span aria-hidden>←</span> Inicio
         </Link>

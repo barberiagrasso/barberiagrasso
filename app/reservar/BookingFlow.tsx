@@ -568,6 +568,15 @@ export default function BookingFlow({
   // del usuario, no una casilla ya marcada de fábrica (pedido de Diego,
   // 19/09/2026, tras la revisión de UX).
   const [aceptaComercial, setAceptaComercial] = useState(false);
+  // Cliente con el perfil bien hecho (nombre, móvil y email válidos): no se le vuelven a pedir los
+  // datos ni el permiso de ofertas — solo ve el resumen y confirma (pedido de David, 22/11/2026).
+  // "Reservar a nombre de otra persona" abre el formulario de siempre.
+  const [editarDatos, setEditarDatos] = useState(false);
+  const perfilCompleto =
+    !!clienteInicial &&
+    clienteInicial.nombre.trim().length > 1 &&
+    clienteInicial.telefono.replace(/\D/g, "").length >= 9 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((clienteInicial.email ?? "").trim());
   const [canjearCoins, setCanjearCoins] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1642,7 +1651,154 @@ export default function BookingFlow({
           </div>
         )}
 
-        {paso === "datos" && (
+        {paso === "datos" && perfilCompleto && !editarDatos && slotElegido && (() => {
+          const inicio = new Date(slotElegido.hora_inicio);
+          const fmt = (o: Intl.DateTimeFormatOptions) => inicio.toLocaleString("es-ES", { timeZone: "Europe/Madrid", ...o });
+          const diaNum = fmt({ day: "numeric" });
+          const mes = fmt({ month: "long" });
+          const diaSemana = fmt({ weekday: "long" });
+          const hora = fmt({ hour: "2-digit", minute: "2-digit" });
+          const pro = profesionales.find((x) => x.id === slotElegido.profesional_id);
+          const nombrePro = slotElegido.profesional_nombre || pro?.nombre || "Tu barbero";
+          const nombreCliente = clienteInicial?.nombre.trim().split(/\s+/)[0] ?? "";
+          const lineas = [servicioSeleccionado, ...complementosElegidos].filter(Boolean) as Servicio[];
+          const conCoins = canjearCoins && coinsCubrenCita;
+          return (
+            <div className="space-y-5">
+              <div className="text-center">
+                <p className="font-mono text-xs uppercase tracking-[0.25em] text-brand-yellow">Todo listo, {nombreCliente}</p>
+                <PasoTitulo>Revisa y confirma</PasoTitulo>
+              </div>
+
+              {/* Entrada tipo ticket: fecha grande arriba, detalles debajo, muescas a los lados. */}
+              <div className="relative overflow-hidden rounded-2xl border border-brand-yellow/40 bg-gradient-to-b from-[#1b1a14] to-[#121210] shadow-xl shadow-black/40">
+                <div className="flex items-center gap-5 px-6 pb-5 pt-6">
+                  <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl bg-brand-yellow text-brand-yellow-ink">
+                    <span className="font-display text-4xl leading-none">{diaNum}</span>
+                    <span className="mt-1 text-[11px] font-bold uppercase tracking-widest">{mes.slice(0, 3)}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-body text-sm capitalize text-brand-white-dim">{diaSemana}</p>
+                    <p className="font-display text-5xl leading-none text-brand-white">{hora}</p>
+                  </div>
+                </div>
+
+                <div className="relative my-1">
+                  <div className="border-t border-dashed border-brand-white/20" />
+                  <span aria-hidden className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-brand-black" />
+                  <span aria-hidden className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-brand-black" />
+                </div>
+
+                <div className="space-y-4 px-6 pb-6 pt-4 font-body">
+                  <div className="flex items-center gap-3">
+                    {pro?.foto_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={pro.foto_url} alt="" className="h-11 w-11 rounded-full object-cover" />
+                    ) : (
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-brand-yellow/50 font-heading text-lg text-brand-yellow">
+                        {nombrePro.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-brand-white-dim">Tu barbero</p>
+                      <p className="text-base font-semibold text-brand-white">{nombrePro}</p>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-1.5 border-t border-brand-white/10 pt-4">
+                    {lineas.map((l) => (
+                      <li key={l.id} className="flex items-baseline justify-between gap-3 text-sm text-brand-white">
+                        <span>{l.nombre}</span>
+                        <span className="font-mono text-brand-white-dim">
+                          {formatearPrecioServicio(l.precio_centimos, Boolean(l.precio_variable))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="flex items-baseline justify-between border-t border-brand-white/10 pt-4">
+                    <span className="text-sm uppercase tracking-widest text-brand-white-dim">Total</span>
+                    {conCoins ? (
+                      <span className="font-mono text-lg font-semibold text-brand-yellow">0,00 € · {formatearGrassoCoins(costeCoinsCita ?? 0)}</span>
+                    ) : (
+                      <span className="font-display text-3xl text-brand-yellow">
+                        {formatearPrecioServicio(precioTotalCentimos, totalEsVariable)}
+                      </span>
+                    )}
+                  </div>
+
+                  {costeCoinsCita !== null && coinsCubrenCita && (
+                    <label className="flex items-start gap-2 rounded-xl border border-brand-yellow/30 bg-brand-yellow/5 p-3 text-sm text-brand-white">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 accent-brand-yellow"
+                        checked={canjearCoins}
+                        onChange={(e) => setCanjearCoins(e.target.checked)}
+                      />
+                      <span>Pagar con {formatearGrassoCoins(costeCoinsCita)} (tienes {coinsDisponibles})</span>
+                    </label>
+                  )}
+
+                  <p className="flex items-start gap-2 border-t border-brand-white/10 pt-4 text-sm text-brand-white-dim">
+                    <span aria-hidden>📍</span>
+                    <span>
+                      {sedeSeleccionada?.nombre}
+                      {sedeSeleccionada?.direccion ? ` · ${sedeSeleccionada.direccion}` : ""}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <details className="group rounded-xl border border-brand-line px-4 py-3 font-body text-sm text-brand-white-dim">
+                <summary className="cursor-pointer list-none select-none">
+                  {notaCliente.trim() ? "Tu nota para el barbero" : "+ Añadir una nota para el barbero (opcional)"}
+                </summary>
+                <textarea
+                  className="mt-3 w-full resize-none rounded-lg border border-brand-line bg-transparent p-3 text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                  placeholder="Ej.: quiero el mismo corte de la última vez"
+                  rows={2}
+                  maxLength={500}
+                  value={notaCliente}
+                  onChange={(e) => setNotaCliente(e.target.value)}
+                />
+              </details>
+
+              {error && <p role="alert" className="text-center font-body text-sm text-red-400">{error}</p>}
+
+              <button
+                type="button"
+                onClick={confirmarReserva}
+                disabled={enviando}
+                className="w-full rounded-full bg-brand-white px-6 py-4 font-body text-base font-bold uppercase tracking-wider text-brand-black shadow-lg shadow-black/40 transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {enviando ? "Reservando…" : "Confirmar cita"}
+              </button>
+              <p className="text-center font-body text-xs text-brand-white-dim">
+                Te avisaremos de tu cita por WhatsApp. Pagas en la barbería cuando termines.
+              </p>
+
+              <div className="flex items-center justify-between pt-1">
+                <EnlaceVolver
+                  onClick={() => {
+                    setViaAsistente(false);
+                    setPaso("fecha");
+                  }}
+                >
+                  ← Cambiar hora
+                </EnlaceVolver>
+                <button
+                  type="button"
+                  onClick={() => setEditarDatos(true)}
+                  className="font-body text-xs text-brand-white-dim underline underline-offset-4 hover:text-brand-yellow"
+                >
+                  Reservar a nombre de otra persona
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {paso === "datos" && !(perfilCompleto && !editarDatos && slotElegido) && (
           <div className="space-y-4">
             <PasoTitulo>Tus datos</PasoTitulo>
             {/* Antes esta tarjeta era oscura, distinta de las fichas
