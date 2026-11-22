@@ -963,21 +963,28 @@ export default function BookingFlow({
     const servicio = searchParams.get("servicio");
     const barbero = searchParams.get("barbero");
     if (!sede || !servicio || !barbero) return;
-    router.replace("/reservar");
-    if (!sedes.some((s) => s.id === sede) || !servicios.some((s) => s.id === servicio && s.activo)) return;
+    if (!sedes.some((s) => s.id === sede) || !servicios.some((s) => s.id === servicio && s.activo)) {
+      router.replace("/reservar");
+      return;
+    }
     setSedeId(sede);
     setServicioId(servicio);
     setComplementoIds([]);
     setProfesionalId(barbero);
     const elegido = servicios.find((s) => s.id === servicio);
-    setPaso(elegido && esComplemento(elegido) ? "fecha" : "complementos");
+    const destino: Paso = elegido && esComplemento(elegido) ? "fecha" : "complementos";
+    setPaso(destino);
+    // La URL se limpia dejando YA el paso de destino: si se dejaba "/reservar" a secas, el efecto
+    // que sigue a la URL veía "sin paso" y devolvía al cliente al paso 1 (sede) — "Reservar de
+    // nuevo" no funcionaba (22/11/2026).
+    router.replace(`/reservar?paso=${destino}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const crudo = searchParams.get("propuesta");
     if (!crudo) return;
-    router.replace("/reservar");
+    router.replace("/reservar?paso=datos"); // mismo motivo que arriba: elegirPropuestaAsistente deja el paso "datos"
     try {
       const opcion = JSON.parse(crudo) as Partial<OpcionPropuestaCita>;
       if (
