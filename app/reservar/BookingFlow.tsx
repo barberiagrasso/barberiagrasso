@@ -2289,7 +2289,12 @@ export default function BookingFlow({
             </p>
             {citaConfirmada.guardadoEnMovil && (
               <p className="font-body text-sm text-brand-yellow">
-                Te hemos guardado en este móvil: la próxima vez reservas en dos toques.
+                Te hemos creado tu perfil y te hemos guardado en este móvil: la próxima vez reservas en dos toques.
+              </p>
+            )}
+            {!clienteInicial && !citaConfirmada.guardadoEnMovil && (
+              <p className="font-body text-xs text-brand-white-dim">
+                Para ver tu perfil e historial, entra con un código que te mandamos por WhatsApp.
               </p>
             )}
             <div className="flex flex-col items-center gap-2 pt-2 sm:flex-row sm:justify-center">
@@ -2299,19 +2304,19 @@ export default function BookingFlow({
               >
                 Ir a inicio
               </Link>
-              {/* Solo si este móvil le reconoce: con un teléfono que ya
-                  existía y sin sesión, para ver su perfil hay que verificarlo. */}
-              {(clienteInicial || citaConfirmada.guardadoEnMovil) && (
+              {/* Si este móvil le reconoce, directo a su perfil. Si no (teléfono
+                  que ya existía, otro móvil o sesión cerrada), tiene que
+                  verificarse con un código por WhatsApp: así nadie puede
+                  entrar al perfil de otro solo sabiendo su teléfono. */}
               <Link
-                href="/perfil"
+                href={clienteInicial || citaConfirmada.guardadoEnMovil ? "/perfil" : "/acceso"}
                 // El estilo de la página pone a los enlaces el color del texto
                 // (crema): sin forzar el color aquí, el botón salía en blanco.
                 style={{ color: "var(--brand-black)" }}
                 className="rounded-full bg-brand-white px-6 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-brand-black transition-opacity hover:opacity-85"
               >
-                Ir a mi perfil
+                {clienteInicial || citaConfirmada.guardadoEnMovil ? "Ir a mi perfil" : "Entrar a mi perfil"}
               </Link>
-              )}
             </div>
           </div>
         )}
