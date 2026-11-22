@@ -572,6 +572,15 @@ export default function BookingFlow({
   // datos ni el permiso de ofertas — solo ve el resumen y confirma (pedido de David, 22/11/2026).
   // "Reservar a nombre de otra persona" abre el formulario de siempre.
   const [editarDatos, setEditarDatos] = useState(false);
+  // Reservar para varias personas a la vez (padre + hijos…): cada una con su nombre y servicio. Se
+  // reservan justo después de la cita principal, en /api/citas/extras (pedido de David, 22/11/2026).
+  const [personasExtra, setPersonasExtra] = useState<{ id: string; nombre: string; servicioId: string }[]>([]);
+  const [anadiendoPersona, setAnadiendoPersona] = useState(false);
+  const [nuevaPersonaNombre, setNuevaPersonaNombre] = useState("");
+  const [nuevaPersonaServicio, setNuevaPersonaServicio] = useState("");
+  const [resultadosExtra, setResultadosExtra] = useState<
+    { nombre: string; ok: boolean; inicio?: string; profesionalNombre?: string; servicioNombre?: string; error?: string }[]
+  >([]);
   const perfilCompleto =
     !!clienteInicial &&
     clienteInicial.nombre.trim().length > 1 &&
@@ -1120,6 +1129,28 @@ export default function BookingFlow({
       if (!res.ok) {
         setError(json.error || "No se pudo confirmar la reserva.");
         return;
+      }
+      if (perfilCompleto && !editarDatos && personasExtra.length > 0) {
+        try {
+          const resExtra = await fetch("/api/citas/extras", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sedeId,
+              fecha,
+              horaInicioISO: slotElegido.hora_inicio,
+              personas: personasExtra.map((x) => ({ nombre: x.nombre, servicioId: x.servicioId })),
+            }),
+          });
+          const jsonExtra = await resExtra.json().catch(() => null);
+          setResultadosExtra(
+            Array.isArray(jsonExtra?.resultados)
+              ? jsonExtra.resultados
+              : personasExtra.map((x) => ({ nombre: x.nombre, ok: false, error: jsonExtra?.error ?? "No se pudo reservar." })),
+          );
+        } catch {
+          setResultadosExtra(personasExtra.map((x) => ({ nombre: x.nombre, ok: false, error: "No se pudo conectar con el servidor." })));
+        }
       }
       setCitaConfirmada({
         inicio: json.cita.inicio,
@@ -1716,13 +1747,43 @@ export default function BookingFlow({
                     ))}
                   </ul>
 
+                  {personasExtra.length > 0 && (
+                    <ul className="space-y-1.5 border-t border-brand-white/10 pt-4">
+                      {personasExtra.map((x) => {
+                        const sv = servicios.find((y) => y.id === x.servicioId);
+                        return (
+                          <li key={x.id} className="flex items-center justify-between gap-3 text-sm text-brand-white">
+                            <span className="min-w-0">
+                              <span className="font-semibold">{x.nombre}</span>
+                              <span className="text-brand-white-dim"> · {sv?.nombre}</span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-3 font-mono text-brand-white-dim">
+                              {sv ? formatearPrecioServicio(sv.precio_centimos, Boolean(sv.precio_variable)) : ""}
+                              <button
+                                type="button"
+                                aria-label={`Quitar a ${x.nombre}`}
+                                onClick={() => setPersonasExtra((l) => l.filter((y) => y.id !== x.id))}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-line text-brand-white hover:border-brand-yellow"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
                   <div className="flex items-baseline justify-between border-t border-brand-white/10 pt-4">
                     <span className="text-sm uppercase tracking-widest text-brand-white-dim">Total</span>
                     {conCoins ? (
                       <span className="font-mono text-lg font-semibold text-brand-yellow">0,00 € · {formatearGrassoCoins(costeCoinsCita ?? 0)}</span>
                     ) : (
                       <span className="font-display text-3xl text-brand-yellow">
-                        {formatearPrecioServicio(precioTotalCentimos, totalEsVariable)}
+                        {formatearPrecioServicio(
+                          precioTotalCentimos + personasExtra.reduce((t, x) => t + (servicios.find((y) => y.id === x.servicioId)?.precio_centimos ?? 0), 0),
+                          totalEsVariable || personasExtra.some((x) => servicios.find((y) => y.id === x.servicioId)?.precio_variable),
+                        )}
                       </span>
                     )}
                   </div>
@@ -1749,6 +1810,67 @@ export default function BookingFlow({
                 </div>
               </div>
 
+              {anadiendoPersona ? (
+                <div className="space-y-3 rounded-xl border border-brand-yellow/40 bg-brand-yellow/5 p-4 font-body">
+                  <p className="text-sm font-semibold text-brand-white">¿Quién más viene?</p>
+                  <input
+                    className="w-full rounded-lg border border-brand-line bg-transparent p-3 text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
+                    placeholder="Nombre (ej.: Lucas, mi hijo)"
+                    maxLength={40}
+                    value={nuevaPersonaNombre}
+                    onChange={(e) => setNuevaPersonaNombre(e.target.value)}
+                  />
+                  <select
+                    className="w-full rounded-lg border border-brand-line bg-brand-black p-3 text-brand-white focus:border-brand-yellow focus:outline-none"
+                    value={nuevaPersonaServicio}
+                    onChange={(e) => setNuevaPersonaServicio(e.target.value)}
+                  >
+                    <option value="">Elige su servicio…</option>
+                    {serviciosDeSede
+                      .filter((x) => x.activo && !esComplemento(x))
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.nombre} · {formatearPrecioServicio(x.precio_centimos, Boolean(x.precio_variable))}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-brand-white-dim">
+                    Le buscamos hueco a la misma hora con otro barbero; si no hay, justo después.
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <button type="button" onClick={() => setAnadiendoPersona(false)} className="text-sm text-brand-white-dim underline underline-offset-4">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={nuevaPersonaNombre.trim().length < 2 || !nuevaPersonaServicio}
+                      onClick={() => {
+                        setPersonasExtra((l) => [
+                          ...l,
+                          { id: String(Date.now()), nombre: nuevaPersonaNombre.trim(), servicioId: nuevaPersonaServicio },
+                        ]);
+                        setNuevaPersonaNombre("");
+                        setNuevaPersonaServicio("");
+                        setAnadiendoPersona(false);
+                      }}
+                      className="rounded-full bg-brand-yellow px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-brand-yellow-ink disabled:opacity-40"
+                    >
+                      Añadir
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                personasExtra.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setAnadiendoPersona(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-yellow/50 px-4 py-3.5 font-body text-sm font-semibold text-brand-yellow transition hover:bg-brand-yellow/10"
+                  >
+                    <span aria-hidden className="text-lg leading-none">+</span> Añadir otra persona o servicio
+                  </button>
+                )
+              )}
+
               <details className="group rounded-xl border border-brand-line px-4 py-3 font-body text-sm text-brand-white-dim">
                 <summary className="cursor-pointer list-none select-none">
                   {notaCliente.trim() ? "Tu nota para el barbero" : "+ Añadir una nota para el barbero (opcional)"}
@@ -1771,7 +1893,7 @@ export default function BookingFlow({
                 disabled={enviando}
                 className="w-full rounded-full bg-brand-white px-6 py-4 font-body text-base font-bold uppercase tracking-wider text-brand-black shadow-lg shadow-black/40 transition active:scale-[0.98] disabled:opacity-50"
               >
-                {enviando ? "Reservando…" : "Confirmar cita"}
+                {enviando ? "Reservando…" : personasExtra.length > 0 ? `Confirmar ${personasExtra.length + 1} citas` : "Confirmar cita"}
               </button>
               <p className="text-center font-body text-xs text-brand-white-dim">
                 Te avisaremos de tu cita por WhatsApp. Pagas en la barbería cuando termines.
@@ -1986,6 +2108,25 @@ export default function BookingFlow({
               Total:{" "}
               {formatearPrecioServicio(precioTotalCentimos, totalEsVariable)}
             </p>
+            {resultadosExtra.length > 0 && (
+              <ul className="space-y-2 border-t border-brand-yellow/30 pt-3 text-left font-body text-sm">
+                {resultadosExtra.map((r, i) => (
+                  <li key={i} className={r.ok ? "text-brand-white" : "text-red-300"}>
+                    <span className="font-semibold">{r.nombre}</span>
+                    {r.ok && r.inicio ? (
+                      <>
+                        {" · "}
+                        {new Date(r.inicio).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}
+                        {r.servicioNombre ? ` · ${r.servicioNombre}` : ""}
+                        {r.profesionalNombre ? ` · ${r.profesionalNombre}` : ""}
+                      </>
+                    ) : (
+                      <> · No se pudo reservar: {r.error} Llámanos o escríbenos y lo arreglamos.</>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="font-body text-xs text-brand-white-dim">
               Te avisaremos por WhatsApp antes de tu cita.
             </p>
