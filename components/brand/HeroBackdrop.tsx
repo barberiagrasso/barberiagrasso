@@ -58,23 +58,102 @@ export function HeroBackdrop() {
     return () => clearTimeout(id);
   }, []);
 
-  // A veces el navegador deja un vídeo en pausa por su cuenta (cambio de
-  // pestaña, ahorro de batería, algún hipo del autoplay al cargar) y,
-  // como aquí no hay controles ni nada que vuelva a darle a "play", se
-  // quedaría parado para siempre. Esto reintenta reanudarlo; si el
-  // navegador lo vuelve a bloquear no pasa nada, se reintenta en el
-  // próximo evento.
+  // A veces el navegador deja un vídeo en pausa o congelado por su cuenta
+  // (cambio de pestaña, ahorro de batería, red lenta, hipo del autoplay) y,
+  // como aquí no hay controles, se quedaría parado para siempre.
+  // Estas funciones lo reanudan y, si hace falta, lo recargan.
+  const ultimoTiempo = useRef<number[]>([]);
+  const congelado = useRef<number[]>([]);
+  const visible = useRef<boolean[]>([]);
+
   function intentarReanudar(video: HTMLVideoElement | null) {
     if (!video) return;
     // iOS solo deja arrancar solo si el silencio está puesto como propiedad
     // (React a veces solo pone el atributo).
     video.muted = true;
-    if (video.paused) video.play().catch(() => {});
+    video.defaultMuted = true;
+    if (video.paused || video.ended) video.play().catch(() => {});
+  }
+
+  function recargar(video: HTMLVideoElement | null) {
+    if (!video) return;
+    try {
+      video.load();
+    } catch {}
+    intentarReanudar(video);
   }
 
   function reanudarTodos() {
     videoRefs.current.forEach(intentarReanudar);
   }
+
+  function ponerVisible(i: number, valor: boolean) {
+    if (visible.current[i] === valor) return;
+    visible.current[i] = valor;
+    marcar(i, valor);
+  }
+
+  // Vigilante: cada 1,5 s comprueba que el tiempo de cada vídeo avanza de
+  // verdad. Si no avanza, oculta ese vídeo (se ve la foto, nunca un
+  // fotograma congelado) e intenta arreglarlo: primero play(), y si sigue
+  // igual, recarga el vídeo.
+  useEffect(() => {
+    if (movimientoReducido) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      videoRefs.current.forEach((v, i) => {
+        if (!v) return;
+        const antes = ultimoTiempo.current[i] ?? -1;
+        const ahora = v.currentTime;
+        ultimoTiempo.current[i] = ahora;
+        const avanza =
+          !v.paused && !v.ended && v.readyState >= 2 && Math.abs(ahora - antes) > 0.05;
+        if (avanza) {
+          congelado.current[i] = 0;
+          ponerVisible(i, true);
+          return;
+        }
+        const n = (congelado.current[i] ?? 0) + 1;
+        congelado.current[i] = n;
+        if (n >= 2) ponerVisible(i, false);
+        if (n === 1 || n === 2) intentarReanudar(v);
+        else if (n >= 3 && n % 3 === 0) {
+          // Sigue sin avanzar: recarga completa del vídeo.
+          recargar(v);
+        } else intentarReanudar(v);
+      });
+    }, 1500);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimientoReducido, cargarResto]);
+
+  // Reintentos al volver a la página, recuperar el foco o tocar la
+  // pantalla (el modo de bajo consumo de iPhone solo deja arrancar tras un
+  // gesto del usuario).
+  useEffect(() => {
+    if (movimientoReducido) return;
+    const reintentar = () => reanudarTodos();
+    const onVis = () => {
+      if (document.visibilityState === "visible") reanudarTodos();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", reintentar);
+    window.addEventListener("focus", reintentar);
+    window.addEventListener("online", reintentar);
+    window.addEventListener("touchstart", reintentar, { passive: true });
+    window.addEventListener("click", reintentar, { passive: true });
+    window.addEventListener("scroll", reintentar, { passive: true });
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", reintentar);
+      window.removeEventListener("focus", reintentar);
+      window.removeEventListener("online", reintentar);
+      window.removeEventListener("touchstart", reintentar);
+      window.removeEventListener("click", reintentar);
+      window.removeEventListener("scroll", reintentar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimientoReducido]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -91,36 +170,11 @@ export function HeroBackdrop() {
     return () => clearInterval(id);
   }, [movimientoReducido]);
 
-  // Cada vez que toca cambiar de clip nos aseguramos de que el nuevo
-  // (y, ya de paso, el resto) esté reproduciéndose de verdad.
-  // Si un vídeo no arranca en 3 s, no lo ponemos encima (queda la foto).
-  useEffect(() => {
-    const id = setTimeout(() => {
-      videoRefs.current.forEach((v, i) => {
-        if (v && v.paused) marcar(i, false);
-      });
-    }, 3000);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activo]);
-
+  // Al cambiar de clip nos aseguramos de que el nuevo esté reproduciéndose.
   useEffect(() => {
     reanudarTodos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo]);
-
-  // Al volver a esta pestaña tras estar en segundo plano, algunos
-  // navegadores dejan los vídeos pausados aunque autoplay/loop sigan
-  // activos — se reintenta en cuanto vuelve a estar visible.
-  useEffect(() => {
-    function onVisibilityChange() {
-      if (document.visibilityState === "visible") reanudarTodos();
-    }
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div
@@ -156,12 +210,23 @@ export function HeroBackdrop() {
             loop
             playsInline
             preload="auto"
-            onPlaying={() => marcar(i, true)}
-            onPause={(e) => {
-              marcar(i, false);
-              intentarReanudar(e.currentTarget);
+            onPlaying={() => {
+              ultimoTiempo.current[i] = -1;
+              congelado.current[i] = 0;
             }}
-            onError={() => marcar(i, false)}
+            onPause={(e) => intentarReanudar(e.currentTarget)}
+            onWaiting={() => {
+              congelado.current[i] = Math.max(congelado.current[i] ?? 0, 1);
+            }}
+            onStalled={(e) => intentarReanudar(e.currentTarget)}
+            onSuspend={(e) => intentarReanudar(e.currentTarget)}
+            onEnded={(e) => intentarReanudar(e.currentTarget)}
+            onCanPlay={(e) => intentarReanudar(e.currentTarget)}
+            onError={(e) => {
+              ponerVisible(i, false);
+              const v = e.currentTarget;
+              setTimeout(() => recargar(v), 2000);
+            }}
             disablePictureInPicture
             className="absolute inset-0 h-full w-full scale-105 object-cover transition-opacity ease-in-out"
             style={{
