@@ -496,7 +496,19 @@ export default function BookingFlow({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [paso, setPaso] = useState<Paso>("sede");
+  // "Reservar de nuevo": el estado ya arranca con sede, servicio y barbero puestos y en el paso de
+  // destino, para que no se vea ni un instante la pantalla de la sede (22/11/2026).
+  const [prefillRepetir] = useState(() => {
+    const sede = searchParams.get("sede");
+    const servicio = searchParams.get("servicio");
+    const barbero = searchParams.get("barbero");
+    if (!sede || !servicio || !barbero) return null;
+    const elegido = servicios.find((x) => x.id === servicio && x.activo);
+    if (!sedes.some((x) => x.id === sede) || !elegido) return null;
+    return { sede, servicio, barbero, paso: (esComplemento(elegido) ? "fecha" : "complementos") as Paso };
+  });
+  const prefillPendiente = useRef(prefillRepetir !== null);
+  const [paso, setPaso] = useState<Paso>(prefillRepetir?.paso ?? "sede");
   // Servicio cuyas fotos de trabajos se están viendo (hoja "Ver trabajos").
   const [trabajosDe, setTrabajosDe] = useState<{ id: string; nombre: string } | null>(null);
   // true cuando la cita en curso viene de aceptar una propuesta del
@@ -504,11 +516,11 @@ export default function BookingFlow({
   // elegirse a mano paso a paso — solo afecta a qué "origen" se manda a
   // /api/citas (para el desglose por canal de los informes), nada más.
   const [viaAsistente, setViaAsistente] = useState(false);
-  const [sedeId, setSedeId] = useState<string | null>(null);
-  const [servicioId, setServicioId] = useState<string | null>(null);
+  const [sedeId, setSedeId] = useState<string | null>(prefillRepetir?.sede ?? null);
+  const [servicioId, setServicioId] = useState<string | null>(prefillRepetir?.servicio ?? null);
   const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
   const [complementoIds, setComplementoIds] = useState<string[]>([]);
-  const [profesionalId, setProfesionalId] = useState<string | null>(null); // null = cualquiera
+  const [profesionalId, setProfesionalId] = useState<string | null>(prefillRepetir?.barbero ?? null); // null = cualquiera
   const [profesionales, setProfesionales] = useState<ProfesionalOpcion[]>([]);
   const [cargandoProfesionales, setCargandoProfesionales] = useState(false);
   const [errorProfesionales, setErrorProfesionales] = useState(false);
@@ -1034,7 +1046,11 @@ export default function BookingFlow({
   // asistente de varios pasos).
   useEffect(() => {
     const deURL = searchParams.get("paso");
-    if (deURL === paso) return;
+    if (deURL === paso) {
+      prefillPendiente.current = false;
+      return;
+    }
+    if (!deURL && prefillPendiente.current) return; // "Reservar de nuevo": la URL aún se está limpiando
     if (!deURL) {
       // Sin ?paso en la URL: es el primer paso ("sede"). Antes esto se
       // ignoraba, así que volver aquí sin remontar el componente (p.ej.
