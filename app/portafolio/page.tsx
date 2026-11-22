@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/public";
 import { cargarFotosPortafolio, cargarResenasExternas } from "@/lib/portafolio";
+import { FOTOS_PORTAFOLIO_FIJAS } from "@/lib/portafolioFijo";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { JourneyHeader } from "@/components/journey/JourneyHeader";
@@ -59,7 +60,7 @@ export default async function PortafolioPage() {
             </div>
           )}
 
-          <PortafolioPublico fotos={fotos} servicios={servicios ?? []} sedes={sedes ?? []} />
+          <PortafolioPublico fotos={[...fotos, ...FOTOS_PORTAFOLIO_FIJAS]} servicios={servicios ?? []} sedes={sedes ?? []} />
         </div>
       </main>
 
