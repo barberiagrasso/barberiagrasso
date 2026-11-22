@@ -22,6 +22,7 @@ const SOLO_ADMIN = new Set([
   "/admin/mi-barberia",
   "/admin/errores",
   "/admin/rendimiento",
+  "/admin/pendientes",
 ]);
 
 // Menú más corto que antes (pedido de Diego): Servicios, Productos y
@@ -66,6 +67,7 @@ const GRUPOS: { label: string; items: { href: string; label: string }[] }[] = [
     { href: "/admin/mi-barberia", label: "Mi barbería" },
     { href: "/admin/auditoria", label: "Auditoría" },
     { href: "/admin/errores", label: "Errores" },
+    { href: "/admin/pendientes", label: "Pendientes" },
   ] },
 ];
 

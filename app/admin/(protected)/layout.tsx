@@ -8,6 +8,7 @@ import SignOutButton from "./SignOutButton";
 import NuevaCitaRapida from "./NuevaCitaRapida";
 import WhatsAppFlotante from "./WhatsAppFlotante";
 import InactividadAutoLogout from "./InactividadAutoLogout";
+import { pendientesAbiertos } from "@/lib/pendientes";
 
 // Cuántos días hacia atrás se cuentan los fallos del asistente para el
 // aviso — lo suficiente para no perder de vista uno del fin de semana sin
@@ -69,6 +70,8 @@ export default async function ProtectedAdminLayout({
       .eq("estado", "pendiente"),
   ]);
 
+  const pendientes = admin.rol === "admin" ? await pendientesAbiertos().catch(() => []) : [];
+
   return (
     <div className="min-h-screen bg-stone-50 md:pl-20 print:pl-0">
       <InactividadAutoLogout />
@@ -97,6 +100,16 @@ export default async function ProtectedAdminLayout({
           </div>
         </div>
       </header>
+      {pendientes.length > 0 && (
+        <div className="border-b border-red-300 bg-red-50 px-4 py-2 print:hidden">
+          <div className="mx-auto max-w-6xl text-sm font-medium text-red-800">
+            <Link href="/admin/pendientes" className="underline decoration-red-400 underline-offset-2">
+              ⚠️ {pendientes.length} tarea{pendientes.length === 1 ? "" : "s"} importante{pendientes.length === 1 ? "" : "s"} por hacer
+              {pendientes.some((p) => p.prioridad === "urgente") ? " (hay urgentes de seguridad)" : ""} — ver lista
+            </Link>
+          </div>
+        </div>
+      )}
       {((escaladasPendientes ?? 0) > 0 ||
         (fallosRecientes ?? 0) > 0 ||
         (admin.rol === "admin" && (erroresSinResolver ?? 0) > 0) ||
