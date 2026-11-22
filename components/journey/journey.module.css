@@ -103,8 +103,8 @@
 /* Oculto hasta que recibe foco por teclado (Tab); al enfocar baja por encima
    de la cabecera. Ver JourneyHeader.tsx. */
 .skipLink {
-  position: fixed; top: env(safe-area-inset-top); left: var(--pad); z-index: 100;
-  transform: translateY(-120%);
+  position: fixed; top: 0; left: var(--pad); z-index: 100;
+  transform: translateY(-150%);
   background: var(--brand-yellow); color: var(--brand-yellow-ink);
   font-size: 14px; font-weight: 600;
   padding: 10px 18px;
@@ -112,7 +112,7 @@
   text-decoration: none;
   transition: transform .2s var(--ease);
 }
-.skipLink:focus { transform: translateY(0); }
+.skipLink:focus { transform: translateY(env(safe-area-inset-top)); }
 /* Logo a la izquierda (pedido de Diego, 09/11/2026): antes iba centrado con position:absolute;
    ahora es un elemento normal del flex, primero en el DOM, pegado al borde izquierdo. */
 .siteHeaderLogo { flex: 0 0 auto; display: flex; align-items: center; }
