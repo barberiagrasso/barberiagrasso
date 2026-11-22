@@ -4,6 +4,23 @@ Actualizado: 15/11/2026. Todo el código ya está en `main` y publicado en Verce
 Lo que queda son activaciones que necesitan acceso a Supabase, Vercel o
 cuentas externas. Marca cada punto cuando esté hecho.
 
+## 0. SEGURIDAD — lo primero (auditoría 22/11/2026)
+
+- [ ] Ejecutar `supabase/seguridad-solo-dueno.sql`: ahora mismo un barbero
+      con su usuario podría leer o borrar los datos de todos los clientes
+      directamente en la base de datos, saltándose la app.
+- [ ] Vercel: añadir `WHATSAPP_APP_SECRET` (Meta → la app de WhatsApp →
+      Configuración → Básica → "Clave secreta de la app"). Sin ella, alguien
+      que conozca la dirección del webhook puede hacerse pasar por un
+      cliente por WhatsApp y cancelarle citas. Con ella, los mensajes
+      falsos se rechazan solos.
+- [ ] Vercel: añadir `CLIENTE_SESSION_SECRET` (una frase larga al azar).
+- [ ] Rotar las claves que se pegaron en el chat (service role de
+      Supabase, token de WhatsApp, clave de Anthropic, token de GitHub,
+      CRON_SECRET).
+- [ ] GitHub: poner el repositorio en **privado** y activar Dependabot
+      (Settings → Code security) para avisos de librerías con fallos.
+
 ## 1. Probador de estilos con IA (sección "Asesor" del panel)
 
 La pizarra, la guía de estilos y el visagismo ya funcionan. Falta la

@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
     // hoy — pasar a rechazar de verdad (401) es poner
     // WHATSAPP_FIRMA_ESTRICTA=true en Vercel, sin volver a desplegar nada.
     const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (!appSecret) {
+      console.warn("[webhook whatsapp] Falta WHATSAPP_APP_SECRET: no se puede comprobar que el mensaje venga de Meta.");
+    }
     if (appSecret) {
       const firmaHeader = request.headers.get("x-hub-signature-256");
       if (!firmaWebhookValida(cuerpoCrudo, firmaHeader, appSecret)) {
@@ -44,7 +47,11 @@ export async function POST(request: NextRequest) {
           mensaje:
             "Firma inválida en un mensaje entrante de WhatsApp (revisa WHATSAPP_APP_SECRET en Vercel si esto se repite para todos los mensajes).",
         });
-        if (process.env.WHATSAPP_FIRMA_ESTRICTA === "true") {
+        // Auditoría 22/11/2026: un mensaje con firma falsa podía hacerse
+        // pasar por cualquier cliente y pedirle a la IA que cancelara sus
+        // citas. Ahora se rechaza siempre (solo se puede relajar a propósito
+        // con WHATSAPP_FIRMA_ESTRICTA=false, para diagnosticar).
+        if (process.env.WHATSAPP_FIRMA_ESTRICTA !== "false") {
           return NextResponse.json({ ok: false }, { status: 401 });
         }
       }

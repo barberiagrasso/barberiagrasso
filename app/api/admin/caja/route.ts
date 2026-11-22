@@ -141,6 +141,9 @@ export async function POST(request: NextRequest) {
     const foto = form.get("foto");
     if (!(foto instanceof File) || foto.size === 0) return NextResponse.json({ error: "Haz la foto del sobre antes de cerrar." }, { status: 400 });
     if (foto.size > 10 * 1024 * 1024) return NextResponse.json({ error: "La foto es demasiado grande." }, { status: 400 });
+    if (!["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"].includes(foto.type || "image/jpeg")) {
+      return NextResponse.json({ error: "La foto del sobre tiene que ser una imagen." }, { status: 400 });
+    }
     const ruta = `${sede.id}/${fecha}-${Date.now()}.jpg`;
     const { error: errFoto } = await supabase.storage.from(BUCKET).upload(ruta, foto, { contentType: foto.type || "image/jpeg" });
     if (errFoto) return NextResponse.json({ error: "No se pudo subir la foto del sobre." }, { status: 500 });
