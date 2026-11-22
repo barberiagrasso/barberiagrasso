@@ -542,6 +542,9 @@ export default function BookingFlow({
   const [telefono, setTelefono] = useState((clienteInicial?.telefono ?? "").replace(/^\+34/, ""));
   const telefonoCompleto = /^\s*(\+|00)/.test(telefono) ? telefono : `+34${telefono}`;
   const [email, setEmail] = useState(clienteInicial?.email ?? "");
+  // Email obligatorio (pedido de David, 22/11/2026): para avisos importantes
+  // y, si el cliente marca la casilla, para promociones.
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
   // Comentario libre del cliente para el último paso ("¿algún
   // comentario o petición para tu visita?"), inspirado en Booksy —
   // pedido de Diego 19/10/2026. Opcional, se guarda junto a la cita.
@@ -741,7 +744,7 @@ export default function BookingFlow({
           profesionalId,
           fecha,
           flexibilidadDias: flexibilidadListaEspera,
-          cliente: { nombre, telefono: telefonoCompleto, email: email || null },
+          cliente: { nombre, telefono: telefonoCompleto, email: email.trim() },
           aceptaComercial,
         }),
       });
@@ -1069,7 +1072,7 @@ export default function BookingFlow({
           profesionalId: profesionalId || slotElegido.profesional_id,
           fecha,
           horaInicioISO: slotElegido.hora_inicio,
-          cliente: { nombre, telefono: telefonoCompleto, email: email || null },
+          cliente: { nombre, telefono: telefonoCompleto, email: email.trim() },
           aceptaComercial,
           complementoIds,
           notaCliente: notaCliente.trim() || null,
@@ -1534,7 +1537,7 @@ export default function BookingFlow({
                       </p>
                     )}
                     <BotonPrimario
-                      disabled={!nombre || !telefono || enviandoListaEspera}
+                      disabled={!nombre || !telefono || !emailValido || enviandoListaEspera}
                       onClick={apuntarseAListaEspera}
                     >
                       {enviandoListaEspera
@@ -1712,7 +1715,8 @@ export default function BookingFlow({
               </div>
               <input
                 className="w-full rounded-lg border border-brand-line bg-transparent p-3 font-body text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
-                placeholder="Email (opcional)"
+                placeholder="Email"
+                required
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -1720,6 +1724,9 @@ export default function BookingFlow({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
+              {email.trim() !== "" && !emailValido && (
+                <p className="-mt-1 font-body text-xs text-red-400">Revisa el email: parece que le falta algo.</p>
+              )}
               <textarea
                 className="w-full resize-none rounded-lg border border-brand-line bg-transparent p-3 font-body text-sm text-brand-white placeholder:text-brand-white-dim focus:border-brand-yellow focus:outline-none"
                 placeholder="¿Algún comentario o petición para tu visita? (opcional)"
@@ -1768,7 +1775,7 @@ export default function BookingFlow({
                 ← Cambiar hora
               </EnlaceVolver>
               <BotonPrimario
-                disabled={!nombre || !telefono || enviando}
+                disabled={!nombre || !telefono || !emailValido || enviando}
                 onClick={confirmarReserva}
               >
                 {enviando ? "Reservando…" : "Confirmar cita"}

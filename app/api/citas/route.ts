@@ -52,7 +52,11 @@ export async function POST(request: NextRequest) {
   // cliente; solo se le apunta la cita.
   const actual = await obtenerClienteActual();
   const canjearGrassoCoins = Boolean(body.canjearGrassoCoins);
-  const email = typeof body.cliente.email === "string" && body.cliente.email.trim() ? body.cliente.email.trim().slice(0, 120) : null;
+  const email = typeof body.cliente.email === "string" ? body.cliente.email.trim().slice(0, 120) : "";
+  // Email obligatorio (pedido de David, 22/11/2026).
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return NextResponse.json({ error: "Escribe un email válido para poder reservar." }, { status: 400 });
+  }
   let datosCliente = { nombre, telefono, email };
   if (canjearGrassoCoins) {
     if (!actual) return NextResponse.json({ error: "Para canjear GrassoCoins entra en tu perfil." }, { status: 401 });
