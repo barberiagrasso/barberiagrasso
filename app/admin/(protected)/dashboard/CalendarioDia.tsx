@@ -1446,7 +1446,7 @@ function MenuCreacion({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1rem))]"
       onClick={onCerrar}
     >
       <div
@@ -1725,7 +1725,7 @@ function EditarBloqueoModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1rem))]"
       onClick={onCerrar}
     >
       <div
@@ -1866,7 +1866,7 @@ function DetalleCitaPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1rem))]"
       onClick={onCerrar}
     >
       <div
@@ -2195,7 +2195,7 @@ function ReciboPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10"
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1rem))]"
       onClick={() => onCerrar(cambioRealizado)}
     >
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>

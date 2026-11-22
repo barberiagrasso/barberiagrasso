@@ -60,6 +60,8 @@ body {
   overflow-x: clip;
   max-width: 100%;
   touch-action: manipulation; /* sin zoom por doble toque */
+  padding-top: env(safe-area-inset-top); /* la app instalada pinta bajo el reloj: dejamos ese hueco */
+  padding-bottom: env(safe-area-inset-bottom);
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body);

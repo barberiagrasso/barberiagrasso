@@ -77,12 +77,12 @@ export default async function ProtectedAdminLayout({
       <InactividadAutoLogout />
       <header className="border-b border-black/10 bg-brand-black print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2">
+          <Link href="/admin/dashboard" className="flex min-h-11 items-center gap-2" aria-label="Ir a la agenda">
             <GrassoMark className="h-6 w-6 text-brand-yellow" />
             <span className="font-heading text-lg italic text-brand-white">
               Barbería Grasso
             </span>
-          </div>
+          </Link>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-body text-sm text-brand-white-dim">
             <span>{admin.nombre || "Administrador"}</span>
             <Link

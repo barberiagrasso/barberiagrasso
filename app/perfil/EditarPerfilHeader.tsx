@@ -84,7 +84,7 @@ function ModalEditarPerfil({ cliente, onCerrar }: { cliente: ClienteEditable; on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16" onClick={onCerrar}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-[max(4rem,calc(env(safe-area-inset-top)+1rem))]" onClick={onCerrar}>
       <div
         className="w-full max-w-sm rounded-2xl border border-brand-line bg-brand-black-soft p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}

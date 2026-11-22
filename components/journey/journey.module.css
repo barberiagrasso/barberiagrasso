@@ -95,15 +95,15 @@
 .siteHeader {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
   display: flex; align-items: center; gap: 28px;
-  padding: 18px var(--pad);
+  padding: calc(18px + env(safe-area-inset-top)) var(--pad) 18px;
   transition: background .4s, padding .4s;
 }
-.siteHeader.scrolled { background: rgba(11,11,10,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding-top: 12px; padding-bottom: 12px; }
+.siteHeader.scrolled { background: rgba(11,11,10,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: 12px; }
 
 /* Oculto hasta que recibe foco por teclado (Tab); al enfocar baja por encima
    de la cabecera. Ver JourneyHeader.tsx. */
 .skipLink {
-  position: fixed; top: 0; left: var(--pad); z-index: 100;
+  position: fixed; top: env(safe-area-inset-top); left: var(--pad); z-index: 100;
   transform: translateY(-120%);
   background: var(--brand-yellow); color: var(--brand-yellow-ink);
   font-size: 14px; font-weight: 600;
@@ -159,4 +159,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .journeyPage *, .journeyPage *::before, .journeyPage *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Botón "Inicio" flotante (abajo a la izquierda) en todas las pantallas menos la portada. */
+.homePill {
+  position: fixed; left: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 45;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border-radius: 999px; border: 1px solid rgba(245, 241, 230, .25);
+  background: rgba(11, 11, 10, .85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--brand-white); font-size: 14px; font-weight: 600; text-decoration: none;
 }

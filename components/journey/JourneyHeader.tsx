@@ -11,6 +11,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { GrassoLogo } from "@/components/brand/GrassoLogo";
 import { CerrarSesionButton } from "@/components/brand/CerrarSesionButton";
 import styles from "./journey.module.css";
@@ -28,6 +29,7 @@ export interface JourneyHeaderProps {
 
 export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     const header = headerRef.current;
@@ -78,6 +80,11 @@ export function JourneyHeader({ cliente, variante }: JourneyHeaderProps) {
           </>
         )}
       </div>
+      {pathname !== "/" && (
+        <Link href="/" className={styles.homePill} aria-label="Ir al inicio">
+          <span aria-hidden>←</span> Inicio
+        </Link>
+      )}
     </header>
   );
 }

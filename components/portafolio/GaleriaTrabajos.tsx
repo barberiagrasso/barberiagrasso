@@ -85,7 +85,7 @@ function VisorFotos({ fotos, inicial, onCerrar }: { fotos: FotoGaleria[]; inicia
         else if (dx < -50) siguiente();
       }}
     >
-      <div className="flex items-center justify-between px-4 py-3 text-white">
+      <div className="flex items-center justify-between px-4 pb-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+0.5rem))] text-white">
         <span className="font-mono text-xs tracking-wider text-white/60">
           {indice + 1} / {fotos.length}
         </span>
@@ -93,7 +93,7 @@ function VisorFotos({ fotos, inicial, onCerrar }: { fotos: FotoGaleria[]; inicia
           type="button"
           onClick={onCerrar}
           aria-label="Cerrar"
-          className="rounded-full px-3 py-1.5 font-body text-sm text-white/80 hover:bg-white/10"
+          className="min-h-11 rounded-full px-4 py-2 font-body text-sm text-white/80 hover:bg-white/10"
         >
           Cerrar ✕
         </button>

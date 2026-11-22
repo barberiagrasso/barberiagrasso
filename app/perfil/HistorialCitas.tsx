@@ -440,7 +440,7 @@ export function HistorialCitas({
 
       {reciboAbierto && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-10"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1rem))]"
           onClick={() => setReciboAbierto(null)}
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 text-stone-900 shadow-xl" onClick={(e) => e.stopPropagation()}>
