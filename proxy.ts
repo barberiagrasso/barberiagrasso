@@ -13,6 +13,16 @@ export async function proxy(request: NextRequest) {
   // de iniciar sesión en vez de mandar siempre a la home / al dashboard.
   request.headers.set("x-pathname", request.nextUrl.pathname + request.nextUrl.search);
 
+  // La app instalada se abre en "/?app=1" (app/manifest.ts): se recuerda con
+  // una cookie para enseñarle siempre la portada "de app" y no la web.
+  if (request.nextUrl.pathname === "/" && request.nextUrl.searchParams.get("app") === "1") {
+    const limpia = request.nextUrl.clone();
+    limpia.searchParams.delete("app");
+    const r = NextResponse.redirect(limpia);
+    r.cookies.set("grasso_app", "1", { path: "/", maxAge: 60 * 60 * 24 * 365 * 2, sameSite: "lax", httpOnly: true, secure: true });
+    return r;
+  }
+
   // Camino rápido para quien no tiene sesión de Supabase: no hay nada que
   // refrescar, así que no se llama a Supabase (ahorra segundos al abrir la
   // app). La portada y la reserva se ven sin cuenta (01/11/2026); solo el

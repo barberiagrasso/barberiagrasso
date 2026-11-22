@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Barbería Grasso",
     short_name: "Grasso",
     description: "Reserva tu cita en Barbería Grasso — Los Molinos y Avenida de las Ciudades",
-    start_url: "/",
+    start_url: "/?app=1",
     scope: "/",
     display: "standalone",
     lang: "es-ES",

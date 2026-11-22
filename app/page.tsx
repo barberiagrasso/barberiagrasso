@@ -4,6 +4,8 @@ import { obtenerClienteActual } from "@/lib/sesionCliente";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cargarResenasExternas } from "@/lib/portafolio";
 import { NuevaHomeClient } from "./nueva-home/NuevaHomeClient";
+import { HomeApp } from "@/components/home/HomeApp";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +63,17 @@ export default async function Home() {
         }
       : null;
 
+  // Cliente ya reconocido, o la app instalada en el móvil (cookie que pone
+  // proxy.ts al abrirla desde el icono): portada "de app" de siempre. El
+  // visitante nuevo de la web ve la portada nueva (pedido de David, 22/11).
+  const esApp = (await cookies()).get("grasso_app")?.value === "1";
+  if (cliente || esApp) {
+    return <HomeApp cliente={cliente ? { nombre: cliente.nombre } : null} sedes={sedes ?? []} resenas={resenas} repetir={repetir} />;
+  }
+
   return (
     <NuevaHomeClient
-      cliente={cliente ? { nombre: cliente.nombre } : null}
+      cliente={null}
       sedes={sedes ?? []}
       resenas={resenas}
       repetir={repetir}
