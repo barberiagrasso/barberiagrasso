@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public";
 import { cargarFotosPortafolio, cargarResenasExternas } from "@/lib/portafolio";
 import { FOTOS_PORTAFOLIO_FIJAS } from "@/lib/portafolioFijo";
+import Link from "next/link";
 import { obtenerClienteActual } from "@/lib/sesionCliente";
 import { NotasResenas } from "@/components/portafolio/NotasResenas";
 import { JourneyHeader } from "@/components/journey/JourneyHeader";
@@ -59,6 +60,54 @@ export default async function PortafolioPage() {
               )}
             </div>
           )}
+
+          {/* Guía de estilos de Grasso (cartel). Al tocarla se abre en grande
+              para ampliarla con los dedos. */}
+          <section style={{ marginBottom: 32 }}>
+            <h2
+              style={{
+                marginBottom: 8,
+                fontSize: 12,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                textAlign: "center",
+                opacity: 0.85,
+              }}
+            >
+              ¿Qué estilo llevas hoy?
+            </h2>
+            <a
+              href="/media/cartel-estilos.jpg"
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: "block", overflow: "hidden", borderRadius: 12, border: "1px solid rgba(255,255,255,0.15)" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/media/cartel-estilos.jpg"
+                alt="Guía de estilos de Barbería Grasso: cortes, barbas, cortes infantiles y servicios"
+                style={{ display: "block", width: "100%", height: "auto" }}
+              />
+            </a>
+            <p style={{ marginTop: 6, textAlign: "center", fontSize: 12, opacity: 0.7 }}>
+              Toca la imagen para verla en grande.
+            </p>
+            <Link
+              href="/estilo"
+              style={{
+                display: "block",
+                marginTop: 12,
+                padding: "12px 16px",
+                textAlign: "center",
+                fontSize: 14,
+                fontWeight: 600,
+                borderRadius: 12,
+                border: "1px solid rgba(240,200,40,0.5)",
+              }}
+            >
+              ✨ ¿No sabes cuál elegir? Descubre tu estilo con IA
+            </Link>
+          </section>
 
           <PortafolioPublico fotos={[...fotos, ...FOTOS_PORTAFOLIO_FIJAS]} servicios={servicios ?? []} sedes={sedes ?? []} />
         </div>
